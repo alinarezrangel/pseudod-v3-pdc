@@ -1,0 +1,4 @@
+variable hola
+fijar hola a 12
+escribir hola
+nl

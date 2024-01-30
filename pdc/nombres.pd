@@ -1,0 +1,195 @@
+utilizar bepd/builtins
+utilizar bepd/datos/caja (Caja)
+utilizar bepd/utilidades/texto (Unir)
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+
+utilizar pdc/cst como CST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback, CrearCST)
+utilizar pdc/catamorfismos (Buscando)
+
+
+variable NombreResuelto
+fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
+    {binding}, VERDADERO,
+    {nombre}, FALSO,
+    {esAutoejecutable}, FALSO,
+    {importadoDesde}, FALSO,
+    {seLlamaba}, FALSO
+
+variable UsoDeNombre
+fijar UsoDeNombre a CrearTipoDeRegistro: {UsoDeNombre},
+    {idNodo}, VERDADERO,
+    {binding}, FALSO
+
+variable DefiniciónDeNombre
+fijar DefiniciónDeNombre a CrearTipoDeRegistro: {DefiniciónDeNombre},
+    {idNodo}, VERDADERO,
+    {binding}, VERDADERO
+
+variable Ámbitos
+fijar Ámbitos a CrearTipoDeRegistro: {Ámbitos},
+    {idNodo}, VERDADERO,
+    {ámbito}, FALSO
+
+clase Ámbito
+    metodo estatico desde: tablaNombres, ámbitoSuperior
+    metodo estatico inicial: tablaNombres
+
+    metodo crear: nombre, esAutoejecutable
+    metodo intentaResolver: nombre
+    metodo esAutoejecutable: binding
+    metodo obtenerBinding
+finclase
+
+atributos Ámbito#tablaNombres, Ámbito#_porNombre, Ámbito#_númBindings, Ámbito#_ámbitoSuperior
+
+metodo estatico Ámbito#desde: tablaNombres, ámbitoSuperior
+    devolver yo#crear: tablaNombres, ámbitoSuperior
+finmetodo
+
+metodo estatico Ámbito#inicial: tablaNombres
+    devolver yo#crear: tablaNombres, NULO
+finmetodo
+
+metodo Ámbito#inicializar: tablaNombres, ámbitoSuperior
+    fijar yo#tablaNombres a tablaNombres
+    fijar yo#_ámbitoSuperior a ámbitoSuperior
+    fijar yo#_porNombre a Diccionario#vacío
+    si no EsNulo: yo#_ámbitoSuperior
+        fijar yo#_númBindings a yo#_ámbitoSuperior#_númBindings
+    sino
+        fijar yo#_númBindings a Caja#crear: 0
+    finsi
+finmetodo
+
+metodo Ámbito#obtenerBinding
+    variable binding
+    fijar binding a yo#_númBindings#valor
+    fijar yo#_númBindings#valor a yo#_númBindings#valor + 1
+    devolver binding
+finmetodo
+
+metodo Ámbito#crear: nombre, esAutoejecutable
+    variable reg
+    fijar reg a NombreResuelto#crear: yo#obtenerBinding, nombre, esAutoejecutable, NULO, NULO
+    yo#_porNombre#fijarEn: nombre, reg
+    yo#tablaNombres#agregar: reg
+    devolver reg
+finmetodo
+
+metodo Ámbito#intentaResolver: nombre
+    si yo#_porNombre#contiene: nombre
+        devolver yo#_porNombre#en: nombre
+    sino
+        si no EsNulo: yo#_ámbitoSuperior
+            devolver yo#_ámbitoSuperior#intentaResolver: nombre
+        sino
+            devolver NULO
+        finsi
+    finsi
+finmetodo
+
+metodo Ámbito#esAutoejecutable: binding
+    variable reg
+    fijar reg a yo#tablaNombres#buscarÚnico: {binding}, binding
+    devolver reg#esAutoejecutable
+finmetodo
+
+metodo Ámbito#comoTexto
+    variable nombres
+    fijar nombres a Arreglo#vacio
+    yo#_porNombre#paraCadaPar: procedimiento: nombre, datos
+        nombres#agregarAlFinal: ({~t: ~t}#formatear: datos#binding, nombre)
+    finprocedimiento
+    devolver {(Ámbito ~t ~t)}#formatear:
+        ((no EsNulo: yo#_ámbitoSuperior)#escojer: {(con sup.)}, {}),
+        (Unir: nombres, {, })
+finmetodo
+
+clase TablasDeResoluciónDeNombres
+    atributos tablaNombres, tablaUsos, tablaDefiniciones, tablaÁmbitos
+finclase
+
+funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
+    Buscando: cst, funcion: nodo
+        si EsInstancia: nodo, CST#NodoIdentificador
+            devolver no nodo#esLiteral
+        finsi
+        devolver (EsInstancia: nodo, CST#NodoBloque)
+              || (EsInstancia: nodo, CST#NodoFunción)
+              || (EsInstancia: nodo, CST#NodoMétodo)
+              || (EsInstancia: nodo, CST#NodoFunciónAnónima)
+    finfuncion, funcion: nodo
+        si EsInstancia: nodo, CST#NodoIdentificador
+            necesitas no nodo#esLiteral
+            si nodo#esDefinición
+                variable reg
+                fijar reg a ámbito#crear: nodo#nombre, nodo#esDefiniciónAutoejecutable
+                tablas#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: nodo#id, reg#binding)
+            sino
+                variable reg
+                fijar reg a ámbito#intentaResolver: nodo#nombre
+                si EsNulo: reg
+                    Escribir:
+                        (ErrorComoTraceback:
+                            (Error#conMensajeYLugar:
+                                ({Variable ~t no exíste}#formatear: nodo#nombre),
+                                nodo#áreaTextual))
+                    __FallarConMensaje: {nombre no encontrado}
+                finsi
+                tablas#tablaUsos#agregar: (UsoDeNombre#crear: nodo#id, reg#binding)
+            finsi
+            devolver NULO
+        finsi
+
+        si EsInstancia: nodo, CST#NodoBloque
+            variable fin
+            fijar fin a Arreglo#vacio
+            fijar nodo#ámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+            tablas#tablaÁmbitos#agregar: (Ámbitos#crear: nodo#id, nodo#ámbito)
+            nodo#recursivo: procedimiento: subnodo
+                devolver ResolverNombres: subnodo, tablas, nodo#ámbito, fin
+            finprocedimiento
+            ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
+            devolver NULO
+        finsi
+
+        si (EsInstancia: nodo, CST#NodoFunciónAnónima)
+            || (EsInstancia: nodo, CST#NodoFunción)
+            || (EsInstancia: nodo, CST#NodoMétodo)
+            variable tieneYo
+            si EsInstancia: nodo, CST#NodoFunciónAnónima
+                fijar tieneYo a nodo#esMétodo
+            sino
+                fijar tieneYo a EsInstancia: nodo, CST#NodoMétodo
+            finsi
+
+            si EsInstancia: nodo, CST#NodoMétodo
+                ResolverNombres: nodo#deClase, tablas, ámbito, paraElFinDelÁmbito
+            finsi
+            si EsInstancia: nodo, CST#NodoFunción
+                ResolverNombres: nodo#nombre, tablas, ámbito, paraElFinDelÁmbito
+            finsi
+
+            fijar nodo#ámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+            si tieneYo
+                variable reg
+                fijar reg a nodo#ámbito#crear: {yo}, FALSO
+                tablas#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: nodo#id, reg#binding)
+            finsi
+            tablas#tablaÁmbitos#agregar: (Ámbitos#crear: nodo#id, nodo#ámbito)
+            paraElFinDelÁmbito#agregarAlFinal: procedimiento
+                variable fin
+                fijar fin a Arreglo#vacio
+                ParaCadaElemento: nodo#parámetros, procedimiento: param
+                    devolver ResolverNombres: param, tablas, nodo#ámbito, fin
+                finprocedimiento
+                ResolverNombres: nodo#cuerpo, tablas, nodo#ámbito, fin
+                ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
+            finprocedimiento
+            devolver NULO
+        finsi
+    finfuncion
+finfuncion

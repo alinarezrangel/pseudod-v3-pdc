@@ -1,0 +1,5 @@
+variable X
+fijar X a funcion: A
+    escribir A
+    devolver A + 1
+finfuncion

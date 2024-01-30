@@ -1,0 +1,496 @@
+utilizar bepd/builtins
+utilizar bepd/datos/caja (Caja)
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+utilizar bepd/utilidades/arreglo (Únicos)
+utilizar bepd/x/enum (Enum)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback, CrearCST)
+utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+utilizar pdc/catamorfismos (Buscando)
+utilizar pdc/abstraer (Abstraer)
+utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
+
+
+procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
+    ParaCadaNúmero: 0, arr#longitud, procedimiento: i
+        variable j
+        fijar j a (arr#longitud - 1) - i
+        devolver %proc: (arr#en: j), j
+    finprocedimiento
+finprocedimiento
+
+
+variable Opcode
+fijar Opcode a Enum: {Opcode},
+    {csaltar},
+    {saltar},
+    {enviarMensaje},
+    {etiqueta},
+    {variadic},
+    {fijarLocal},
+    {fijarLocalC},
+    {obtenerLocal},
+    {obtenerLocalC},
+    {caja},
+    {fijarCaja},
+    {fijarCajaC},
+    {obtenerCaja},
+    {obtenerCajaC},
+    {prn},
+    {prnl},
+    {assert},
+    {devolverN},
+    {empujarNúmero},
+    {empujarTexto},
+    {empujarNulo},
+    {negar},
+    {sonIdénticos},
+    {obtenerObjeto},
+    {capturas},
+    {locales},
+    {mkclz}
+
+clase Etiqueta
+    atributo id
+    metodo estatico vacía
+finclase
+
+metodo estatico Etiqueta#vacía
+    devolver yo#crear
+finmetodo
+
+metodo Etiqueta#comoTexto
+    devolver {etq:~t}#formatear: yo#id
+finmetodo
+
+clase FunciónIR
+    atributos id, instrucciones
+finclase
+
+metodo FunciónIR#inicializar: instrucciones
+    fijar yo#instrucciones a instrucciones
+finmetodo
+
+clase Emisor
+    atributos instrucciones, funciones, idDeEtiqueta, idDeFunción
+
+    metodo emitir: opcode, ...args
+    metodo moverAFunción
+    metodo combinar: subEmisor
+    metodo ajustarEtiqueta: etiqueta
+finclase
+
+metodo estatico Emisor#subEmisor: emisorPadre
+    variable c
+    fijar c a yo#crear
+    fijar c#idDeEtiqueta a emisorPadre#idDeEtiqueta
+    fijar c#idDeFunción a emisorPadre#idDeFunción
+    devolver c
+finmetodo
+
+metodo Emisor#inicializar
+    fijar yo#instrucciones a Arreglo#vacio
+    fijar yo#funciones a Arreglo#vacio
+    fijar yo#idDeEtiqueta a Caja#crear: 0
+    fijar yo#idDeFunción a Caja#crear: 0
+finmetodo
+
+metodo Emisor#emitir: ...tupla
+    necesitas tupla#longitud > 0
+    yo#instrucciones#agregarAlFinal: tupla
+finmetodo
+
+metodo Emisor#moverAFunción
+    variable func
+    fijar func a FunciónIR#crear: yo#instrucciones
+    fijar func#id a yo#idDeFunción#valor
+    fijar yo#idDeFunción#valor a yo#idDeFunción#valor + 1
+    yo#funciones#agregarAlFinal: func
+    fijar yo#instrucciones a Arreglo#vacio
+    devolver func
+finmetodo
+
+metodo Emisor#combinar: subEmisor
+    ParaCadaElemento: subEmisor#funciones, procedimiento: func
+        yo#funciones#agregarAlFinal: func
+    finprocedimiento
+finmetodo
+
+metodo Emisor#ajustarEtiqueta: etiqueta
+    fijar etiqueta#id a yo#idDeEtiqueta#valor
+    fijar yo#idDeEtiqueta#valor a yo#idDeEtiqueta#valor + 1
+    yo#emitir: Opcode#etiqueta, etiqueta#id
+finmetodo
+
+
+procedimiento EscribirEmisor: emisor
+    procedimiento escribirInstrucciones: pref, instrs
+        ParaCadaElemento: instrs, procedimiento: instr
+            escribir pref#comoTexto
+            escribir {    }
+            escribir (instr#en: 0)#nombre
+            ParaCadaNúmero: 1, instr#longitud, procedimiento: i
+                escribir {	}
+                escribir (instr#en: i)#comoTexto
+            finprocedimiento
+            nl
+        finprocedimiento
+    finprocedimiento
+
+    Escribir: {.instrucciones}
+    escribirInstrucciones: {}, emisor#instrucciones
+    Escribir: {.funciones}
+    ParaCadaElemento: emisor#funciones, procedimiento: func
+        Escribir: {  .func}, func#id
+        escribirInstrucciones: {  }, func#instrucciones
+    finprocedimiento
+finprocedimiento
+
+
+clase EstadoDeEmisión
+    atributos tablasRnAst, tablasMcAst, emisor, locales, capturas
+finclase
+
+metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor
+    devolver yo#crear: tablasRnAst, tablasMcAst, emisor
+finmetodo
+
+metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor
+    fijar yo#tablasRnAst a tablasRnAst
+    fijar yo#tablasMcAst a tablasMcAst
+    fijar yo#emisor a emisor
+    fijar yo#locales a Diccionario#vacío
+    fijar yo#capturas a Diccionario#vacío
+finmetodo
+
+metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
+    variable reg
+    fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
+    si EsNulo: reg
+        fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
+    finsi
+    si EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
+        si yo#locales#contiene: reg#binding
+            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
+        finsi
+    sino
+        si yo#locales#contiene: reg#binding
+            yo#emisor#emitir: Opcode#fijarCaja, (yo#locales#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#fijarCajaC, (yo#capturas#en: reg#binding)
+        finsi
+    finsi
+finmetodo
+
+metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
+    variable reg
+    fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
+    si EsNulo: reg
+        fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
+    finsi
+    si EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
+        si yo#locales#contiene: reg#binding
+            yo#emisor#emitir: Opcode#obtenerLocal, (yo#locales#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#obtenerLocalC, (yo#capturas#en: reg#binding)
+        finsi
+    sino
+        si yo#locales#contiene: reg#binding
+            yo#emisor#emitir: Opcode#obtenerCaja, (yo#locales#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#obtenerCajaC, (yo#capturas#en: reg#binding)
+        finsi
+    finsi
+finmetodo
+
+metodo EstadoDeEmisión#subestado: emisor, locales, capturas
+    variable sub
+    fijar sub a EstadoDeEmisión#crear
+    fijar sub#tablasRnAst a yo#tablasRnAst
+    fijar sub#tablasMcAst a yo#tablasMcAst
+    fijar sub#emisor a emisor
+    fijar sub#locales a locales
+    fijar sub#capturas a capturas
+    devolver sub
+finmetodo
+
+funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor
+    variables reg, locales, capturas, sub
+
+    fijar reg a tablasMcAst#tablaCapturas#buscarÚnico: {idNodo}, nodoConCapturas#id
+    fijar capturas a Diccionario#vacío
+    ParaCadaElementoConÍndice: reg#bindingsCapturados, procedimiento: binding, i
+        capturas#fijarEn: binding, i
+    finprocedimiento
+    emisor#emitir: Opcode#capturas, reg#bindingsCapturados#longitud
+
+    fijar reg a tablasMcAst#tablaLocales#buscarÚnico: {idNodo}, nodoConCapturas#id
+    fijar locales a Diccionario#vacío
+    ParaCadaElementoConÍndice: reg#bindingsLocales, procedimiento: binding, i
+        locales#fijarEn: binding, i
+    finprocedimiento
+    emisor#emitir: Opcode#locales, reg#bindingsLocales#longitud
+
+    devolver ObjetoAdHoc: {locales}, locales,
+                          {capturas}, capturas
+finfuncion
+
+metodo EstadoDeEmisión#inicializarVariable: nodoIdentificador
+    variable reg
+    fijar reg a yo#tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
+    si EsNulo: reg
+        fijar reg a yo#tablasRnAst#tablaUsos#buscarÚnico: {idNodo}, nodoIdentificador#id
+    finsi
+
+    si no EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
+        yo#emisor#emitir: Opcode#caja
+    finsi
+    si yo#capturas#contiene: reg#binding
+        yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
+    sino
+        yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
+    finsi
+finmetodo
+
+metodo EstadoDeEmisión#emitir: ast
+    si EsInstancia: ast, AST#NodoBloque
+        ParaCadaElemento: ast#cuerpo, &(yo#emitir)
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoPrograma
+        variables sub, caps
+        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst, yo#emisor
+        fijar sub a yo#subestado: yo#emisor, caps#locales, caps#capturas
+        sub#emitir: ast#cuerpo
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoIdentificador
+        [ Solo maneja los usos de un nombre. Las definiciones son manejadas manualmente ]
+        yo#emitirObtenerIdentificador: ast
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoVariable
+        yo#emisor#emitir: Opcode#empujarNulo
+        yo#inicializarVariable: ast#nombre
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoFijar
+        yo#emitir: ast#expresión
+        yo#emitirFijarIdentificador: ast#objetivo
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoEscribir
+        yo#emitir: ast#expresión
+        yo#emisor#emitir: Opcode#prn
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoNl
+        yo#emisor#emitir: Opcode#prnl
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoNecesitas
+        yo#emitir: ast#expresión
+        yo#emisor#emitir: Opcode#assert
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoDevolver
+        yo#emitir: ast#expresión
+        yo#emisor#emitir: Opcode#devolverN, 1
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoSi
+        variable etqSino, etqFinsi
+        fijar etqSino a Etiqueta#vacía
+        fijar etqFinsi a Etiqueta#vacía
+
+        yo#emitir: ast#condición
+        yo#emisor#emitir: Opcode#csaltar, etqSino
+        yo#emitir: ast#cuerpoSiVerdadero
+        yo#emisor#emitir: Opcode#saltar, etqFinsi
+        yo#emisor#ajustarEtiqueta: etqSino
+        yo#emitir: ast#cuerpoSiFalso
+        yo#emisor#ajustarEtiqueta: etqFinsi
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoMientras
+        variable etqInicio, etqFinmientras
+        fijar etqInicio a Etiqueta#vacía
+        fijar etqFinmientras a Etiqueta#vacía
+
+        yo#emisor#ajustarEtiqueta: etqInicio
+        yo#emitir: ast#condición
+        yo#emisor#emitir: Opcode#csaltar, etqFinmientras
+        yo#emitir: ast#cuerpo
+        yo#emisor#emitir: Opcode#saltar, etqInicio
+        yo#emisor#ajustarEtiqueta: etqFinmientras
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoUtilizar
+        NoImplementado
+    finsi
+
+    si EsInstancia: ast, AST#NodoLiteralNumérica
+        yo#emisor#emitir: Opcode#empujarNúmero, ast#valor
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoLiteralTextual
+        yo#emisor#emitir: Opcode#empujarTexto, ast#valor
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoEnviarMensaje
+        variable proto
+        yo#emitir: ast#objeto
+        ParaCadaElemento: ast#argumentos, funcion: arg
+            yo#emitir: arg#expresión
+        finfuncion
+        fijar proto a Mapear: ast#argumentos, funcion: arg
+            devolver arg#esVariadic#escojer: 1, 0
+        finfuncion
+        yo#emisor#emitir: Opcode#enviarMensaje, ast#mensaje, proto
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoFunciónAnónima
+        variables sub, caps, emisor, func
+        fijar emisor a Emisor#subEmisor: yo#emisor
+        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst, emisor
+        fijar sub a yo#subestado: emisor, caps#locales, caps#capturas
+        ParaCadaElementoEnReversaConÍndice: ast#parámetros, procedimiento: param, i
+            si param#esVariadic
+                sub#emisor#emitir: Opcode#variadic, i
+            finsi
+            sub#inicializarVariable: param#identificador
+        finprocedimiento
+        sub#emitir: ast#cuerpo
+        sub#emisor#emitir: Opcode#empujarNulo
+        sub#emisor#emitir: Opcode#devolverN, 1
+
+        fijar func a sub#emisor#moverAFunción
+        yo#emisor#combinar: sub#emisor
+        caps#capturas#paraCadaLlave: procedimiento: binding
+            si yo#capturas#contiene: binding
+                yo#emisor#emitir: Opcode#obtenerLocalC, (yo#capturas#en: binding)
+            sino
+                yo#emisor#emitir: Opcode#obtenerLocal, (yo#locales#en: binding)
+            finsi
+        finprocedimiento
+        yo#emisor#emitir: Opcode#mkclz, func#id, caps#capturas#longitud
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoNo
+        yo#emitir: ast#expresión
+        yo#emisor#emitir: Opcode#negar
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoSonIdénticos
+        yo#emitir: ast#lhs
+        yo#emitir: ast#rhs
+        yo#emisor#emitir: Opcode#sonIdénticos
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoBuiltin
+        si ast#nombre = {objeto}
+            yo#emisor#emitir: Opcode#obtenerObjeto
+            devolver NULO
+        finsi
+        Escribir: {Builtin}, ast#nombre
+        NoImplementado
+    finsi
+
+    Escribir: ast
+    Inalcanzable
+finmetodo
+
+
+variables T, A, cst, tablaCst, ast, tablaAst, tablaNombres, parches, tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin
+fijar A a __Argv#en: 0
+fijar T a LeerArchivo: A
+
+fijar parches a Arreglo#vacio
+
+fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
+
+fijar tablasRnCst a TablasDeResoluciónDeNombres#crear
+fijar tablasRnCst#tablaNombres a tablaNombres
+fijar tablasRnCst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+fijar tablasRnCst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+fijar tablasRnCst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+
+fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
+fijar tablasRnAst#tablaNombres a tablaNombres
+fijar tablasRnAst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+fijar tablasRnAst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+fijar tablasRnAst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+
+fijar cst a CrearCST: T, A
+fijar tablaCst a EntablarÁrbol: cst
+fijar fin a Arreglo#vacio
+ResolverNombres: cst, tablasRnCst, (Ámbito#inicial: tablaNombres), fin
+ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
+ValidaLlamadasAutoejecutables: cst, tablasRnCst
+
+fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parches
+fijar tablaAst a EntablarÁrbol: ast
+ParaCadaElemento: parches, (MétodoComoFunción: {llamar})
+ValidaDevolverFueraDeFunción: ast
+
+variables pos, def, tablasMcAst
+fijar pos a Diccionario#vacío
+fijar def a Arreglo#vacio
+fijar tablaEsCap a Tabla#vacíaConEsquema: EsCapturada
+fijar tablaCaps a Tabla#vacíaConEsquema: CapturasDeFunción
+fijar tablaLoc a Tabla#vacíaConEsquema: LocalesDeFunción
+fijar tablasMcAst a TablasDeCapturas#crear
+fijar tablasMcAst#tablaLocales a tablaLoc
+fijar tablasMcAst#tablaCapturas a tablaCaps
+fijar tablasMcAst#tablaEsCapturada a tablaEsCap
+MarcarCapturas: ast, tablasRnAst, tablasMcAst, pos, def
+
+Escribir: ast
+Escribir: { AST ================================================== }
+EscribirTabla: tablaAst
+Escribir: { NOMS ================================================== }
+EscribirTabla: tablaNombres
+Escribir: { USOS AST ================================================== }
+EscribirTabla: tablasRnAst#tablaUsos
+Escribir: { DEFS AST ================================================== }
+EscribirTabla: tablasRnAst#tablaDefiniciones
+Escribir: { AMB AST ================================================== }
+EscribirTabla: tablasRnAst#tablaÁmbitos
+Escribir: { ESCAP ================================================== }
+EscribirTabla: tablaEsCap
+Escribir: { CAPS ================================================== }
+EscribirTabla: tablaCaps
+Escribir: { LOCS ================================================== }
+EscribirTabla: tablaLoc
+
+variables emisor, estado
+fijar emisor a Emisor#crear
+fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor
+estado#emitir: ast
+
+EscribirEmisor: emisor

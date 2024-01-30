@@ -1,0 +1,472 @@
+utilizar bepd/builtins
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback, CrearCST)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+
+
+funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
+    procedimiento registrarParche: parche
+        parches#agregarAlFinal: parche
+    finprocedimiento
+
+    funcion abstraer: nodoCst
+        devolver Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
+    finfuncion
+
+    funcion abstraer': nodoCst, ámbito
+        devolver Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbito
+    finfuncion
+
+    funcion abstraerArgumentos: args
+        devolver Mapear: args, funcion: arg
+            variable mapeo
+            si EsInstancia: arg, AST#Nodo
+                fijar mapeo a &Identidad
+            sino
+                fijar mapeo a &abstraer
+            finsi
+            si EsInstancia: arg, CST#NodoVariadic
+                devolver AST#NodoArgumento#crear: arg#áreaTextual,
+                    (%mapeo: arg#interno), VERDADERO
+            sino
+                devolver AST#NodoArgumento#crear: arg#áreaTextual,
+                    (%mapeo: arg), FALSO
+            finsi
+        finfuncion
+    finfuncion
+
+    si EsInstancia: nodoCst, CST#NodoPrograma
+        devolver AST#NodoPrograma#crear: nodoCst#áreaTextual, (abstraer: nodoCst#instrucciones)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoBloque
+        variables bloque, ámbitoDelBloque
+        fijar ámbitoDelBloque a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#id
+        fijar bloque a AST#NodoBloque#crear: nodoCst#áreaTextual,
+            (AplanarTodo: (Mapear: nodoCst#instrucciones, funcion: nodoCst
+                devolver abstraer': nodoCst, ámbitoDelBloque#ámbito
+            finfuncion))
+        registrarParche: procedimiento
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: bloque#id, ámbitoDelBloque#ámbito)
+        finprocedimiento
+        devolver bloque
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoVariable
+        devolver Mapear: nodoCst#nombres, funcion: nombre
+            devolver AST#NodoVariable#crear: nodoCst#áreaTextual, (abstraer: nombre)
+        finfuncion
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoFijar
+        si EsInstancia: nodoCst#objetivo, CST#NodoEnviarMensaje
+            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#objetivo#objeto),
+                ({fijar_}#concatenar: nodoCst#objetivo#mensaje),
+                (abstraerArgumentos:
+                    (Concatenar: (Mapear: nodoCst#objetivo#argumentos, &abstraer),
+                        (Arreglo#crearCon: (abstraer: nodoCst#valor))))
+        sino
+            devolver AST#NodoFijar#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#objetivo), (abstraer: nodoCst#valor)
+        finsi
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoEscribir
+        devolver AST#NodoEscribir#crear: nodoCst#áreaTextual, (abstraer: nodoCst#valor)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoNl
+        devolver AST#NodoNl#crear: nodoCst#áreaTextual
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoClase
+        [ clase CLASE hereda BASE DECLR... finclase ]
+        [  =>  ]
+        variables cuerpo, base
+        funcion usoNombre
+            variable usoNombre', reg
+            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
+            fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
+            registrarParche: procedimiento
+                tablasRnAst#tablaUsos#agregar: (DefiniciónDeNombre#crear: usoNombre'#id, reg#binding)
+            finprocedimiento
+            devolver usoNombre'
+        finfuncion
+
+        fijar cuerpo a Arreglo#vacio
+        [ variable CLASE ]
+        cuerpo#agregarAlFinal: (AST#NodoVariable#crear: nodoCst#nombre#áreaTextual, (abstraer: nodoCst#nombre))
+        [ fijar CLASE a BASE#subclase ]
+        si no EsNulo: nodoCst#claseBase
+            fijar base a abstraer: nodoCst#claseBase
+        sino
+            fijar base a AST#NodoBuiltin#crear: nodoCst#áreaTextual, {objeto}
+        finsi
+        cuerpo#agregarAlFinal:
+            (AST#NodoFijar#crear: nodoCst#áreaTextual,
+                usoNombre,
+                (AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                    base, {subclase}, Arreglo#vacio))
+        [ fijar CLASE#nombre a {CLASE} ]
+        cuerpo#agregarAlFinal:
+            (AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                usoNombre, {fijar_nombre},
+                (abstraerArgumentos: (Arreglo#crearCon:
+                    (AST#NodoLiteralTextual#crear: nodoCst#áreaTextual, nodoCst#nombre#nombre))))
+
+        ParaCadaElemento: nodoCst#declaraciones, procedimiento: declr
+            si EsInstancia: declr, CST#NodoDeclaraciónDeAtributosEnClase
+                ParaCadaElemento: declr#nombres, funcion: attr
+                    [ CLASE#agregarAtributo: {ATTR} ]
+                    cuerpo#agregarAlFinal:
+                        (AST#NodoEnviarMensaje#crear: declr#áreaTextual,
+                            usoNombre, {agregarAtributo},
+                            (abstraerArgumentos: (Arreglo#crearCon:
+                                (AST#NodoLiteralTextual#crear: attr#áreaTextual, attr#nombre))))
+                finfuncion
+                devolver NULO
+            finsi
+            si EsInstancia: declr, CST#NodoDeclaraciónDeMétodoEnClase
+                [ Nada que hacer... ]
+                devolver NULO
+            finsi
+            Inalcanzable
+        finprocedimiento
+
+        devolver cuerpo
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoFunción
+        variables fn, ámbito
+        funcion usoNombre
+            variable usoNombre', reg
+            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
+            fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
+            registrarParche: procedimiento
+                tablasRnAst#tablaUsos#agregar: (DefiniciónDeNombre#crear: usoNombre'#id, reg#binding)
+            finprocedimiento
+            devolver usoNombre'
+        finfuncion
+        fijar ámbito a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#id
+        fijar fn a AST#NodoFunciónAnónima#crear: nodoCst#áreaTextual,
+            (Mapear: nodoCst#parámetros, funcion: param
+                 si EsInstancia: param, CST#NodoVariadic
+                     devolver AST#NodoParámetro#crear: param#áreaTextual,
+                         (abstraer': param#interno, ámbito#ámbito), VERDADERO
+                 sino
+                     devolver AST#NodoParámetro#crear: param#áreaTextual,
+                         (abstraer': param, ámbito#ámbito), FALSO
+                 finsi
+             finfuncion),
+             (abstraer': nodoCst#cuerpo, ámbito#ámbito)
+        registrarParche: procedimiento
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: fn#id, ámbito#ámbito)
+        finprocedimiento
+        devolver Arreglo#crearCon:
+            (AST#NodoVariable#crear: nodoCst#áreaTextual, (abstraer: nodoCst#nombre)),
+            (AST#NodoFijar#crear: nodoCst#áreaTextual, usoNombre, fn)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoNecesitas
+        devolver AST#NodoNecesitas#crear: nodoCst#áreaTextual, (abstraer: nodoCst#expresión)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoDevolver
+        devolver AST#NodoDevolver#crear: nodoCst#áreaTextual, (abstraer: nodoCst#expresión)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoSi
+        devolver AST#NodoSi#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#condición), (abstraer: nodoCst#siVerdadero), (abstraer: nodoCst#siFalso)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoMientras
+        devolver AST#NodoMientras#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#condiciónal), (abstraer: nodoCst#cuerpo)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoMétodo
+        variables reg, binding, yo, ámbito, met
+        fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}
+        fijar reg a tablasRnCst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoCst#id
+        fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
+        registrarParche: procedimiento
+            tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: yo#id, reg#binding)
+        finprocedimiento
+        fijar ámbito a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#id
+
+        fijar met a AST#NodoFunciónAnónima#crear: nodoCst#áreaTextual,
+            (Concatenar:
+                (Arreglo#crearCon:
+                    (AST#NodoParámetro#crear: nodoCst#áreaTextual, yo, FALSO)),
+                (Mapear: nodoCst#parámetros, funcion: param
+                    si EsInstancia: param, CST#NodoVariadic
+                        devolver AST#NodoParámetro#crear: param#áreaTextual,
+                            (abstraer': param#interno, ámbito#ámbito), VERDADERO
+                    sino
+                        devolver AST#NodoParámetro#crear: param#áreaTextual,
+                            (abstraer': param, ámbito#ámbito), FALSO
+                    finsi
+                finfuncion)),
+            (abstraer': nodoCst#cuerpo, ámbito#ámbito)
+
+        registrarParche: procedimiento
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: met#id, ámbito#ámbito)
+        finprocedimiento
+
+        [ metodo CLASE#NOMBRE: ...P CUERPO finmetodo ]
+        [  =>  ]
+        [ CLASE#agregarMetodo: {NOMBRE}, funcion: yo, ...P CUERPO finfuncion ]
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#deClase),
+            (nodoCst#esEstático#escojer: {agregarMetodoEstatico}, {agregarMetodo}),
+            (abstraerArgumentos:
+                (Arreglo#crearCon:
+                    (AST#NodoLiteralTextual#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre),
+                    met))
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoAtributos
+        [ atributo CLASE#NOMBRE ]
+        [ => ]
+        devolver Mapear: nodoCst#nombres, funcion: nombre
+            [ CLASE#agregarAtributo: {NOMBRE} ]
+            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#deClase),
+                {agregarAtributo},
+                (abstraerArgumentos: (Arreglo#crearCon: (AST#NodoLiteralTextual#crear: nombre#áreaTextual, nombre#nombre)))
+        finfuncion
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoUtilizar
+        variables ns, nombres
+        si no EsNulo: nodoCst#espacioDeNombres
+            fijar ns a abstraer: nodoCst#espacioDeNombres
+        finsi
+        si no EsNulo: nodoCst#nombresEspecíficos
+            fijar nombres a Mapear: nodoCst#nombresEspecíficos, funcion: nombreORenombre
+                si EsInstancia: nombreORenombre, CST#NodoIdentificador
+                    devolver AST#NodoNombreEspecífico#crear: nombreORenombre#áreaTextual, (abstraer: nombreORenombre), NULO
+                sino
+                    devolver AST#NodoNombreEspecífico#crear: (nombreORenombre#en: 1)#áreaTextual,
+                        (abstraer: (nombreORenombre#en: 0)), (abstraer: (nombreORenombre#en: 1))
+                finsi
+            finfuncion
+        finsi
+        devolver AST#NodoUtilizar#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#módulo),
+            ns,
+            (Mapear: nodoCst#nombresEspecíficos)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoIdentificador
+        si nodoCst#esLiteral
+            devolver AST#NodoLiteralTextual#crear: nodoCst#áreaTextual, nodoCst#nombre
+        finsi
+        variables binding, reg, id
+        fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre
+        fijar reg a tablasRnCst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoCst#id
+        si no EsNulo: reg
+            fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
+            registrarParche: procedimiento
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
+            finprocedimiento
+        sino
+            fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#id
+            fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
+            registrarParche: procedimiento
+                tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: id#id, reg#binding)
+            finprocedimiento
+        finsi
+        si binding#esAutoejecutable && nodoCst#aplicaAutoejecución
+            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual, id, {llamar}, Arreglo#vacio
+        sino
+            devolver id
+        finsi
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoNumeroLiteral
+        devolver AST#NodoLiteralNumérica#crear: nodoCst#áreaTextual, nodoCst#valor
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoTextoLiteral
+        devolver AST#NodoLiteralTextual#crear: nodoCst#áreaTextual, nodoCst#valor
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoLlamarProcedimiento
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#proc),
+            {llamar},
+            (abstraerArgumentos: nodoCst#argumentos)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoEnviarMensaje
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#objeto),
+            nodoCst#mensaje,
+            (abstraerArgumentos: nodoCst#argumentos)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoOperador
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#lhs),
+            ({operador_}#concatenar: nodoCst#op#contenido),
+            (abstraerArgumentos: (Arreglo#crearCon: nodoCst#rhs))
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoNoLlamar
+        si nodoCst#mensajes#longitud = 0
+            devolver abstraer: nodoCst#base
+        sino
+            variables fn, idParam, idArg, mensajes, nombreParam, ámbito, reg
+            fijar nombreParam a {parámetro implícito de &()}
+            fijar ámbito a Ámbito#desde: ámbitoActual#tablaNombres, ámbitoActual
+            fijar reg a ámbito#crear: nombreParam, FALSO
+
+            fijar idParam a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam
+            fijar idArg a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam
+
+            fijar mensajes a Reducir: (abstraer: nodoCst#base), funcion: acc, mensaje
+                devolver AST#NodoEnviarMensaje#crear: mensaje#áreaTextual, acc, mensaje#contenido, Arreglo#vacio
+            finfuncion, nodoCst#mensajes
+            mensajes#argumentos#agregarAlFinal: (AST#NodoArgumento#crear: nodoCst#áreaTextual, idArg, VERDADERO)
+            fijar fn a AST#NodoFunciónAnónima#crear: nodoCst#áreaTextual,
+                (Arreglo#crearCon: (AST#NodoParámetro#crear: nodoCst#áreaTextual, idParam, VERDADERO)),
+                (AST#NodoDevolver#crear: nodoCst#áreaTextual, mensajes)
+
+            registrarParche: procedimiento
+                tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: idParam#id, reg#binding)
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: idArg#id, reg#binding)
+                tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: fn#id, ámbito)
+            finprocedimiento
+
+            devolver fn
+        finsi
+        devolver NULO
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoAutoejecutar
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+            (abstraer: nodoCst#expr),
+            {llamar},
+            (abstraerArgumentos: nodoCst#argumentos)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoFunciónAnónima
+        variables yo', fn, ámbito
+        fijar yo' a Arreglo#vacio
+        si nodoCst#esMétodo
+            variables yo, reg, binding
+            fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}
+            yo'#agregarAlFinal:
+                (AST#NodoParámetro#crear: nodoCst#áreaTextual, yo, FALSO)
+
+            fijar reg a tablasRnCst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoCst#id
+            fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
+            registrarParche: procedimiento
+                tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: yo#id, reg#binding)
+            finprocedimiento
+        finsi
+        fijar ámbito a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#id
+
+        fijar fn a AST#NodoFunciónAnónima#crear: nodoCst#áreaTextual,
+            (Concatenar: yo',
+                (Mapear: nodoCst#parámetros, funcion: param
+                        si EsInstancia: param, CST#NodoVariadic
+                            devolver AST#NodoParámetro#crear: param#áreaTextual,
+                            (abstraer': param#interno, ámbito#ámbito), VERDADERO
+                        sino
+                            devolver AST#NodoParámetro#crear: param#áreaTextual,
+                            (abstraer': param, ámbito#ámbito), FALSO
+                        finsi
+                finfuncion)),
+            (abstraer': nodoCst#cuerpo, ámbito#ámbito)
+
+        registrarParche: procedimiento
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: fn#id, ámbito#ámbito)
+        finprocedimiento
+
+        devolver fn
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoSonIguales
+        si nodoCst#tipoIgualdad = CST#TipoIgualdad#IDÉNTICOS
+            devolver AST#NodoSonIdénticos#crear: nodoCst#áreaTextual, (abstraer: nodoCst#lhs), (abstraer: nodoCst#rhs)
+        finsi
+        si nodoCst#tipoIgualdad = CST#TipoIgualdad#IGUALES
+            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#lhs), {operador_=},
+                (abstraerArgumentos: (Arreglo#crearCon: nodoCst#rhs))
+        finsi
+        si nodoCst#tipoIgualdad = CST#TipoIgualdad#DIFERENTES
+            devolver AST#NodoNo#crear: nodoCst#áreaTextual,
+                (AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                    (abstraer: nodoCst#lhs), {operador_=},
+                    (abstraerArgumentos: (Arreglo#crearCon: nodoCst#rhs)))
+        finsi
+        Inalcanzable
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoNo
+        devolver AST#NodoNo#crear: nodoCst#áreaTextual, (abstraer: nodoCst#expresión)
+    finsi
+
+    si EsInstancia: nodoCst, CST#NodoClonar
+        variables cuerpo, fn, mensajes, nombreVar, ámbito, reg, subámbito, bloque, defVar
+        fijar cuerpo a Arreglo#vacio
+        fijar nombreVar a {variable implícita de clonar}
+        fijar ámbito a Ámbito#desde: ámbitoActual#tablaNombres, ámbitoActual
+        fijar subámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+        fijar reg a ámbito#crear: nombreVar, FALSO
+
+        fijar defVar a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar
+
+        funcion usoVar
+            variable id
+            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar
+            registrarParche: procedimiento
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
+            finprocedimiento
+            devolver id
+        finfuncion
+
+        cuerpo#agregarAlFinal: (AST#NodoVariable#crear: nodoCst#áreaTextual, defVar)
+        cuerpo#agregarAlFinal: (AST#NodoFijar#crear: nodoCst#áreaTextual,
+            usoVar,
+            (AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#expresiónAClonar), {clonar}, Arreglo#vacio))
+        ParaCadaElemento: nodoCst#campos, procedimiento: par
+            variables nombre, valor
+            fijar nombre a par#en: 0
+            fijar valor a par#en: 1
+            cuerpo#agregarAlFinal: (AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                usoVar, ({fijar_}#concatenar: nombre),
+                (Arreglo#crearCon:
+                    (AST#NodoArgumento#crear: nodoCst#áreaTextual, (abstraer: valor), FALSO)))
+        finprocedimiento
+        cuerpo#agregarAlFinal: (AST#NodoDevolver#crear: nodoCst#áreaTextual, usoVar)
+
+        fijar bloque a AST#NodoBloque#crear: nodoCst#áreaTextual, cuerpo
+
+        fijar fn a AST#NodoFunciónAnónima#crear: nodoCst#áreaTextual,
+            Arreglo#vacio,
+            bloque
+
+        registrarParche: procedimiento
+            tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: defVar#id, reg#binding)
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: fn#id, ámbito)
+            tablasRnAst#tablaÁmbitos#agregar: (Ámbitos#crear: bloque#id, subámbito)
+        finprocedimiento
+
+        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual, fn, {llamar}, Arreglo#vacio
+    finsi
+
+    Escribir: nodoCst
+    Inalcanzable
+finfuncion

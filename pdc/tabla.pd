@@ -1,0 +1,139 @@
+utilizar bepd/builtins
+utilizar bepd/utilidades/texto (Unir)
+
+clase Tabla
+    atributos índices, esquema, valores
+
+    metodo estatico vacíaConEsquema: esquema
+
+    metodo agregar: registro
+    metodo intentaBuscarÚnico: campo, valor
+    metodo buscarÚnico: campo, valor
+    metodo escaneoLineal: f
+finclase
+
+metodo estatico Tabla#vacíaConEsquema: esquema
+    devolver yo#crear: esquema
+finmetodo
+
+metodo Tabla#inicializar: esquema
+    fijar yo#esquema a esquema
+    fijar yo#valores a Arreglo#vacio
+    fijar yo#índices a Diccionario#vacío
+    yo#esquema#paraCadaCampoIndexado: procedimiento: campo
+        yo#índices#fijarEn: campo, Diccionario#vacío
+    finprocedimiento
+finmetodo
+
+metodo Tabla#agregar: registro
+    yo#valores#agregarAlFinal: registro
+    yo#esquema#paraCadaCampoIndexado: procedimiento: campo
+        (yo#índices#en: campo)#fijarEn: (EnviarMensaje: registro, campo), registro
+    finprocedimiento
+finmetodo
+
+metodo Tabla#intentaBuscarÚnico: campo, valor
+    variable índice
+    fijar índice a yo#índices#en: campo
+    si índice#contiene: valor
+        devolver índice#en: valor
+    sino
+        devolver NULO
+    finsi
+finmetodo
+
+metodo Tabla#buscarÚnico: campo, valor
+    variable índice
+    fijar índice a yo#índices#en: campo
+    si índice#contiene: valor
+        devolver índice#en: valor
+    sino
+        __FallarConMensaje: ({No se pudo encontrar el campo ~t con el valor ~t en la tabla ~t}#formatear: campo, valor, yo#esquema)
+    finsi
+finmetodo
+
+metodo Tabla#escaneoLineal: f
+    ParaCadaElemento: yo#valores, f
+finmetodo
+
+funcion CrearTipoDeRegistro: nombre, ...pares
+    variables campos, i
+    fijar campos a Arreglo#vacio
+    fijar i a 0
+    mientras i < pares#longitud
+        campos#agregarAlFinal: (Arreglo#crearCon: (pares#en: i), (pares#en: (i + 1)))
+        fijar i a i + 2
+    finmientras
+
+    clase TipoDeRegistro
+    finclase
+
+    fijar TipoDeRegistro#nombre a nombre
+
+    ParaCadaElemento: campos, procedimiento: campo
+        TipoDeRegistro#agregarAtributo: (campo#en: 0)
+    finprocedimiento
+
+    metodo estatico TipoDeRegistro#paraCadaCampoIndexado: f
+        ParaCadaElemento: campos, procedimiento: campo
+            si campo#en: 1
+                %f: (campo#en: 0)
+            finsi
+        finprocedimiento
+    finmetodo
+
+    metodo estatico TipoDeRegistro#paraCadaCampo: f
+        ParaCadaElemento: campos, procedimiento: campo
+            %f: (campo#en: 0)
+        finprocedimiento
+    finmetodo
+
+    metodo TipoDeRegistro#inicializar: ...valores
+        ParaCadaElementoConÍndice: campos, procedimiento: campo, i
+            EnviarMensaje: yo, ({fijar_}#concatenar: (campo#en: 0)), (valores#en: i)
+        finprocedimiento
+    finmetodo
+
+    metodo TipoDeRegistro#comoTexto
+        devolver {(~t ~t)}#formatear: nombre, (Unir: (Mapear: campos, funcion: campo
+            devolver (EnviarMensaje: yo, (campo#en: 0))#comoTexto
+        finfuncion), {, })
+    finmetodo
+
+    devolver TipoDeRegistro
+finfuncion
+
+variable NodoDeÁrbol
+fijar NodoDeÁrbol a CrearTipoDeRegistro: {NodoDeÁrbol},
+    {id}, VERDADERO,
+    {nodo}, FALSO
+
+funcion EntablarÁrbol: árbol
+    variables tabla, id
+    fijar tabla a Tabla#vacíaConEsquema: NodoDeÁrbol
+    fijar id a 0
+    funcion asignar: nodo
+        fijar nodo#id a id
+        fijar id a id + 1
+        tabla#agregar: (NodoDeÁrbol#crear: nodo#id, nodo)
+        nodo#recursivo: &asignar
+    finfuncion
+    asignar: árbol
+    devolver tabla
+finfuncion
+
+procedimiento EscribirTabla: tabla
+    tabla#esquema#paraCadaCampo: procedimiento: campo
+        escribir campo
+        escribir {	}
+    finprocedimiento
+    nl
+    tabla#escaneoLineal: procedimiento: reg
+        tabla#esquema#paraCadaCampo: procedimiento: campo
+            escribir (EnviarMensaje: reg, campo)#comoTexto
+            escribir {	}
+        finprocedimiento
+        nl
+    finprocedimiento
+    nl
+finprocedimiento

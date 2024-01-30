@@ -1,0 +1,438 @@
+utilizar bepd/builtins
+utilizar bepd/datos/resultado (Resultado)
+utilizar bepd/utilidades/texto (TextoContiene)
+utilizar bepd/utilidades/texto/ascii como ASCII
+utilizar bepd/x/puerto como Puerto
+utilizar bepd/x/puerto/conPosición como PuertoConPos
+utilizar bepd/x/puerto/conPosición (PosiciónTextual)
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+
+utilizar pdc/tokens como Tokens
+
+funcion ContarPosición: texto, desdePos, hasta
+    variables i, n, j
+    fijar n a desdePos#línea
+    fijar i a desdePos#offset - desdePos#columna
+    fijar j a i
+    mientras i < hasta
+        fijar j a i
+        fijar i a texto#buscar: (i + 1), {~%}#formatear
+        si EsNulo: i
+            fijar i a texto#longitud
+        sino
+            fijar n a n + 1
+        finsi
+    finmientras
+    devolver PosiciónTextual#crear: desdePos#nombreDelArchivo, (n - 1), ((hasta - j) - 1), hasta
+finfuncion
+
+[DOCUMENTA
+@brief{Tokeniza un texto.}
+
+@pd{nombreDelArchivo} es el nombre del archivo que se usará en la información
+de posición.
+DOCUMENTA]
+funcion TokenizarTexto: texto, nombreDelArchivo
+    variables pos, tokens, post
+    fijar pos a 0
+    fijar tokens a Arreglo#vacio
+    fijar post a PosiciónTextual#crear: nombreDelArchivo, 1, 0, 0
+
+    procedimiento áreaTextual: ps
+        variables p, h
+        fijar p a post
+        fijar h a ContarPosición: texto, post, ps
+        fijar post a h
+        devolver Tokens#ÁreaTextual#crear: p, h
+    finprocedimiento
+
+    funcion TokenizarSiguiente
+        variable sp, c
+        fijar pos a AvanzarEspaciosEnBlanco: texto, pos
+        si pos >= texto#longitud
+            devolver pos
+        finsi
+
+        si (texto#en: pos) = {&}
+            si (texto#en: (pos + 1)) = {&}
+                tokens#agregarAlFinal: (Tokens#Token#crear: Tokens#TipoDeToken#OPERADOR, (áreaTextual: (pos + 2)), {&&})
+                fijar pos a pos + 2
+                devolver NULO
+            sino
+                tokens#agregarAlFinal: (Tokens#Token#crear: Tokens#TipoDeToken#PALABRA_CLAVE, (áreaTextual: (pos + 1)), {&})
+                fijar pos a pos + 1
+                devolver NULO
+            finsi
+        finsi
+
+        fijar sp a AvanzarPalabra: texto, pos
+        si sp > pos
+            variables tipo, palabra
+            fijar palabra a texto#parteDelTexto: pos, sp
+            fijar tipo a Tokens#TipoDeToken#IDENTIFICADOR
+            si Tokens#PALABRAS_CLAVE_COMO_DICCIONARIO#contiene: palabra
+                fijar tipo a Tokens#TipoDeToken#PALABRA_CLAVE
+            sino
+                si EsNúmero: palabra
+                    fijar tipo a Tokens#TipoDeToken#NÚMERO
+                    fijar palabra a ConvertirANúmero: palabra
+                sino
+                    si Todos: (Mapear: palabra, &EsOperador)
+                        fijar tipo a Tokens#TipoDeToken#OPERADOR
+                    sino
+                        fijar tipo a Tokens#TipoDeToken#IDENTIFICADOR
+                    finsi
+                finsi
+            finsi
+            tokens#agregarAlFinal: (Tokens#Token#crear: tipo, (áreaTextual: sp), palabra)
+            fijar pos a sp
+            devolver NULO
+        finsi
+
+        fijar sp a AvanzarOperador: texto, pos
+        si sp > pos
+            tokens#agregarAlFinal:
+                (Tokens#Token#operador: (áreaTextual: sp), (texto#parteDelTexto: pos, sp))
+            fijar pos a sp
+            devolver NULO
+        finsi
+
+        fijar c a ObtenerCarácter: texto, pos
+        si EsSímbolo: c
+            fijar sp a pos + 1
+            tokens#agregarAlFinal:
+                (Tokens#Token#palabraClave: (áreaTextual: sp), (texto#parteDelTexto: pos, sp))
+            fijar pos a sp
+            devolver NULO
+        finsi
+        si c = {[}
+            fijar sp a AvanzarHasta: texto, (pos + 1), {]}
+            si sp > pos
+                tokens#agregarAlFinal:
+                    (Tokens#Token#comentario: (áreaTextual: sp), (texto#parteDelTexto: (pos + 1), (sp - 1)))
+                fijar pos a sp
+                devolver NULO
+            sino
+                Escribir: {Error: comentario sin cerrar. Desde la posición}, pos
+                fijar pos a NULO
+                devolver NULO
+            finsi
+        finsi
+        si c = «{»
+            fijar sp a AvanzarHasta: texto, (pos + 1), «}»
+            si sp > pos
+                tokens#agregarAlFinal:
+                    (Tokens#Token#texto: (áreaTextual: sp), (texto#parteDelTexto: (pos + 1), (sp - 1)))
+                fijar pos a sp
+                devolver NULO
+            sino
+                Escribir: {Error: texto con corchetes sin cerrar. Desde la posición}, pos
+                fijar pos a NULO
+                devolver NULO
+            finsi
+        finsi
+        si c = {"}
+            fijar sp a AvanzarHasta: texto, (pos + 1), {"}
+            si sp > pos
+                tokens#agregarAlFinal:
+                    (Tokens#Token#texto: (áreaTextual: sp), (texto#parteDelTexto: (pos + 1), (sp - 1)))
+                fijar pos a sp
+                devolver NULO
+            sino
+                Escribir: {Error: texto con comillas sin cerrar. Desde la posición}, pos
+                fijar pos a NULO
+                devolver NULO
+            finsi
+        finsi
+
+        si (texto#subTexto: pos, 2) = {«}
+            fijar sp a AvanzarHasta: texto, (pos + 1), {»}
+            si sp > pos
+                tokens#agregarAlFinal:
+                    (Tokens#Token#texto: (áreaTextual: sp), (texto#parteDelTexto: (pos + 2), (sp - 2)))
+                fijar pos a sp
+                devolver NULO
+            sino
+                Escribir: {Error: texto con comillas angulares sin cerrar. Desde la posición}, pos
+                fijar pos a NULO
+                devolver NULO
+            finsi
+        finsi
+
+        Escribir: {Error: carácter inválido en la posición}, pos, c
+        devolver NULO
+    finfuncion
+
+    mientras pos < texto#longitud
+        TokenizarSiguiente
+    finmientras
+
+    devolver tokens
+finfuncion
+
+funcion ObtenerCarácter: texto, pos
+    devolver texto#subTexto: pos, 1
+finfuncion
+
+funcion AvanzarPalabra: texto, pos
+    mientras (pos < texto#longitud)
+        && (no EsFinDePalabra: (ObtenerCarácter: texto, pos))
+        && (no EsEspacioEnBlanco: (ObtenerCarácter: texto, pos))
+        fijar pos a pos + 1
+    finmientras
+    devolver pos
+finfuncion
+
+funcion AvanzarEspaciosEnBlanco: texto, pos
+    mientras (pos < texto#longitud) && EsEspacioEnBlanco: (ObtenerCarácter: texto, pos)
+        fijar pos a pos + 1
+    finmientras
+    devolver pos
+finfuncion
+
+funcion AvanzarOperador: texto, pos
+    mientras (pos < texto#longitud) && EsOperador: (ObtenerCarácter: texto, pos)
+        fijar pos a pos + 1
+    finmientras
+    devolver pos
+finfuncion
+
+funcion AvanzarHasta: texto, pos, terminador
+    variable inic
+    fijar inic a pos
+    mientras (pos < texto#longitud)
+        && son diferentes (texto#subTexto: pos, terminador#longitud) y terminador
+        fijar pos a pos + 1
+    finmientras
+    si pos >= texto#longitud
+        devolver inic - 1
+    finsi
+    devolver pos + terminador#longitud
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{car} (un carácter) es un separador de palabras.}
+
+Por ejemplo, la letra @code{a} no es un separador de palabras porque el
+identificador @code{holaMundo} es válido, si @code{a} fuese un separador,
+@code{holaMundo} sería tokenizado como @code{hol}, @code{a}, @code{Mundo}.
+DOCUMENTA]
+funcion EsFinDePalabra: car
+    devolver (TextoContiene: «{}():#.%[],"», car) || (TextoContiene: {«»}, car)
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{car} es un espacio en blanco.}
+DOCUMENTA]
+funcion EsEspacioEnBlanco: car
+    devolver (car = { }) || (car = {~%}#formatear) || (car = {	})
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{car} es un carácter válido para un operador.}
+DOCUMENTA]
+funcion EsOperador: car
+    devolver (TextoContiene: {<>=+-*/!|^&~}, car)
+finfuncion
+
+[DOCUMENTA
+@brief{Si @pd{car} es un símbolo especial.}
+
+Por ejemplo, los paréntesis son especiales, ya que deben tokenizarse como
+palabras clave incluso si no están rodeados de espacios en blanco.
+DOCUMENTA]
+funcion EsSímbolo: car
+    devolver TextoContiene: {():#.%,&}, car
+finfuncion
+
+
+[DOCUMENTA
+@brief{Lee una palabra del puerto.}
+
+@param{acc} debe ser lo que ya se leyó de la palabra, o el texto vacío.
+
+Deja de leer cuando se encuentra un carácter que es el fin de la palabra, como
+los espacios en blanco o algún carácter que pasa @pd{EsFinDePalabra}.
+DOCUMENTA]
+procedimiento LeerPalabra: acc, puerto
+    variables car, palabra
+    fijar palabra a acc
+    fijar car a puerto#leerCarácter
+    mientras no car = Puerto#EOF
+        si EsEspacioEnBlanco: car
+            puerto#desleerCarácter
+            devolver palabra
+        sino
+            si EsFinDePalabra: car
+                si palabra#longitud > 0
+                    puerto#desleerCarácter
+                    devolver palabra
+                sino
+                    devolver car
+                finsi
+            sino
+                fijar palabra a palabra#concatenar: car
+                fijar car a puerto#leerCarácter
+            finsi
+        finsi
+    finmientras
+    devolver palabra
+finprocedimiento
+
+[ Un patrón común en estos procedimientos de ayuda es pedir tres parámetros:
+  posIni, tx y puerto. puerto es el puerto del cual se leerán los
+  carácteres. posIni es la posición de donde se comenzo la lectura, esto es
+  necesario para generar áreas textuales correctas. tx es el texto que ya se
+  había leído antes de llamar al procedimiento.
+
+  Podría parecer innecesario, pero es la manera más fácil de estructurar el
+  tokenizador: lee uno o más carácteres, has un "dispatch" para saber cual de
+  estos procedimientos llamar, etc. Los carácteres leídos antes de llamar a
+  estos procedimientos son pasados como el texto "tx", mientras que la posición
+  textual del principio como posIni. ]
+
+procedimiento LeerLiteralNumérica: posIni, tx, puerto
+    variables texto, posFin, area, punto
+    fijar texto a LeerPalabra: tx, puerto
+    fijar punto a puerto#leerCarácter
+    si punto = {.}
+       variable decimales
+       fijar decimales a LeerPalabra: {}, puerto
+       necesitas EsNúmeroEntero: decimales
+       fijar texto a texto#concatenar: ({.}#concatenar: decimales)
+    sino
+        puerto#desleerCarácter
+    finsi
+    fijar posFin a puerto#posiciónActual
+    fijar area a Tokens#ÁreaTextual#crear: posIni, posFin
+    necesitas EsNúmero: texto
+    devolver Tokens#Token#número: area, (ConvertirANúmero: texto)
+finprocedimiento
+
+procedimiento LeerIdentificador: posIni, tx, puerto
+    variables texto, posFin, area
+    fijar texto a LeerPalabra: tx, puerto
+    fijar posFin a puerto#posiciónActual
+    fijar area a Tokens#ÁreaTextual#crear: posIni, posFin
+
+    si Tokens#PALABRAS_CLAVE_COMO_DICCIONARIO#contiene: texto
+        devolver Tokens#Token#palabraClave: area, texto
+    finsi
+    si Todos: (Mapear: texto, &EsOperador)
+        devolver Tokens#Token#operador: area, texto
+    finsi
+    devolver Tokens#Token#identificador: area, texto
+finprocedimiento
+
+[DOCUMENTA
+@brief{Lee un token del puerto.}
+
+No ignora espacios en blanco. Es la verdadera implementación de
+@pd{Tokenizador#siguienteLexema}.
+DOCUMENTA]
+procedimiento LeerLexema: puerto
+    variables car, posIni
+    fijar posIni a puerto#posiciónActual
+    fijar car a puerto#leerCarácter
+    si son identicos car y Puerto#EOF
+        devolver Puerto#EOF
+    finsi
+    si car = {-}
+        variables car2, posFin
+        fijar posFin a puerto#posiciónActual
+        fijar car2 a puerto#leerCarácter
+        si EsEspacioEnBlanco: car2
+            devolver Tokens#Token#operador: (Tokens#ÁreaTextual#crear: posIni, posFin), car
+        sino
+            fijar car a car#concatenar: car2
+            si ASCII#EsDígitoDecimal: car2
+                devolver LeerLiteralNumérica: posIni, car, puerto
+            sino
+                devolver LeerIdentificador: posIni, car, puerto
+            finsi
+        finsi
+    finsi
+    si ASCII#EsDígitoDecimal: car
+        devolver LeerLiteralNumérica: posIni, car, puerto
+    finsi
+    si EsSímbolo: car
+        variable posFin
+        si car = {&}
+            variable c
+            fijar c a puerto#leerCarácter
+            si c = {&}
+                fijar posFin a puerto#posiciónActual
+                devolver Tokens#Token#operador: (Tokens#ÁreaTextual#crear: posIni, posFin), {&&}
+            sino
+                puerto#desleerCarácter
+            finsi
+        finsi
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#palabraClave: (Tokens#ÁreaTextual#crear: posIni, posFin), car
+    finsi
+    si car = {"}
+        variables texto, posFin
+        fijar texto a Puerto#LeerHasta: puerto, {"}
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#texto: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    si car = (__ByteATexto: 194)
+        fijar car a puerto#leerCarácter
+        necesitas car = (__ByteATexto: 171)
+
+        variables texto, posFin
+        fijar texto a {}
+        LlamarConEC: procedimiento: ec
+            mientras VERDADERO
+                fijar texto a texto#concatenar: (Puerto#LeerHasta: puerto, (__ByteATexto: 194))
+                fijar car a puerto#leerCarácter
+                si (car = (__ByteATexto: 187)) || (car = Puerto#EOF)
+                    %ec: NULO
+                finsi
+                fijar texto a texto#concatenar: (__ByteATexto: 194)
+                fijar texto a texto#concatenar: car
+            finmientras
+        finprocedimiento
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#texto: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    si car = {«}
+        variables texto, posFin
+        fijar texto a Puerto#LeerHasta: puerto, {»}
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#texto: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    si car = «{»
+        variables texto, posFin
+        fijar texto a Puerto#LeerHasta: puerto, «}»
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#texto: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    si car = {[}
+        variables texto, posFin
+        fijar texto a Puerto#LeerHasta: puerto, {]}
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#comentario: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    si car = {\}
+        variables texto, posFin
+        fijar texto a Puerto#LeerHasta: puerto, {\}
+        fijar posFin a puerto#posiciónActual
+        devolver Tokens#Token#identificador: (Tokens#ÁreaTextual#crear: posIni, posFin), texto
+    finsi
+    devolver LeerIdentificador: posIni, car, puerto
+finprocedimiento
+
+funcion TokenizarTexto2: texto, nombreDelArchivo
+    variables puerto, token, tokens
+    fijar puerto a PuertoConPos#PuertoConPosiciónTextual#crear: (Puerto#TextoComoPuerto: texto), nombreDelArchivo
+    fijar tokens a Arreglo#vacio
+    Puerto#SaltarEspacios: puerto
+    fijar token a LeerLexema: puerto
+    mientras no sean identicos token y Puerto#EOF
+        tokens#agregarAlFinal: token
+        Puerto#SaltarEspacios: puerto
+        fijar token a LeerLexema: puerto
+    finmientras
+    devolver tokens
+finfuncion

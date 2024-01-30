@@ -1,0 +1,172 @@
+utilizar bepd/builtins
+utilizar bepd/x/enum (Enum)
+utilizar bepd/x/puerto/conPosición (PosiciónTextual)
+
+[DOCUMENTA
+@brief{Área dentro de un archivo.}
+
+Representa un área dentro de un archivo, delimitada por dos posiciones
+textuales (véase @pd{PosiciónTextual}).
+DOCUMENTA]
+clase ÁreaTextual
+    [DOCUMENTA
+    @brief{Posición inicial del área (inclusíva).}
+    DOCUMENTA]
+    atributo posiciónInicial
+
+    [DOCUMENTA
+    @brief{Posición final del área (inclusíva).}
+    DOCUMENTA]
+    atributo posiciónFinal
+
+    [DOCUMENTA
+    @brief{Inicializa el área con las dos posiciones que la definen.}
+    DOCUMENTA]
+    metodo inicializar: posInicial, posFinal
+
+    [DOCUMENTA
+    @brief{Devuelve una representación sencilla del área como texto.}
+    DOCUMENTA]
+    metodo comoTexto
+finclase
+
+metodo ÁreaTextual#inicializar: posiciónInicial, posiciónFinal
+    fijar yo#posiciónInicial a posiciónInicial
+    fijar yo#posiciónFinal a posiciónFinal
+finmetodo
+
+metodo ÁreaTextual#comoTexto
+    devolver {(desde ~t hasta ~t)}#formatear: yo#posiciónInicial, yo#posiciónFinal
+finmetodo
+
+[DOCUMENTA
+@brief{Tipo de un token.}
+
+@enum(
+@defenum(NÚMERO){Una literal numérica como @pd{-21}.}
+@defenum(TEXTO){Una literal textual como @pd{"hola"}.}
+@defenum(IDENTIFICADOR){Un nombre com @code{hola}.}
+@defenum(PALABRA_CLAVE){Una palabra clave como @pd{adquirir}.}
+@defenum(OPERADOR){Un operador como @code{+} o @code{<<}.}
+@defenum(COMENTARIO){Un comentario.}
+)
+DOCUMENTA]
+variable TipoDeToken
+fijar TipoDeToken a Enum: {TipoDeToken},
+    {NÚMERO},
+    {TEXTO},
+    {IDENTIFICADOR},
+    {PALABRA_CLAVE},
+    {OPERADOR},
+    {COMENTARIO}
+
+[DOCUMENTA
+@brief{Un token.}
+
+Cada token tiene un tipo (véase @pd{TipoDeToken}), su contenido (cuyo tipo
+depende del tipo de token) y un área textual (véase @pd{ÁreaTextual}).
+DOCUMENTA]
+clase Token
+    atributo tipo
+    atributo áreaTextual
+    atributo contenido
+
+    metodo estatico crear: tipo, área, contenido
+
+    metodo comoTexto
+finclase
+
+metodo estatico Token#número: área, contenido
+    devolver yo#crear: TipoDeToken#NÚMERO, área, contenido
+finmetodo
+
+metodo estatico Token#texto: área, contenido
+    devolver yo#crear: TipoDeToken#TEXTO, área, contenido
+finmetodo
+
+metodo estatico Token#identificador: área, contenido
+    devolver yo#crear: TipoDeToken#IDENTIFICADOR, área, contenido
+finmetodo
+
+metodo estatico Token#palabraClave: área, contenido
+    devolver yo#crear: TipoDeToken#PALABRA_CLAVE, área, contenido
+finmetodo
+
+metodo estatico Token#operador: área, contenido
+    devolver yo#crear: TipoDeToken#OPERADOR, área, contenido
+finmetodo
+
+metodo estatico Token#comentario: área, contenido
+    devolver yo#crear: TipoDeToken#COMENTARIO, área, contenido
+finmetodo
+
+metodo Token#inicializar: tipo, área, contenido
+    fijar yo#tipo a tipo
+    fijar yo#áreaTextual a área
+    fijar yo#contenido a contenido
+finmetodo
+
+metodo Token#comoTexto
+    devolver {(Token ~t en ~t con ~t)}#formatear: yo#tipo, yo#áreaTextual, yo#contenido
+finmetodo
+
+metodo Token#esNúmero
+    devolver yo#tipo = TipoDeToken#NÚMERO
+finmetodo
+
+metodo Token#esTexto
+    devolver yo#tipo = TipoDeToken#TEXTO
+finmetodo
+
+metodo Token#esIdentificador
+    devolver yo#tipo = TipoDeToken#IDENTIFICADOR
+finmetodo
+
+metodo Token#esPalabraClave: palabra
+    devolver (yo#tipo = TipoDeToken#PALABRA_CLAVE) && (yo#contenido = palabra)
+finmetodo
+
+metodo Token#esOperador
+    devolver yo#tipo = TipoDeToken#OPERADOR
+finmetodo
+
+metodo Token#esComentario
+    devolver yo#tipo = TipoDeToken#COMENTARIO
+finmetodo
+
+[DOCUMENTA
+@brief{Todas las palabras clave del lenguaje.}
+
+Arreglo de texto que contiene todas las palabras clave. Símbolos especiales
+como @code{(} y @code{)} también son incluidos.
+DOCUMENTA]
+variable PALABRAS_CLAVE
+fijar PALABRAS_CLAVE a
+    (Arreglo#crearCon:
+        {#}, {(}, {)}, {,}, {.}, {:}, {%}, {\}, {"}, {«}, {»}, «{», «}»,
+        {[}, {]}, {&},
+        {variable}, {variables}, {adquirir}, {instancia}, {fijar}, {a},
+        {escribir}, {nl}, {leer}, {si}, {finsi}, {sino}, {mientras},
+        {finmientras}, {funcion}, {finfuncion}, {procedimiento},
+        {finprocedimiento}, {metodo}, {finmetodo}, {devolver}, {llamar},
+        {finargs}, {con}, {de}, {y}, {e}, {clase}, {hereda}, {extiende},
+        {implementa}, {finclase}, {atributo}, {atributos}, {estatico},
+        {clonar}, {finclonar}, {son}, {sean}, {iguales}, {diferentes}, {y},
+        {tanto}, {como}, {algun}, {o}, {necesitas}, {utilizar}, {no},
+        {finimplementa}, {ref}, {identicos}, {identicas}
+    )
+
+[DOCUMENTA
+@brief{Las palabras clave pero como un diccionario.}
+
+Mapea cada palabra clave a @pd{VERDADERO}. Existe porque un @pd{Diccionario}
+puede ser más rápido que buscar en una lista.
+DOCUMENTA]
+variable PALABRAS_CLAVE_COMO_DICCIONARIO
+fijar PALABRAS_CLAVE_COMO_DICCIONARIO a
+    Diccionario#desdeArreglo:
+        (Mapear:
+            PALABRAS_CLAVE,
+            funcion: palabra
+                devolver Arreglo#crearCon: palabra, VERDADERO
+            finfuncion)

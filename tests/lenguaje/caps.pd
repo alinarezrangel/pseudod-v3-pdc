@@ -1,0 +1,7 @@
+variables A, B
+funcion F: X
+    funcion G: Y
+        devolver X + Y + A
+    finfuncion
+    devolver &G
+finfuncion

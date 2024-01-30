@@ -1,0 +1,66 @@
+utilizar bepd/builtins
+
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+
+__Lua: «
+function()
+  rt.__exts = require "backends.lua.exts"
+  rt.__sql = require "lsqlite3"
+end
+»
+
+clase BaseDeDatos
+    metodo estatico abrir: archivo
+    metodo estatico enMemoria
+
+    metodo ejecutarSQL: sql, ...valores
+    metodo consultar: esquema, sql, ...valores
+    metodo cerrar
+finclase
+
+atributo BaseDeDatos#_db
+
+metodo estatico BaseDeDatos#abrir: archivo
+    devolver yo#crear: (__Lua: «function(file) return rt.__exts.wrap(rt.__sql.open(file)) end», archivo)
+finmetodo
+
+metodo estatico BaseDeDatos#enMemoria
+    devolver yo#crear: (__Lua: «function() return rt.__exts.wrap(rt.__sql.open_memory()) end»)
+finmetodo
+
+metodo BaseDeDatos#inicializar: handle
+    fijar yo#_db a handle
+finmetodo
+
+metodo BaseDeDatos#ejecutarSQL: sql, ...valores
+    yo#consultar: &ObjetoAdHoc, sql, ...valores
+finmetodo
+
+metodo BaseDeDatos#consultar: esquema, sql, ...valores
+    devolver __Lua: «function(crear, w, sql, valores)
+   local db = rt.__exts.unwrap(w)
+   local p = db:prepare(sql)
+   for i = 0, rt.enviarMensaje(valores, "longitud") - 1 do
+      p:bind(i + 1, rt.enviarMensaje(valores, "en", i))
+   end
+   local r = rt.arreglo()
+   for row in p:nrows() do
+      local h = { __pd_var = true, n = 0 }
+      for k, v in pairs(row) do
+         h[h.n + 1] = k
+         h[h.n + 2] = v
+         h.n = h.n + 2
+      end
+      rt.enviarMensaje(r, "agregarAlFinal", rt.enviarMensajeV(crear, "llamar", h))
+   end
+   p:finalize()
+   return r
+end», esquema, yo#_db, sql, valores
+finmetodo
+
+metodo BaseDeDatos#cerrar
+    __Lua: «function(w)
+   local db = rt.__exts.unwrap(w)
+   db:close()
+end», yo#_db
+finmetodo

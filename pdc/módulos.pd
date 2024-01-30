@@ -1,0 +1,49 @@
+utilizar bepd/builtins
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, EscribirTabla)
+
+
+clase Módulo
+    atributos paquete, módulo, exportaciones, compilado, informaciónDeDepuración
+    metodo nombreCompleto
+finclase
+
+clase Módulos
+    metodo estatico desdeArchivo: archivo
+    metodo estatico enMemoria
+
+    metodo agregarMódulo: módulo
+    metodo buscarMódulo: nombreCompleto
+finclase
+
+
+variable Módulo
+fijar Módulo a CrearTipoDeRegistro: {Módulo},
+    {nombreCompleto}, VERDADERO,
+    {paquete}, FALSO,
+    {módulo}, FALSO,
+    {exportaciones}, FALSO,
+    {compilado}, FALSO
+
+clase Exportación
+    atributos nombre, esAutoejecutable
+finclase
+
+metodo Exportación#inicializar: nombre, esAutoejecutable
+    fijar yo#nombre a nombre
+    fijar yo#esAutoejecutable a esAutoejecutable
+finmetodo
+
+procedimiento AgregarMódulo: tablaMódulos, paquete, módulo, exportaciones, compilado
+    variable mod
+    fijar mod a Módulo#crear:
+        ({~t/~t}#formatear: paquete, módulo),
+        paquete,
+        módulo,
+        exportaciones,
+        compilado
+    tablaMódulos#agregar: mod
+    devolver mod
+finprocedimiento
+

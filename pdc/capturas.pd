@@ -1,0 +1,85 @@
+utilizar bepd/builtins
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+utilizar bepd/utilidades/arreglo (Únicos)
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback, CrearCST)
+utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+utilizar pdc/catamorfismos (Buscando)
+utilizar pdc/abstraer (Abstraer)
+
+
+variable EsCapturada
+fijar EsCapturada a CrearTipoDeRegistro: {EsCapturada},
+    {binding}, VERDADERO
+
+variable CapturasDeFunción
+fijar CapturasDeFunción a CrearTipoDeRegistro: {CapturasDeFunción},
+    {idNodo}, VERDADERO,
+    {bindingsCapturados}, FALSO
+
+variable LocalesDeFunción
+fijar LocalesDeFunción a CrearTipoDeRegistro: {LocalesDeFunción},
+    {idNodo}, VERDADERO,
+    {bindingsLocales}, FALSO
+
+clase TablasDeCapturas
+    atributos tablaEsCapturada, tablaCapturas, tablaLocales
+finclase
+
+procedimiento MarcarCapturas: ast', tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
+    procedimiento rec: nodo, posiblesCapturas', definitivamenteNoCapturas'
+        MarcarCapturas: nodo, tablasRnAst, tablasMcAst, posiblesCapturas', definitivamenteNoCapturas'
+    finprocedimiento
+
+    Buscando: ast', funcion: ast
+        devolver (EsInstancia: ast, AST#NodoFunciónAnónima)
+              || (EsInstancia: ast, AST#NodoPrograma)
+              || (EsInstancia: ast, AST#NodoIdentificador)
+    finfuncion, procedimiento: ast
+        si (EsInstancia: ast, AST#NodoFunciónAnónima) || (EsInstancia: ast, AST#NodoPrograma)
+            variables posiblesCapturas', definitivamenteNoCapturas'
+            fijar posiblesCapturas' a Diccionario#vacío
+            fijar definitivamenteNoCapturas' a Arreglo#vacio
+
+            ast#recursivo: procedimiento: nodo
+                rec: nodo, posiblesCapturas', definitivamenteNoCapturas'
+            finprocedimiento
+
+            ParaCadaElemento: definitivamenteNoCapturas', procedimiento: binding
+                posiblesCapturas'#eliminar: binding
+            finprocedimiento
+            tablasMcAst#tablaLocales#agregar: (LocalesDeFunción#crear: ast#id, definitivamenteNoCapturas')
+            [ Ahora sabemos que todos los bindings en posiblesCapturas' son capturas ]
+            variable capturas
+            fijar capturas a Arreglo#vacio
+            posiblesCapturas'#paraCadaLlave: procedimiento: bindingCapturado
+                posiblesCapturas#fijarEn: bindingCapturado, VERDADERO
+                capturas#agregarAlFinal: bindingCapturado
+                si EsNulo: (tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, bindingCapturado)
+                    tablasMcAst#tablaEsCapturada#agregar: (EsCapturada#crear: bindingCapturado)
+                finsi
+            finprocedimiento
+            tablasMcAst#tablaCapturas#agregar: (CapturasDeFunción#crear: ast#id, capturas)
+            devolver NULO
+        finsi
+
+        si EsInstancia: ast, AST#NodoIdentificador
+            variables reg, binding
+            fijar reg a tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, ast#id
+            si no EsNulo: reg
+                posiblesCapturas#fijarEn: reg#binding, VERDADERO
+            sino
+                fijar reg a tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, ast#id
+                definitivamenteNoCapturas#agregarAlFinal: reg#binding
+            finsi
+            devolver NULO
+        finsi
+
+        Inalcanzable
+    finprocedimiento
+finprocedimiento

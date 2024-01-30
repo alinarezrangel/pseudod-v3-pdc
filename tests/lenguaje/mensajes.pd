@@ -1,0 +1,4 @@
+variable hola
+fijar hola a {mundo}
+escribir {hola }#concatenar: hola
+nl

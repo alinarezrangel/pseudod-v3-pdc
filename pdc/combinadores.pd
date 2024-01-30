@@ -1,0 +1,858 @@
+utilizar bepd/builtins
+utilizar bepd/x/puerto como Puerto (EOF)
+utilizar bepd/x/puerto/conPosición como PuertoConPos
+
+utilizar pdc/tokens como TokensNS
+
+clase Tokens
+    atributos posición, tokens
+finclase
+
+metodo Tokens#inicializar: tokens
+    fijar yo#posición a 0
+    fijar yo#tokens a tokens
+finmetodo
+
+metodo Tokens#inspeccionarToken
+    si yo#posición >= yo#tokens#longitud
+        devolver EOF
+    sino
+        devolver yo#tokens#en: yo#posición
+    finsi
+finmetodo
+
+metodo Tokens#leerToken1
+    variable tk
+    fijar tk a yo#inspeccionarToken
+    si yo#posición < yo#tokens#longitud
+        fijar yo#posición a yo#posición + 1
+    finsi
+    devolver tk
+finmetodo
+
+metodo Tokens#leerToken
+    variable tk
+    fijar tk a yo#leerToken1
+    si tk = EOF
+        devolver EOF
+    finsi
+    mientras tk#esComentario
+        fijar tk a yo#leerToken1
+        si tk = EOF
+            devolver EOF
+        finsi
+    finmientras
+    devolver tk
+finmetodo
+
+metodo Tokens#avanzar
+    yo#leerToken
+finmetodo
+
+metodo Tokens#retroceder
+    fijar yo#posición a yo#posición - 1
+    si yo#posición < 0
+        fijar yo#posición a 0
+    finsi
+finmetodo
+
+metodo Tokens#puntoActual
+    devolver yo#posición
+finmetodo
+
+metodo Tokens#irAPunto: punto
+    fijar yo#posición a punto
+finmetodo
+
+metodo Tokens#áreaTextualDesde: pos
+    si yo#posición = 0
+        devolver (yo#tokens#en: 0)#áreaTextual
+    sino
+        devolver Tokens#ÁreaTextual#crear:
+            (yo#tokens#en: pos)#áreaTextual#posiciónInicial,
+            (yo#tokens#en: (yo#posición - 1))#áreaTextual#posiciónFinal
+    finsi
+finmetodo
+
+[DOCUMENTA
+@brief{Aproxima la posición textual actual en el punto actual de los tokens.}
+
+Obtiene los tokens justo antes y justo después del punto actual en @pd{tokens},
+y usándolos trata de aproximar la posición textual. Esto no es posible en el
+caso general (el espacio entre dos tokens no es una posición sino un área
+textual). Pero este procedimiento trata de aproximarlo (dandole prioridad a la
+posición @bold{después} del punto actual). Es utilizada para algunos mensajes
+de error.
+
+@devuelve{Una @pd{PuertoConPos#PosiciónTextual}, o @pd{NULO} si no se pudo
+aproximar una posición textual.}
+DOCUMENTA]
+funcion AproximarPosiciónActual: tokens
+    variables p, tk, inicio
+    fijar p a tokens#puntoActual
+    tokens#retroceder
+    fijar tk a tokens#leerToken
+    fijar inicio a tokens#puntoActual > p
+    [ A simple vista, puede parecer redundante `tokens#irAPunto: p`, digo,
+      `leerToken` ya avanza el token y dado que habíamos retrocedido, ¿no
+      nos debería dejar esto justo donde empezamos? Pero hay que tener en
+      cuenta que `retroceder` no hace nada si ya está al principio del
+      programa. ]
+    tokens#irAPunto: p
+    si tk = EOF
+        [ El programa está "vacío" ]
+        devolver NULO
+    sino
+        si inicio
+            devolver tk#áreaTextual#posiciónInicial
+        sino
+            devolver tk#áreaTextual#posiciónFinal
+        finsi
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Un error de parseo/compilación.}
+
+Estos errores consisten de un mensaje de error (que es un texto), un lugar (una
+posición textual que indica en que parte del archivo sucedio el error) y una
+causa opcional (otra instancia de @pd{Error} o @pd{NULO} si no tiene otro error
+como causa).
+DOCUMENTA]
+clase Error
+    atributos mensaje, lugar, causa
+
+    [DOCUMENTA
+    @brief{Inicializa el error.}
+
+    No es recomendable crear instancias de @pd{Error} con @code{#crear}, en
+    cambio, prefiere los otros métodos estáticos.
+    DOCUMENTA]
+    metodo inicializar: mensaje, lugar, causa
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje, sin lugar y sin causa.}
+    DOCUMENTA]
+    metodo estatico conMensaje: mensaje
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje y lugar pero sin causa.}
+    DOCUMENTA]
+    metodo estatico conMensajeYLugar: mensaje, lugar
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje, lugar y causa.}
+    DOCUMENTA]
+    metodo estatico conMensajeLugarYCausa: mensaje, lugar, causa
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje y en la posición de un token.}
+
+    @pd{token} puede ser @pd{EOF}, en cuyo caso el error no tiene
+    posición.
+    DOCUMENTA]
+    metodo estatico enToken: mensaje, token
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje, en la posición de un token y con una
+    causa.}
+
+    @pd{token} puede ser @pd{EOF}, en cuyo caso el error no tiene
+    posición.
+    DOCUMENTA]
+    metodo estatico enTokenConCausa: mensaje, token, causa
+
+    [DOCUMENTA
+    @brief{Crea un error con un mensaje y una causa, pero no un lugar.}
+    DOCUMENTA]
+    metodo estatico conCausa: mensaje, causa
+
+    [DOCUMENTA
+    @brief{Devuelve una representación textual simple del error.}
+
+    Para mejores resultados tendrás que recorrer manualmente el error y sus
+    causas generando un texto.
+    DOCUMENTA]
+    metodo comoTexto
+finclase
+
+metodo estatico Error#conMensaje: mensaje
+    devolver yo#crear: mensaje, (PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0), NULO
+finmetodo
+
+metodo estatico Error#conMensajeYLugar: mensaje, lugar
+    devolver yo#crear: mensaje, lugar, NULO
+finmetodo
+
+metodo estatico Error#conMensajeLugarYCausa: mensaje, lugar, causa
+    devolver yo#crear: mensaje, lugar, causa
+finmetodo
+
+metodo estatico Error#enToken: mensaje, token
+    variable pos
+    si token = EOF
+        fijar pos a PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0
+    sino
+        fijar pos a token#áreaTextual#posiciónInicial
+    finsi
+    devolver yo#crear: mensaje, pos, NULO
+finmetodo
+
+metodo estatico Error#enTokenConCausa: mensaje, token, causa
+    variable pos
+    si token = EOF
+        fijar pos a PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0
+    sino
+        fijar pos a token#áreaTextual#posiciónInicial
+    finsi
+    devolver yo#crear: mensaje, pos, causa
+finmetodo
+
+metodo estatico Error#conCausa: mensaje, causa
+    devolver yo#crear: mensaje, causa#lugar, causa
+finmetodo
+
+metodo Error#inicializar: mensaje, lugar, causa
+    fijar yo#mensaje a mensaje
+    fijar yo#lugar a lugar
+    fijar yo#causa a causa
+finmetodo
+
+metodo Error#comoTexto
+    devolver {(Error en ~t: ~t causado por ~t)}#formatear: yo#lugar, yo#mensaje, yo#causa
+finmetodo
+
+funcion ComoTextoBonito: tkOEOF
+    si tkOEOF = EOF
+        devolver {el fin del programa}
+    sino
+        devolver tkOEOF#comoTexto
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Un combinador (@italic{parser combinator}).}
+
+Un combinador acepta una instancia de @pd{Tokens} y devuelve un @pd{Resultado}
+contieniendo un valor parseado (de cualquier tipo) o un error (de tipo
+@pd{Error}). Los combinadores son implementados como clases que implementan a
+esta.
+
+La posición del punto en la instancia de @pd{Tokens} cuando el combinador
+finalize afecta a los otros combinadores y es parte de su API pública, véa los
+otros combinadores para más información.
+DOCUMENTA]
+clase Combinador
+    metodo parsear: tokens
+finclase
+
+metodo Combinador#parsear: tokens
+    MétodoAbstracto
+finmetodo
+
+[ Todos los combinadores son implementados como una clase que implementa
+  Combinador y una función que construye y devuelve una instancia del
+  mismo. Las clases no están documentadas pero las funciones si (debido a como
+  funcionan los combinadores, solo es necesario documentar la clase o la
+  función pero no ámbos). Las clases (que comienzan con "Comb" para indicar que
+  son combinadores) son, además, privadas, y no deberías utilizarlas fuera de
+  este módulo. En cambio, siempre usa las funciones. ]
+
+clase CombToken hereda Combinador
+    atributos predicado, generarMensajeDeError
+    metodo parsear: tokens
+finclase
+
+metodo CombToken#parsear: tokens
+    variables posAct, tk
+    fijar posAct a tokens#puntoActual
+    fijar tk a tokens#leerToken
+    si no yo#predicado#\llamar\: tk
+        variable pos
+        si tk = EOF
+            fijar pos a AproximarPosiciónActual: tokens
+        sino
+            fijar pos a tk#áreaTextual#posiciónInicial
+        finsi
+        devolver Resultado#error: (yo#generarMensajeDeError#\llamar\: tk, pos)
+    finsi
+    devolver Resultado#ok: tk
+finmetodo
+
+[DOCUMENTA
+@brief{Parsea un token que pase un predicado.}
+
+Este combinador parsea cualquier token que pase el predicado, que debe ser una
+función que toma un valor (el token o @pd{EOF}) y devuelve verdadero o
+falso.
+
+Si @pd{predicado} no acepta al token, @pd{generarMensajeDeError} es llamado con
+el token (o EOF) y una posición textual y debe devolver una instancia de
+@pd{Error} que contiene un mensaje, lugar y posiblemente causa apropiados.
+
+Este combinador siempre avanza el punto por 1 (el token leído).
+DOCUMENTA]
+funcion Token: predicado, generarMensajeDeError
+    variable comb
+    fijar comb a CombToken#_crear
+    fijar comb#predicado a predicado
+    fijar comb#generarMensajeDeError a generarMensajeDeError
+    devolver comb
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un combinador que acepta la palabra clave @pd{pal}.}
+
+Está implementado con @pd{Token} y comparte su mismo comportamiento con
+respecto a la posición del punto.
+DOCUMENTA]
+funcion PalabraClave: pal
+    funcion pred: tk
+        si tk = EOF
+            devolver FALSO
+        sino
+            devolver tk#esPalabraClave: pal
+        finsi
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Error#conMensajeYLugar:
+            ({Se esperaba la palabra clave [~t] pero se obtuvo ~t}#formatear: pal, (ComoTextoBonito: tk)),
+            pos
+    finfuncion
+    devolver Token: &pred, &genMensjError
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un combinador que acepta un token identificador.}
+
+Está implementado con @pd{Token} y comparte su mismo comportamiento con
+respecto a la posición del punto.
+DOCUMENTA]
+funcion Identificador
+    funcion pred: tk
+        si tk = EOF
+            devolver FALSO
+        finsi
+        devolver tk#esIdentificador
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Error#conMensajeYLugar:
+            ({Se esperaba un identificador pero se obtuvo ~t}#formatear: (ComoTextoBonito: tk)),
+            pos
+    finfuncion
+    devolver Token: &pred, &genMensjError
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un combinador que acepta un token númerico.}
+
+Está implementado con @pd{Token} y comparte su mismo comportamiento con
+respecto a la posición del punto.
+DOCUMENTA]
+funcion NumeroLiteral
+    funcion pred: tk
+        si tk = EOF
+            devolver FALSO
+        finsi
+        devolver tk#esNúmero
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Error#conMensajeYLugar:
+            ({Se esperaba un número pero se obtuvo ~t}#formatear: (ComoTextoBonito: tk)),
+            pos
+    finfuncion
+    devolver Token: &pred, &genMensjError
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un combinador que acepta un token operador.}
+
+Está implementado con @pd{Token} y comparte su mismo comportamiento con
+respecto a la posición del punto.
+DOCUMENTA]
+funcion Operador
+    funcion pred: tk
+        si tk = EOF
+            devolver FALSO
+        finsi
+        devolver tk#esOperador
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Error#conMensajeYLugar:
+            ({Se esperaba un operador pero se obtuvo ~t}#formatear: (ComoTextoBonito: tk)),
+            pos
+    finfuncion
+    devolver Token: &pred, &genMensjError
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un combinador que acepta un token de texto literal.}
+
+Está implementado con @pd{Token} y comparte su mismo comportamiento con
+respecto a la posición del punto.
+DOCUMENTA]
+funcion TextoLiteral
+    funcion pred: tk
+        si tk = EOF
+            devolver FALSO
+        finsi
+        devolver tk#esTexto
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Error#conMensajeYLugar:
+            ({Se esperaba un texto literal pero se obtuvo ~t}#formatear: (ComoTextoBonito: tk)),
+            pos
+    finfuncion
+    devolver Token: &pred, &genMensjError
+finfuncion
+
+clase CombComponer hereda Combinador
+    atributo combinadores
+    metodo parsear: tokens
+finclase
+
+metodo CombComponer#parsear: tokens
+    variable res
+    fijar res a Resultado#ok: Arreglo#vacio
+    ParaCadaElemento: yo#combinadores, procedimiento: comb
+        si res#esError devolver NULO finsi
+        variable r
+        fijar r a comb#parsear: tokens
+        si r#esError
+            fijar res#error a r#error
+        sino
+            res#valor#agregarAlFinal: r#valor
+        finsi
+    finprocedimiento
+    devolver res
+finmetodo
+
+[DOCUMENTA
+@brief{Crea un combinador que compone varios otros.}
+
+El combinador devuelto trata de parsear todos los combinadores de @pd{combs}
+(un arreglo de combinadores) en order. Avanza el punto solo en la forma que los
+combinadores de @pd{combs} lo hagan.
+
+Por ejemplo:
+
+@ejemplo|{
+variables númeroYTexto, idYTexto
+fijar númeroYTexto a Componer: (Arreglo#crearCon: NumeroLiteral, TextoLiteral)
+fijar idYTexto a Componer: (Arreglo#crearCon: Identificador, TextoLiteral)
+}|
+DOCUMENTA]
+funcion Componer: combs
+    variable comb
+    fijar comb a CombComponer#_crear
+    fijar comb#combinadores a combs
+    devolver comb
+finfuncion
+
+clase CombElegir hereda Combinador
+    atributo combinadores
+    metodo parsear: tokens
+finclase
+
+metodo CombElegir#mensajeDeError: tokens
+    variables p, tk, pos
+    fijar p a tokens#puntoActual
+    fijar tk a tokens#leerToken
+    tokens#irAPunto: p
+    si tk = EOF
+        fijar pos a AproximarPosiciónActual: tokens
+    sino
+        fijar pos a tk#áreaTextual#posiciónInicial
+    finsi
+    devolver Error#conMensajeYLugar:
+        ({No se esperaba ~t}#formatear: (ComoTextoBonito: tk)),
+        pos
+finmetodo
+
+metodo CombElegir#parsear: tokens
+    variables posIni, res, encajoCombinador
+    fijar posIni a tokens#puntoActual
+    fijar res a Resultado#error: (yo#mensajeDeError: tokens)
+    fijar encajoCombinador a FALSO
+    ParaCadaElemento: yo#combinadores, procedimiento: comb
+        si encajoCombinador devolver NULO finsi
+        variables posFinal, r
+        fijar r a comb#parsear: tokens
+        fijar posFinal a tokens#puntoActual
+        si r#esError && (posIni = posFinal)
+            [ Backtracking solo es utilizado si el combinador no consumio tokens ]
+            tokens#irAPunto: posIni
+        sino
+            fijar res a r
+            fijar encajoCombinador a VERDADERO
+        finsi
+    finprocedimiento
+    devolver res
+finmetodo
+
+[DOCUMENTA
+@brief{Devuelve un combinador que devuelve el primero de @pd{combs} que sea
+exitoso.}
+
+Trata cada uno de los combinadores en @pd{combs) (un arreglo de combinadores)
+hasta que uno tenga éxito. En especifico, si uno de los combinadores devuelve
+un error pero no avanza el punto, entonces intenta con el siguiente. Si uno de
+devuelve error y avanza el punto, este combinador devuelve el mismo error. Y
+bueno, si un combinador no devuelve un error entonces su valor es devuelto
+también de manera exitosa.
+
+Por ejemplo, supongamos que existe este combinador @pd{NúmeroNA} que intenta
+parsear un número, pero si falla no avanza el punto. Entonces podríamos crear
+un nuevo combinador:
+
+@ejemplo|{
+Elegir: (Componer: NúmeroNA, TextoLiteral),
+        (Componer: Identificador TextoLiteral)
+}|
+
+Este combinador parsea un número seguido de un texto, o un identificador
+seguido de un texto. Funciona de la siguiente manera:
+
+@itemlist(
+@item{Intenta parsear @pd{NúmeroNA}. Si @pd{NúmeroNA} logra parsear un número
+entonces intenta parsear un texto.}
+@item{Como @pd{NúmeroNA} ya parseo correctamente y avanzó el punto, si no se
+logra parsear un texto después el error es propagado y la siguiente elección no
+es intentada.}
+@item{Ya que @pd{NúmeroNA} no avanza el punto si falla, de no haber un número
+el punto de toda la primera elección no se mueve y @pd{Elegir} intenta la
+siguiente elección.}
+@item{Ámbos combinadores en la siguiente elección avanzan el punto en todo
+caso, así que cualquier error allí es propagado. Si agregáramos otra elección
+después de la segunda nunca sería elegida ya que @pd{(Componer: Identificador
+TextoLiteral)} nunca fallará sin avanzar el punto.}
+)
+DOCUMENTA]
+funcion Elegir: combs
+    variable comb
+    fijar comb a CombElegir#_crear
+    fijar comb#combinadores a combs
+    devolver comb
+finfuncion
+
+clase CombEfecto hereda Combinador
+    atributo efecto, combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombEfecto#parsear: tokens
+    variable res
+    fijar res a yo#combinador#parsear: tokens
+    si res#esOk
+        devolver Resultado#ok: (yo#efecto#\llamar\: res#valor)
+    sino
+        devolver res
+    finsi
+finmetodo
+
+[DOCUMENTA
+@brief{Devuelve un combinador que transforma un resultado.}
+
+El combinador devuelto es equivalente a @pd{combinador}, pero el valor devuelto
+por @pd{combinador} de manera exitosa es transformado con @pd{efecto} (una
+función que toma un valor y devuelve un valor) para obtener el resultado de
+este combinador de efecto.
+
+Por ejemplo: @pd{Efecto: funcion: X devolver X + 1 finfuncion,
+combinadorQueDevuelveUnNúmero} crea un combinador que parsea lo mismo que
+@pd{combinadorQueDevuelveUnNúmero} pero cualquier resultado no-erróneo de dicho
+se le suma 1. Un ejemplo más útil es el siguiente:
+
+@ejemplo|{
+funcion NúmeroLiteral'
+    devolver Efecto:
+        funcion: res
+            devolver res#valor
+        finfuncion,
+        NumeroLiteral
+finfuncion
+}|
+
+Este combinador @pd{NúmeroLiteral'} parsea exactamente lo mismo y tiene el
+mismo comportamiento que @pd{NumeroLiteral}, pero en vez de devolver en éxito
+un token @pd{TokensNS#TokenNumero} devuelve directamente el @pd{Numero}
+contenido por el token.
+DOCUMENTA]
+funcion Efecto: efecto, combinador
+    variable comb
+    fijar comb a CombEfecto#_crear
+    fijar comb#efecto a efecto
+    fijar comb#combinador a combinador
+    devolver comb
+finfuncion
+
+clase CombIntentar hereda Combinador
+    atributo combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombIntentar#parsear: tokens
+    variables posIni, res
+    fijar posIni a tokens#puntoActual
+    fijar res a yo#combinador#parsear: tokens
+    si res#esError
+        tokens#irAPunto: posIni
+    finsi
+    devolver res
+finmetodo
+
+[DOCUMENTA
+@brief{Un combinador que intenta parsear otro.}
+
+Intenta parsear con @pd{comb}. Si devuelve un valor exitoso entonces este
+combinador también devuelve el mismo valor. @pd{Intentar} solo es interesante
+cuando @pd{comb} falla: Irrelevantemente de si @pd{comb} avanzó o no el punto,
+@pd{Intenta} lo regresa a su posición antes de iniciar @pd{comb}.
+
+Esto te permite convertir combinadores que, al fallar, avanzarían el punto en
+unos que no (y los podrías utilizar, por ejemplo, junto a @pd{Elegir}).
+DOCUMENTA]
+funcion Intentar: comb
+    variable inst
+    fijar inst a CombIntentar#_crear
+    fijar inst#combinador a comb
+    devolver inst
+finfuncion
+
+clase CombMensajeDeError hereda Combinador
+    atributos mensaje, combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombMensajeDeError#parsear: tokens
+    variables res, optTk, pos
+    fijar pos a tokens#puntoActual
+    fijar optTk a tokens#leerToken
+    tokens#irAPunto: pos
+    fijar res a yo#combinador#parsear: tokens
+    si res#esError
+        si optTk = EOF
+            devolver Resultado#error: (Error#conCausa: yo#mensaje, res#error)
+        sino
+            devolver Resultado#error: (Error#enTokenConCausa: yo#mensaje, optTk, res#error)
+        finsi
+    sino
+        devolver res
+    finsi
+finmetodo
+
+[DOCUMENTA
+@brief{Cambia el mensaje de error de un combinador.}
+
+El combinador devuelto es igual a @pd{combinador}, excepto que cualquier error
+producido por @pd{combinador} es transformado para que su causa y lugar sean
+iguales, pero su mensaje sea @pd{mensaje}.
+DOCUMENTA]
+funcion MensajeDeError: mensaje, combinador
+    variable comb
+    fijar comb a CombMensajeDeError#_crear
+    fijar comb#mensaje a mensaje
+    fijar comb#combinador a combinador
+    devolver comb
+finfuncion
+
+clase CombRecursivo hereda Combinador
+    atributo obtenerCombinador
+    metodo parsear: tokens
+finclase
+
+metodo CombRecursivo#parsear: tokens
+    devolver yo#obtenerCombinador#\llamar\#parsear: tokens
+finmetodo
+
+[DOCUMENTA
+@brief{Un combinador de función.}
+
+@pd{obtenerCombinador} debe ser una función o procedimiento que, al llamarse
+sin argumentos, debe devolver un combinador. El combinador devuelto por
+@pd{obtenerCombinador} es el que será llamado para parsear los tokens.
+
+El propósito de este combinador es permitir crear gramáticas recursivas, por
+ejemplo:
+
+@ejemplo|{
+variables Valor, Paréntesis
+fijar Valor a Componer:
+    (Intenta: NumeroLiteral),
+    (Intenta: TextoLiteral),
+    (Recursivo: funcion devolver Paréntesis finfuncion)
+fijar Paréntesis a Componer:
+    (Intenta: (PalabraClave: {(})),
+    Valor,
+    (PalabraClave: {)})
+}|
+
+En la gramática anterior, @pd{Valor} depende de @pd{Lista} y @pd{Lista} de
+@pd{Valor}. Esto es posible ya que @pd{Valor} puede utilizar combinadores que
+aún no están definidos utilizando @pd{Recursivo}.
+DOCUMENTA]
+funcion Recursivo: obtenerCombinador
+    variable comb
+    fijar comb a CombRecursivo#_crear
+    fijar comb#obtenerCombinador a obtenerCombinador
+    devolver comb
+finfuncion
+
+clase CombRepetir hereda Combinador
+    atributo combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombRepetir#parsear: tokens
+    variable resultados
+    fijar resultados a Arreglo#vacio
+    mientras VERDADERO
+        variables rescomb, posIni, posFinal
+        fijar posIni a tokens#puntoActual
+        fijar rescomb a yo#combinador#parsear: tokens
+        fijar posFinal a tokens#puntoActual
+        si rescomb#esOk
+            resultados#agregarAlFinal: rescomb#valor
+        sino
+            si posIni = posFinal
+                devolver Resultado#ok: resultados
+            sino
+                devolver rescomb
+            finsi
+        finsi
+    finmientras
+finmetodo
+
+[DOCUMENTA
+@brief{Repite el combinador un número indefinído de veces.}
+
+Intenta parsear el combinador @pd{combinador} hasta que falle sin avanzar el
+punto. Cada valor exitoso es acumulado en un arreglo que es el valor de este
+combinador. Si en algún momento @pd{combinador} falla y mueve el punto el error
+es propagado.
+DOCUMENTA]
+funcion Repetir: combinador
+    variable comb
+    fijar comb a CombRepetir#_crear
+    fijar comb#combinador a combinador
+    devolver comb
+finfuncion
+
+clase CombNoSigue hereda Combinador
+    atributo combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombNoSigue#parsear: tokens
+    variables posIni, res
+    fijar posIni a tokens#puntoActual
+    fijar res a yo#combinador#parsear: tokens
+    si res#esError
+        devolver Resultado#ok: NULO
+    sino
+        variable tk
+        tokens#irAPunto: posIni
+        fijar tk a tokens#leerToken
+        devolver Resultado#error:
+            (Error#enToken:
+                ({El combinador de NoSigue la logrado parsear en ~t}#formatear: tk#áreaTextual),
+                tk)
+    finsi
+finmetodo
+
+[DOCUMENTA
+@brief{Se asegura que @pd{combinador} no parsee.}
+
+Es equivalente al operador "not" de muchas bibliotecas de combinadores.
+
+Este combinador intenta parsear @pd{combinador}. Si @pd{combinador} tiene
+éxito, el punto es avanzado @bold{solamente por 1} (irrelevantemente de cuanto
+consumió @pd{combinador}). Si @pd{combinador} no tiene éxito, este combinador
+devuelve el valor @pd{NULO} de manera exitosa y solo avanza el punto tanto como
+lo avanzó @pd{combinador} antes de fallar.
+DOCUMENTA]
+funcion NoSigue: combinador
+    variable comb
+    fijar comb a CombNoSigue#_crear
+    fijar comb#combinador a combinador
+    devolver comb
+finfuncion
+
+clase CombSigue hereda Combinador
+    atributo combinador
+    metodo parsear: tokens
+finclase
+
+metodo CombSigue#parsear: tokens
+    variables posIni, res
+    fijar posIni a tokens#puntoActual
+    fijar res a yo#combinador#parsear: tokens
+    si res#esOk
+        tokens#irAPunto: posIni
+    finsi
+    devolver res
+finmetodo
+
+[DOCUMENTA
+@brief{Este combinador hace que @pd{combinador} no avanze el punto.}
+
+Intenta parsear @pd{combinador}. Cualquier valor o error devuelto por este será
+también el valor o error devuelto por @pd{Sigue}. Si @pd{combinador} tiene
+éxito, el punto es devuelto al lugar donde estaba antes de comenzar a parsear
+@pd{combinador}.
+DOCUMENTA]
+funcion Sigue: combinador
+    variable comb
+    fijar comb a CombSigue#_crear
+    fijar comb#combinador a combinador
+    devolver comb
+finfuncion
+
+clase CombHasta hereda Combinador
+    atributos final, principal
+    metodo parsear: tokens
+finclase
+
+metodo CombHasta#parsear: tokens
+    variables resultados, terminó
+    fijar resultados a Arreglo#vacio
+    fijar terminó a FALSO
+    mientras no terminó
+        variables posIni, posFinal, resFinal, resPrincipal
+        fijar posIni a tokens#puntoActual
+        fijar resFinal a yo#final#parsear: tokens
+        fijar posFinal a tokens#puntoActual
+        si resFinal#esOk
+            fijar terminó a VERDADERO
+        sino
+            si no (posIni = posFinal)
+                devolver resFinal
+            finsi
+            tokens#irAPunto: posIni
+            fijar resPrincipal a yo#principal#parsear: tokens
+            si resPrincipal#esOk
+                resultados#agregarAlFinal: resPrincipal#valor
+            sino
+                devolver resPrincipal
+            finsi
+        finsi
+    finmientras
+    devolver Resultado#ok: resultados
+finmetodo
+
+[DOCUMENTA
+@brief{Parsea un combinador hasta que otro parsee.}
+
+Intenta parsear @pd{terminar}. Si tiene éxito entonces este combinador no
+parsea nada más. Si no tiene éxito y no avanzó el punto, intenta parsear
+@pd{comb}. Si @pd{comb} falla propaga el error. Los valores devueltos por
+@pd{comb} son acumulados en un arreglo, que es el valor de este combinador. Si
+@pd{terminar} falla pero avanzó el punto también propaga el error.
+DOCUMENTA]
+funcion Hasta: terminar, comb
+    variable inst
+    fijar inst a CombHasta#_crear
+    fijar inst#final a terminar
+    fijar inst#principal a comb
+    devolver inst
+finfuncion

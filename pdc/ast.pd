@@ -1,0 +1,403 @@
+utilizar bepd/builtins
+
+clase Nodo
+    atributos id, áreaTextual
+finclase
+
+clase NodoBloque hereda Nodo
+    atributo cuerpo
+finclase
+
+metodo NodoBloque#inicializar: área, cuerpo
+    fijar yo#áreaTextual a área
+    fijar yo#cuerpo a cuerpo
+finmetodo
+
+metodo NodoBloque#recursivo: f
+    ParaCadaElemento: yo#cuerpo, f
+finmetodo
+
+metodo NodoBloque#comoTexto
+    devolver {(NodoBloque ~t)}#formatear: yo#cuerpo
+finmetodo
+
+clase NodoPrograma hereda Nodo
+    atributo cuerpo
+finclase
+
+metodo NodoPrograma#inicializar: área, cuerpo
+    fijar yo#áreaTextual a área
+    fijar yo#cuerpo a cuerpo
+finmetodo
+
+metodo NodoPrograma#recursivo: f
+    %f: yo#cuerpo
+finmetodo
+
+metodo NodoPrograma#comoTexto
+    devolver {(NodoPrograma ~t)}#formatear: yo#cuerpo
+finmetodo
+
+clase NodoIdentificador hereda Nodo
+    atributo nombre
+    atributos esUso, esDeclaración
+finclase
+
+metodo NodoIdentificador#inicializar: área, nombre, esUso, esDeclaración
+    fijar yo#áreaTextual a área
+    fijar yo#nombre a nombre
+    fijar yo#esUso a esUso
+    fijar yo#esDeclaración a esDeclaración
+finmetodo
+
+metodo NodoIdentificador#recursivo: f
+finmetodo
+
+metodo NodoIdentificador#comoTexto
+    devolver {(NodoIdentificador ~t)}#formatear: yo#nombre
+finmetodo
+
+clase NodoVariable hereda Nodo
+    atributo nombre
+finclase
+
+metodo NodoVariable#inicializar: área, nombre
+    fijar yo#áreaTextual a área
+    fijar yo#nombre a nombre
+finmetodo
+
+metodo NodoVariable#recursivo: f
+    %f: yo#nombre
+finmetodo
+
+metodo NodoVariable#comoTexto
+    devolver {(NodoVariable ~t)}#formatear: yo#nombre
+finmetodo
+
+clase NodoFijar hereda Nodo
+    atributo objetivo, expresión
+finclase
+
+metodo NodoFijar#inicializar: área, objetivo, expresión
+    fijar yo#áreaTextual a área
+    fijar yo#objetivo a objetivo
+    fijar yo#expresión a expresión
+finmetodo
+
+metodo NodoFijar#recursivo: f
+    %f: yo#objetivo
+    %f: yo#expresión
+finmetodo
+
+metodo NodoFijar#comoTexto
+    devolver {(NodoFijar ~t a ~t)}#formatear: yo#objetivo, yo#expresión
+finmetodo
+
+clase NodoEscribir hereda Nodo
+    atributo expresión
+finclase
+
+metodo NodoEscribir#inicializar: área, expresión
+    fijar yo#áreaTextual a área
+    fijar yo#expresión a expresión
+finmetodo
+
+metodo NodoEscribir#recursivo: f
+    %f: yo#expresión
+finmetodo
+
+metodo NodoEscribir#comoTexto
+    devolver {(NodoEscribir ~t)}#formatear: yo#expresión
+finmetodo
+
+clase NodoNl hereda Nodo
+finclase
+
+metodo NodoNl#recursivo: f
+finmetodo
+
+metodo NodoNl#comoTexto
+    devolver {(NodoNl)}
+finmetodo
+
+clase NodoParámetro hereda Nodo
+    atributos identificador, esVariadic
+finclase
+
+metodo NodoParámetro#inicializar: área, identificador, esVariadic
+    fijar yo#áreaTextual a área
+    fijar yo#identificador a identificador
+    fijar yo#esVariadic a esVariadic
+finmetodo
+
+metodo NodoParámetro#recursivo: f
+    %f: yo#identificador
+finmetodo
+
+metodo NodoParámetro#comoTexto
+    devolver {(NodoParámetro ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#identificador
+finmetodo
+
+clase NodoNecesitas hereda Nodo
+    atributo expresión
+finclase
+
+metodo NodoNecesitas#inicializar: área, expresión
+    fijar yo#áreaTextual a área
+    fijar yo#expresión a expresión
+finmetodo
+
+metodo NodoNecesitas#recursivo: f
+    %f: yo#expresión
+finmetodo
+
+metodo NodoNecesitas#comoTexto
+    devolver {(NodoNecesitas ~t)}#formatear: yo#expresión
+finmetodo
+
+clase NodoDevolver hereda Nodo
+    atributo expresión
+finclase
+
+metodo NodoDevolver#inicializar: área, expresión
+    fijar yo#áreaTextual a área
+    fijar yo#expresión a expresión
+finmetodo
+
+metodo NodoDevolver#recursivo: f
+    %f: yo#expresión
+finmetodo
+
+metodo NodoDevolver#comoTexto
+    devolver {(NodoDevolver ~t)}#formatear: yo#expresión
+finmetodo
+
+clase NodoSi hereda Nodo
+    atributos condición, cuerpoSiVerdadero, cuerpoSiFalso
+finclase
+
+metodo NodoSi#inicializar: área, condición, cuerpoSiVerdadero, cuerpoSiFalso
+    fijar yo#áreaTextual a área
+    fijar yo#condición a condición
+    fijar yo#cuerpoSiVerdadero a cuerpoSiVerdadero
+    fijar yo#cuerpoSiFalso a cuerpoSiFalso
+finmetodo
+
+metodo NodoSi#recursivo: f
+    %f: yo#condición
+    %f: yo#cuerpoSiVerdadero
+    %f: yo#cuerpoSiFalso
+finmetodo
+
+metodo NodoSi#comoTexto
+    devolver {(NodoSi ~t entonces ~t si no ~t)}#formatear:
+        yo#condición, yo#cuerpoSiVerdadero, yo#cuerpoSiFalso
+finmetodo
+
+clase NodoMientras hereda Nodo
+    atributo condición, cuerpo
+finclase
+
+metodo NodoMientras#inicializar: área, condición, cuerpo
+    fijar yo#áreaTextual a área
+    fijar yo#condición a condición
+    fijar yo#cuerpo a cuerpo
+finmetodo
+
+metodo NodoMientras#recursivo: f
+    %f: yo#condición
+    %f: yo#cuerpo
+finmetodo
+
+metodo NodoMientras#comoTexto
+    devolver {(NodoMientras ~t entonces ~t)}#formatear: yo#condición, yo#cuerpo
+finmetodo
+
+clase NodoUtilizar hereda Nodo
+    atributos módulo, espacioDeNombres, nombresEspecíficos
+finclase
+
+metodo NodoUtilizar#inicializar: área, módulo, espacioDeNombres, nombresEspecíficos
+    fijar yo#áreaTextual a área
+    fijar yo#módulo a módulo
+    fijar yo#espacioDeNombres a espacioDeNombres
+    fijar yo#nombresEspecíficos a nombresEspecíficos
+finmetodo
+
+metodo NodoUtilizar#recursivo: f
+    %f: yo#módulo
+    si no EsNulo: yo#espacioDeNombres
+        %f: yo#espacioDeNombres
+    finsi
+    si no EsNulo: yo#nombresEspecíficos
+        ParaCadaElemento: yo#nombresEspecíficos, f
+    finsi
+finmetodo
+
+metodo NodoUtilizar#comoTexto
+    devolver {(NodoUtilizar ~t // ~t // ~t)}#formatear:
+        yo#módulo, yo#espacioDeNombres, yo#nombresEspecíficos
+finmetodo
+
+clase NodoNombreEspecífico hereda Nodo
+    atributos debeRenombrarse, nombre, renombre
+finclase
+
+metodo NodoNombreEspecífico#inicializar: área, nombre, renombre
+    fijar yo#áreaTextual a área
+    fijar yo#debeRenombrarse a no EsNulo: renombre
+    fijar yo#nombre a nombre
+    fijar yo#renombre a renombre
+finmetodo
+
+metodo NodoNombreEspecífico#recursivo: f
+    %f: yo#nombre
+    si yo#debeRenombrarse
+        %f: yo#renombre
+    finsi
+finmetodo
+
+metodo NodoNombreEspecífico#comoTexto
+    devolver {(NodoNombreEspecífico ~t ~t)}#formatear: yo#nombre, yo#renombre
+finmetodo
+
+clase NodoLiteralNumérica hereda Nodo
+    atributo valor
+finclase
+
+metodo NodoLiteralNumérica#inicializar: área, valor
+    fijar yo#áreaTextual a área
+    fijar yo#valor a valor
+finmetodo
+
+metodo NodoLiteralNumérica#recursivo: f
+finmetodo
+
+metodo NodoLiteralNumérica#comoTexto
+    devolver {(NodoLiteralNumérica ~t)}#formatear: yo#valor
+finmetodo
+
+clase NodoLiteralTextual hereda Nodo
+    atributo valor
+finclase
+
+metodo NodoLiteralTextual#inicializar: área, valor
+    fijar yo#áreaTextual a área
+    fijar yo#valor a valor
+finmetodo
+
+metodo NodoLiteralTextual#recursivo: f
+finmetodo
+
+metodo Nodo#comoTexto
+    devolver {(NodoLiteralTextual ~t)}#formatear: yo#valor
+finmetodo
+
+clase NodoArgumento hereda Nodo
+    atributos expresión, esVariadic
+finclase
+
+metodo NodoArgumento#inicializar: área, expresión, esVariadic
+    fijar yo#áreaTextual a área
+    fijar yo#expresión a expresión
+    fijar yo#esVariadic a esVariadic
+finmetodo
+
+metodo NodoArgumento#recursivo: f
+    %f: yo#expresión
+finmetodo
+
+metodo NodoArgumento#comoTexto
+    devolver {(NodoArgumento ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#expresión
+finmetodo
+
+clase NodoEnviarMensaje hereda Nodo
+    atributos objeto, mensaje, argumentos
+finclase
+
+metodo NodoEnviarMensaje#inicializar: área, objeto, mensaje, argumentos
+    fijar yo#áreaTextual a área
+    fijar yo#objeto a objeto
+    fijar yo#mensaje a mensaje
+    fijar yo#argumentos a argumentos
+finmetodo
+
+metodo NodoEnviarMensaje#recursivo: f
+    %f: yo#objeto
+    ParaCadaElemento: yo#argumentos, f
+finmetodo
+
+metodo NodoEnviarMensaje#comoTexto
+    devolver {(NodoEnviarMensaje ~t # ~t : ~t)}#formatear: yo#objeto, yo#mensaje, yo#argumentos
+finmetodo
+
+clase NodoFunciónAnónima hereda Nodo
+    atributos parámetros, cuerpo
+finclase
+
+metodo NodoFunciónAnónima#inicializar: área, parámetros, cuerpo
+    fijar yo#áreaTextual a área
+    fijar yo#parámetros a parámetros
+    fijar yo#cuerpo a cuerpo
+finmetodo
+
+metodo NodoFunciónAnónima#recursivo: f
+    ParaCadaElemento: yo#parámetros, f
+    %f: yo#cuerpo
+finmetodo
+
+metodo NodoFunciónAnónima#comoTexto
+    devolver {(NodoFunciónAnónima ~t ~t)}#formatear: yo#parámetros, yo#cuerpo
+finmetodo
+
+clase NodoNo hereda Nodo
+    atributo expresión
+finclase
+
+metodo NodoNo#inicializar: área, expresión
+    fijar yo#áreaTextual a área
+    fijar yo#expresión a expresión
+finmetodo
+
+metodo NodoNo#recursivo: f
+    %f: yo#expresión
+finmetodo
+
+metodo NodoNo#comoTexto
+    devolver {(NodoNo ~t)}#formatear: yo#expresión
+finmetodo
+
+clase NodoSonIdénticos hereda Nodo
+    atributo lhs, rhs
+finclase
+
+metodo NodoSonIdénticos#inicializar: área, lhs, rhs
+    fijar yo#áreaTextual a área
+    fijar yo#lhs a lhs
+    fijar yo#rhs a rhs
+finmetodo
+
+metodo NodoSonIdénticos#recursivo: f
+    %f: yo#lhs
+    %f: yo#rhs
+finmetodo
+
+metodo NodoSonIdénticos#comoTexto
+    devolver {(NodoSonIdénticos ~t y ~t)}#formatear: yo#lhs, yo#rhs
+finmetodo
+
+clase NodoBuiltin hereda Nodo
+    atributo nombre
+finclase
+
+metodo NodoBuiltin#inicializar: área, nombre
+    fijar yo#áreaTextual a área
+    fijar yo#nombre a nombre
+finmetodo
+
+metodo NodoBuiltin#recursivo: f
+finmetodo
+
+metodo NodoBuiltin#comoTexto
+    devolver {(NodoBuiltin ~t)}#formatear: yo#nombre
+finmetodo

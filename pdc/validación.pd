@@ -1,0 +1,42 @@
+utilizar bepd/builtins
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/catamorfismos (Buscando, Buscando')
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback)
+
+funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst
+    Buscando': cst, funcion: cst
+        devolver EsInstancia: cst, CST#NodoLlamarProcedimiento
+    finfuncion, funcion: cst, continuar
+        variables reg, binding
+        fijar reg a tablasRnCst#tablaUsos#buscarÚnico: {idNodo}, cst#proc#id
+        fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
+        si no binding#esAutoejecutable
+            Escribir:
+                (ErrorComoTraceback:
+                    (Error#conMensajeYLugar:
+                        ({La variable ~t no es autoejecutable}#formatear: cst#proc#nombre),
+                        cst#proc#áreaTextual))
+            __FallarConMensaje: {Variable no es autoejecutable}
+        finsi
+        devolver %continuar
+    finfuncion
+finfuncion
+
+funcion ValidaDevolverFueraDeFunción: ast
+    Buscando: ast, funcion: ast
+        devolver (EsInstancia: ast, AST#NodoFunciónAnónima)
+              || (EsInstancia: ast, AST#NodoDevolver)
+    finfuncion, funcion: ast
+        si EsInstancia: ast, AST#NodoDevolver
+            Escribir:
+                (ErrorComoTraceback:
+                    (Error#conMensajeYLugar:
+                        {Devolver fuera de una función/método/procedimiento},
+                        ast#áreaTextual))
+            __FallarConMensaje: {Devolver fuera de una función/método/procedimiento}
+        finsi
+    finfuncion
+finfuncion

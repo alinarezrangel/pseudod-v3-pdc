@@ -1,0 +1,11 @@
+clase Hola
+    atributo hola
+finclase
+atributo Hola#mundo
+metodo Hola#adios: A, B
+    devolver yo#hola + yo#mundo
+finmetodo
+metodo estatico Hola#saludar
+    variables Z, Y
+    devolver 12
+finmetodo

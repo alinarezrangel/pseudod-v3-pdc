@@ -1,0 +1,7 @@
+funcion Hola
+    devolver 2
+finfuncion
+
+variable Adios
+
+Hola: (Adios: 2)

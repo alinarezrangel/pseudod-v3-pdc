@@ -1,0 +1,7 @@
+variables A, B, C
+clase Hola hereda A
+    atributos A, B, C
+finclase
+clase Adios hereda Hola
+    atributos C, D, E
+finclase

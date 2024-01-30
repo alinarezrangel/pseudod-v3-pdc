@@ -1,0 +1,8 @@
+si 1
+    escribir 2
+finsi
+si 3
+    escribir 4
+sino
+    escribir 5
+finsi

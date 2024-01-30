@@ -1,0 +1,7 @@
+funcion Hola
+    Mundo
+finfuncion
+
+funcion Mundo
+    Hola
+finfuncion

@@ -1,0 +1,1124 @@
+utilizar bepd/builtins
+utilizar bepd/utilidades/texto
+utilizar bepd/x/puerto como Puerto (EOF)
+utilizar bepd/x/puerto/conPosición como PuertoConPos
+utilizar bepd/algoritmos como Algoritmos
+
+utilizar pdc/tokens como Tokens
+utilizar pdc/tokenizador como Tokenizador
+utilizar pdc/combinadores como Comb
+utilizar pdc/cst como CST
+
+[ Por conveniencia, este módulo define algunos "aliases" simples para los
+  combinadores. ]
+
+funcion kw: K  [ => TokenPalabraClave ]
+    devolver Comb#PalabraClave: K
+finfuncion
+
+funcion id  [ => TokenIdentificador ]
+    devolver Comb#Identificador
+finfuncion
+
+funcion op  [ => TokenOperador ]
+    devolver Comb#Operador
+finfuncion
+
+funcion num  [ => TokenNumero ]
+    devolver Comb#NumeroLiteral
+finfuncion
+
+funcion txtlit  [ => TokenTexto ]
+    devolver Comb#TextoLiteral
+finfuncion
+
+funcion seq: ...K  [ => Arreglo con (K#en:0), (K#en:1), ... ]
+    devolver Comb#Componer: K
+finfuncion
+
+funcion alt: ...K  [ => (K#en:0) o (K#en:1) o ... ]
+    devolver Comb#Elegir: K
+finfuncion
+
+funcion msjerror: msj, K  [ => K ]
+    devolver Comb#MensajeDeError: msj, K
+finfuncion
+
+funcion try: ...K  [ => Arreglo con ...K ]
+    devolver Comb#Intentar: (Aplicar: &seq, K)
+finfuncion
+
+funcion try': K  [ => K ]
+    devolver Comb#Intentar: K
+finfuncion
+
+funcion delay: mk  [ => mk#\llamar\ ]
+    devolver Comb#Recursivo: mk
+finfuncion
+
+funcion rep0': K  [ => Arreglo de K ]
+    devolver Comb#Repetir: K
+finfuncion
+
+funcion rep0: ...K  [ => Arreglo de (Arreglo con (K#en:0), (K#en:1), ...) ]
+    devolver Comb#Repetir: (Aplicar: &seq, K)
+finfuncion
+
+funcion rep1': K  [ => Arreglo de K, con al menos un K ]
+    devolver Comb#Efecto:
+        funcion: res
+            devolver (ArregloConFinal: (res#en: 0), (res#en: 1))
+        finfuncion,
+        (seq: K, (rep0': K))
+finfuncion
+
+funcion rep1: ...K  [ => Arreglo de (Arreglo con (K#en:0), (K#en:1), ...) ]
+    [ Tal como rep1', el arreglo devuelto siempre contiene al menos un elemento ]
+    devolver rep1': (Aplicar: &seq, K)
+finfuncion
+
+funcion nada  [ => Arreglo vacío ]
+    devolver seq
+finfuncion
+
+funcion opt: K  [ => K o Arreglo vacío ]
+    devolver alt: K, nada
+finfuncion
+
+funcion opt': ...K  [ => (Arreglo con Ks...) o Arreglo vacío ]
+    devolver opt: (Aplicar: &seq, K)
+finfuncion
+
+funcion delim1: comb, sep  [ => Arreglo de comb, con al menos un elemento ]
+    devolver Comb#Efecto:
+        funcion: res
+            variables valores, reps, i
+            fijar valores a Arreglo#crearCon: (res#en: 0)
+            fijar reps a res#en: 1
+            ParaCadaElemento: reps, procedimiento: el
+                valores#agregarAlFinal: (el#en: 1)
+            finprocedimiento
+            devolver valores
+        finfuncion,
+        (seq: comb, (rep0: sep, comb))
+finfuncion
+
+funcion delim0: comb, sep  [ => Arreglo de comb ]
+    devolver opt: (delim1: comb, sep)
+finfuncion
+
+funcion not: comb
+    devolver Comb#NoSigue: comb
+finfuncion
+
+funcion not': ...K
+    devolver not: (Aplicar: &seq, K)
+finfuncion
+
+funcion until: term, rep
+    devolver Comb#Hasta: term, rep
+finfuncion
+
+funcion eof
+    funcion pred: tk
+        devolver tk = Puerto#EOF
+    finfuncion
+    funcion genMensjError: tk, pos
+        devolver Comb#Error#conMensajeYLugar: ({Se esperaba el fin del programa pero se obtuvo ~t}#formatear: (Comb#ComoTextoBonito: tk)), pos
+    finfuncion
+    devolver Comb#Token: &pred, &genMensjError
+finfuncion
+
+funcion bloque: hasta
+    devolver Comb#Efecto:
+        funcion: res
+            variables bloque, área
+            fijar bloque a CST#NodoBloque#crear
+            fijar bloque#instrucciones a res
+            si bloque#instrucciones#longitud = 0
+                variable pos
+                fijar pos a (PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0)
+                fijar área a Tokens#ÁreaTextual#crear: pos, pos
+            sino
+                fijar área a AreaTotal: (bloque#instrucciones#en: 0), (ÚltimoElemento: bloque#instrucciones)
+            finsi
+            fijar bloque#áreaTextual a área
+            devolver bloque
+        finfuncion,
+        (until: hasta, (delay: funcion devolver grInstrucción finfuncion))
+finfuncion
+
+funcion bloque'
+    devolver Comb#Efecto:
+        funcion: res
+            variables bloque, área
+            fijar bloque a CST#NodoBloque#crear
+            fijar bloque#instrucciones a res
+            si bloque#instrucciones#longitud = 0
+                variable pos
+                fijar pos a (PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0)
+                fijar área a Tokens#ÁreaTextual#crear: pos, pos
+            sino
+                fijar área a AreaTotal: (bloque#instrucciones#en: 0), (ÚltimoElemento: bloque#instrucciones)
+            finsi
+            fijar bloque#áreaTextual a área
+            devolver bloque
+        finfuncion,
+        (rep0': (delay: funcion devolver grInstrucción finfuncion))
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve un area textual que incluye a @pd{inicio} y a @pd{final}.}
+
+@pd{inicio} y @pd{final} pueden ser tokens o nodos. El area textual devuelta va
+desde el inicio de @pd{inicio} hasta el final de @pd{final}. @pd{inicio} y
+@pd{final} pueden ser de tipos distíntos (por ejemplo, uno un token y el otro
+un nodo).
+DOCUMENTA]
+funcion AreaTotal: inicio, final
+    variables areaInicio, areaFinal
+    fijar areaInicio a inicio#áreaTextual
+    fijar areaFinal a final#áreaTextual
+    devolver Tokens#ÁreaTextual#crear: areaInicio#posiciónInicial, areaFinal#posiciónFinal
+finfuncion
+
+[DOCUMENTA
+@brief{La tabla de precedencia de operadores.}
+
+Un arreglo ordenado por prioridad (mayor prioridad al principio, menor al
+final).
+
+Cada elemento es un segundo arreglo con los textos que son los
+operadores. Todos los elementos de estos arreglos tienen la misma prioridad.
+DOCUMENTA]
+variable TABLA_DE_PRECEDENCIA
+fijar TABLA_DE_PRECEDENCIA a
+    (Arreglo#crearCon:
+        (Arreglo#crearCon: {*}, {/}),
+        (Arreglo#crearCon: {+}, {-}),
+        (Arreglo#crearCon: {<}, {>}, {=<}, {>=}, {=}, {==}, {===}),
+        (Arreglo#crearCon: {&&}, {||})
+        )
+
+[DOCUMENTA
+@brief{Todos los operadores del lenguaje.}
+
+Un arreglo con todos los operadores (como textos).
+DOCUMENTA]
+variable OPERADORES
+fijar OPERADORES a Aplanar: TABLA_DE_PRECEDENCIA
+
+[DOCUMENTA
+@brief{Determina si @pd{obj} es un token operador}
+DOCUMENTA]
+funcion EsOperador: obj
+    si EsInstancia: obj, Tokens#Token
+        devolver obj#esOperador
+    sino
+        devolver FALSO
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve la precedencia de un operador.}
+
+Mientras más grande el número devuelto, mayor es la precedencia.
+DOCUMENTA]
+funcion PrecedenciaDe: tokenOperador
+    variable precedenciaInversa
+    fijar precedenciaInversa a 0
+    ParaCadaElementoConÍndice: TABLA_DE_PRECEDENCIA, procedimiento: ops, idx
+        si Contiene: ops, tokenOperador#contenido
+            fijar precedenciaInversa a idx
+        finsi
+    finprocedimiento
+    devolver (TABLA_DE_PRECEDENCIA#longitud - 1) - precedenciaInversa
+finfuncion
+
+[DOCUMENTA
+@brief{Resuelve la precedencia de una expresión.}
+
+@pd{seq} es un arreglo de nodos y @pd{Tokens#TokenOperador} de la forma
+@code{nodo, op, nodo, op ....}. Estos son agrupados en distíntos
+@pd{CST#NodoOperador} de acuerdo a su precedencia.
+DOCUMENTA]
+funcion ShuntingYard: seq
+    devolver Algoritmos#ShuntingYard: seq, funcion: A, op, B
+        devolver clonar CST#NodoOperador#crear con
+            áreaTextual: (AreaTotal: A, B)
+            lhs: A
+            op: op
+            rhs: B
+        finclonar
+    finfuncion, &PrecedenciaDe, &EsOperador
+finfuncion
+
+variable grId
+fijar grId a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoIdentificador#crear con
+                áreaTextual: res#áreaTextual
+                nombre: res#contenido
+                esLiteral: FALSO
+                aplicaAutoejecución: FALSO
+            finclonar
+        finfuncion,
+        id
+
+variable grNum
+fijar grNum a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoNumeroLiteral#crear con
+                áreaTextual: res#áreaTextual
+                valor: res#contenido
+            finclonar
+        finfuncion,
+        num
+
+variable grTexto
+fijar grTexto a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoTextoLiteral#crear con
+                áreaTextual: res#áreaTextual
+                valor: res#contenido
+            finclonar
+        finfuncion,
+        txtlit
+
+variable grParens
+fijar grParens a
+    Comb#Efecto:
+        funcion: res
+            devolver res#en: 1
+        finfuncion,
+        (seq:
+            (try': (kw: {(})),
+            (delay: funcion devolver grExpr finfuncion),
+            (kw: {)}))
+
+variable grVariadicArg
+fijar grVariadicArg a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoVariadic#crear con
+                áreaTextual: AreaTotal: ((res#en: 0)#en: 0), (res#en: 1)
+                interno: res#en: 1
+            finclonar
+        finfuncion,
+        (seq: (try: (kw: {.}), (kw: {.}), (kw: {.})), (alt: grParens, grId))
+
+variable grArgumentos
+fijar grArgumentos a
+    Comb#Efecto:
+        funcion: res
+            devolver res#en: 1
+        finfuncion,
+        (seq:
+            (try': (kw: {:})),
+            (delim1:
+                (alt:
+                    grVariadicArg,
+                    (delay: funcion devolver grExprSinOperador finfuncion)),
+                (try': (kw: {,}))))
+
+variable grLlamarProc
+fijar grLlamarProc a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoLlamarProcedimiento#crear con
+                áreaTextual: (AreaTotal: ((res#en: 0)#en: 0), ((res#en: 0)#en: 1))
+                proc: (res#en: 0)#en: 0
+                argumentos: res#en: 1
+            finclonar
+        finfuncion,
+        (seq: (try: grId, (Comb#Sigue: (kw: {:}))), grArgumentos)
+
+variable idORefMensaje
+fijar idORefMensaje a
+    Comb#Efecto:
+        funcion: res
+            si EsInstancia: res, CST#NodoIdentificador
+                devolver Arreglo#crearCon: res
+            sino
+                variables base, msgs
+                fijar base a res#en: 1
+                fijar msgs a Mapear: (res#en: 2), funcion: el
+                    devolver el#en: 1
+                finfuncion
+                devolver ArregloConFinal: base, msgs
+            finsi
+        finfuncion,
+        (alt:
+            (try': grId),
+            (seq:
+                (kw: {(}),
+                grId,
+                (rep0: (try': (kw: {#})), id),
+                (kw: {)})))
+
+variable grNoLlamar
+fijar grNoLlamar a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoNoLlamar#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (ÚltimoElemento: (res#en: 1))
+                base: (res#en: 1)#en: 0
+                mensajes: PedazoDeArreglo: (res#en: 1), 1, -1
+            finclonar
+        finfuncion,
+        (seq: (try': (kw: {&})), idORefMensaje)
+
+variable grAutoejecutar
+fijar grAutoejecutar a
+    Comb#Efecto:
+        funcion: res
+            variables base, argumentos, nodoFinal
+            fijar base a res#en: 1
+            fijar argumentos a res#en: 2
+            si argumentos#longitud > 0
+                fijar nodoFinal a ÚltimoElemento: argumentos
+            sino
+                fijar nodoFinal a base
+            finsi
+            devolver clonar CST#NodoAutoejecutar#crear con
+                áreaTextual: AreaTotal: base, nodoFinal
+                expr: base
+                argumentos: argumentos
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {%})),
+            (alt: grParens, grId),
+            (opt: grArgumentos))
+
+variable grVariadic
+fijar grVariadic a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoVariadic#crear con
+                áreaTextual: AreaTotal: ((res#en: 0)#en: 0), (res#en: 1)
+                interno: res#en: 1
+            finclonar
+        finfuncion,
+        (seq: (try: (kw: {.}), (kw: {.}), (kw: {.})), grId)
+
+variable grParámetrosDeFunción
+fijar grParámetrosDeFunción a
+    Comb#Efecto:
+        funcion: res
+            variables parte, params
+            fijar params a Arreglo#vacio
+            si res#longitud > 0
+                fijar params a res#en: 1
+                ParaCadaElementoConÍndice: params, funcion: param, i
+                    si EsInstancia: param, CST#NodoVariadic
+                        fijar param#interno#esDefinición a VERDADERO
+                        fijar param#interno#esDefiniciónAutoejecutable a FALSO
+                    sino
+                        fijar param#esDefinición a VERDADERO
+                        fijar param#esDefiniciónAutoejecutable a FALSO
+                    finsi
+
+                    si (EsInstancia: param, CST#NodoVariadic) && no (i = (params#longitud - 1))
+                        __FallarConMensaje: {Variadic solo puede estar al final de la lista de parámetros}
+                    finsi
+                finfuncion
+            finsi
+            devolver params
+        finfuncion,
+        (msjerror: {En los parámetros de una función/metodo/procedimiento:},
+            (opt':
+                (try': (kw: {:})),
+                (delim1:
+                    (alt: grVariadic, grId),
+                    (try': (kw: {,})))))
+
+variable grFunciónAnónima
+fijar grFunciónAnónima a
+    Comb#Efecto:
+        funcion: res
+            variables esMet, params, cuerpo
+            fijar esMet a (res#en: 0)#contenido = {metodo}
+            fijar params a res#en: 1
+            fijar cuerpo a res#en: 2
+            devolver clonar CST#NodoFunciónAnónima#crear con
+                áreaTextual: (res#en: 0)#áreaTextual
+                esMétodo: esMet
+                parámetros: params
+                cuerpo: cuerpo
+            finclonar
+        finfuncion,
+        (seq:
+            (alt:
+                (try': (kw: {funcion})),
+                (try': (kw: {procedimiento})),
+                (try': (kw: {metodo}))),
+            grParámetrosDeFunción,
+            (bloque:
+                (alt:
+                    (try': (kw: {finfuncion})),
+                    (try': (kw: {finmetodo})),
+                    (try': (kw: {finprocedimiento})))))
+
+variable grEnviarMensaje
+fijar grEnviarMensaje a
+    Comb#Efecto:
+        funcion: res
+            variable args
+            fijar args a res#en: 2
+            devolver clonar CST#NodoEnviarMensaje#crear con
+                áreaTextual: (res#en: 0)#áreaTextual
+                objeto: NULO
+                mensaje: (res#en: 1)#contenido
+                argumentos: args
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {#})),
+            id,
+            (opt: grArgumentos))
+
+variable grSonIguales
+fijar grSonIguales a
+    Comb#Efecto:
+        funcion: res
+            variables tipoIgualdad, lhs, rhs, pc
+            fijar pc a (res#en: 1)#contenido
+            si pc = {iguales}
+                fijar tipoIgualdad a CST#TipoIgualdad#IGUALES
+            sino
+                si (pc = {identicos}) || (pc = {identicas})
+                    fijar tipoIgualdad a CST#TipoIgualdad#IDÉNTICOS
+                sino
+                    fijar tipoIgualdad a CST#TipoIgualdad#DIFERENTES
+                finsi
+            finsi
+            fijar lhs a res#en: 2
+            fijar rhs a res#en: 4
+            devolver clonar CST#NodoSonIguales#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 4)
+                lhs: lhs
+                tipoIgualdad: tipoIgualdad
+                rhs: rhs
+            finclonar
+        finfuncion,
+        (seq:
+            (alt:
+                (try': (kw: {son})),
+                (try': (kw: {sean}))),
+            (alt:
+                (try': (kw: {iguales})),
+                (try': (kw: {diferentes})),
+                (try': (kw: {identicos})),
+                (try': (kw: {identicas}))),
+            (delay: funcion devolver grExpr finfuncion),
+            (kw: {y}),
+            (delay: funcion devolver grExpr finfuncion))
+
+variable grNo
+fijar grNo a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoNo#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 1)
+                expresión: res#en: 1
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {no})),
+            (delay: funcion devolver grExpr finfuncion))
+
+variable grClonar
+fijar grClonar a
+    Comb#Efecto:
+        funcion: res
+            variables exprAClonar, campos
+            fijar exprAClonar a res#en: 1
+            fijar campos a Mapear: (res#en: 3), funcion: res
+                devolver Arreglo#crearCon: (res#en: 0)#contenido, (res#en: 2)
+            finfuncion
+            devolver clonar CST#NodoClonar#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 4)
+                expresiónAClonar: exprAClonar
+                campos: campos
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {clonar})),
+            (delay: funcion devolver grExpr finfuncion),
+            (kw: {con}),
+            (rep0: (try': id), (kw: {:}), (delay: funcion devolver grExpr finfuncion)),
+            (kw: {finclonar}))
+
+variable grExprSinOperador
+fijar grExprSinOperador a
+    Comb#Efecto:
+        funcion: res
+            variables obj, mensajes
+            fijar obj a res#en: 0
+            si EsInstancia: obj, CST#NodoIdentificador
+                fijar obj#aplicaAutoejecución a VERDADERO
+            finsi
+            fijar mensajes a res#en: 1
+            ParaCadaElemento: mensajes, procedimiento: mensaje
+                fijar obj a clonar mensaje con
+                    objeto: obj
+                finclonar
+            finprocedimiento
+            devolver obj
+        finfuncion,
+        (seq:
+            (alt:
+                grParens,
+                grLlamarProc,
+                grNoLlamar,
+                grAutoejecutar,
+                grFunciónAnónima,
+                grSonIguales,
+                grNo,
+                grClonar,
+                (try': grId),
+                (try': grNum),
+                (try': grTexto)),
+            (rep0': grEnviarMensaje))
+
+variable grOperador
+fijar grOperador a (seq: (try': op), grExprSinOperador)
+
+variable grExpr
+fijar grExpr a
+    Comb#Efecto:
+        funcion: res
+            variables r, exprBase, ops, seq
+            fijar exprBase a res#en: 0
+            fijar ops a res#en: 1
+            fijar seq a Concatenar: (Arreglo#crearCon: exprBase), (Aplanar: ops)
+            devolver ShuntingYard: seq
+        finfuncion,
+        (seq: grExprSinOperador, (rep0': grOperador))
+
+variable grObjetivoSimple
+fijar grObjetivoSimple a grId
+
+variable grObjetivoComplejoInicio
+fijar grObjetivoComplejoInicio a (alt: grParens, grId)
+
+variable grObjetivoMétodo
+fijar grObjetivoMétodo a
+    Comb#Efecto:
+        funcion: res
+            variables mensajesUnarios, mensajesFinales, obj
+            fijar obj a res#en: 0
+            fijar mensajesFinales a res#en: 1
+            ParaCadaElemento: mensajesFinales, procedimiento: mensajeFinal
+                fijar obj a clonar mensajeFinal con
+                    objeto: obj
+                finclonar
+            finprocedimiento
+            devolver obj
+        finfuncion,
+        (seq:
+            grObjetivoComplejoInicio,
+            (rep1': grEnviarMensaje))
+
+variable grObjetivo
+fijar grObjetivo a
+    (alt: (try': grObjetivoMétodo), grObjetivoSimple)
+
+variable grVariable
+fijar grVariable a
+    Comb#Efecto:
+        funcion: res
+            variable nombres
+            fijar nombres a res#en: 1
+            ParaCadaElemento: nombres, procedimiento: nombre
+                fijar nombre#esDefinición a VERDADERO
+                fijar nombre#esDefiniciónAutoejecutable a FALSO
+            finprocedimiento
+            devolver clonar CST#NodoVariable#crear con
+                áreaTextual: (AreaTotal: (res#en: 0), (res#en: 0))
+                nombres: nombres
+            finclonar
+        finfuncion,
+        (seq:
+            (alt:
+                (try': (kw: {variable})),
+                (try': (kw: {variables})),
+                (try': (kw: {adquirir}))),
+            (msjerror: {En los nombres de las variables a crear:},
+                       (delim1: grId, (try': (kw: {,})))))
+
+variable grFijar
+fijar grFijar a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoFijar#crear con
+                áreaTextual: (AreaTotal: (res#en: 0), (res#en: 3))
+                objetivo: (res#en: 1)
+                valor: (res#en: 3)
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {fijar})),
+            (msjerror: {En el objetivo de `fijar`:}, grObjetivo),
+            (kw: {a}),
+            (msjerror: {Se esperaba una expresión (el valor de `fijar`)}, grExpr))
+
+variable grEscribir
+fijar grEscribir a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoEscribir#crear con
+                áreaTextual: (AreaTotal: (res#en: 0), (res#en: 1))
+                valor: (res#en: 1)
+            finclonar
+        finfuncion,
+        (msjerror: {En `escribir`:},
+            (seq: (try': (kw: {escribir})), grExpr))
+
+variable grNl
+fijar grNl a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoNl#crear con
+                áreaTextual: res#áreaTextual
+            finclonar
+        finfuncion,
+        (try': (kw: {nl}))
+
+variable grAtributoClaseSinEfecto
+fijar grAtributoClaseSinEfecto a
+    (seq:
+        (alt: (try': (kw: {atributo})), (try': (kw: {atributos}))),
+        (delim1: grId, (try': (kw: {,}))))
+
+variable grAtributoClase
+fijar grAtributoClase a
+    Comb#Efecto:
+        funcion: res
+            variables nombres
+            fijar nombres a res#en: 1
+            ParaCadaElemento: nombres, procedimiento: nombre
+                fijar nombre#esLiteral a VERDADERO
+            finprocedimiento
+            devolver clonar CST#NodoDeclaraciónDeAtributosEnClase#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
+                nombres: nombres
+            finclonar
+        finfuncion,
+        grAtributoClaseSinEfecto
+
+variable grMétodoClase
+fijar grMétodoClase a
+    Comb#Efecto:
+        funcion: res
+            variables esEstático, nombre, params
+
+            fijar esEstático a no EsInstancia: (res#en: 1), Arreglo
+            fijar nombre a res#en: 2
+            fijar nombre#esLiteral a VERDADERO
+            fijar params a res#en: 3
+            devolver clonar CST#NodoDeclaraciónDeMétodoEnClase#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
+                esEstático: esEstático
+                nombre: nombre
+                parámetros: params
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {metodo})),
+            (opt': (try': (kw: {estatico}))),
+            grId,
+            grParámetrosDeFunción)
+
+variable grCuerpoDeClase
+fijar grCuerpoDeClase a
+    (alt: grAtributoClase, grMétodoClase)
+
+variable grClase
+fijar grClase a
+    Comb#Efecto:
+        funcion: res
+            variables nombre, claseBase, implementaClases, extiendeClases, cuerpo
+
+            fijar nombre a res#en: 1
+            fijar nombre#esDefinición a VERDADERO
+            fijar nombre#esDefiniciónAutoejecutable a FALSO
+
+            si (res#en: 2)#longitud = 0
+                fijar claseBase a NULO
+            sino
+                fijar claseBase a (res#en: 2)#en: 1
+            finsi
+
+            fijar implementaClases a Arreglo#vacio
+            ParaCadaElementoConÍndice: (res#en: 3), procedimiento: el, i
+                implementaClases#agregarAlFinal: (el#en: 1)
+            finprocedimiento
+
+            fijar extiendeClases a Arreglo#vacio
+            ParaCadaElementoConÍndice: (res#en: 4), procedimiento: el, i
+                extiendeClases#agregarAlFinal: (el#en: 1)
+            finprocedimiento
+
+            fijar cuerpo a res#en: 5
+
+            devolver clonar CST#NodoClase#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
+                nombre: nombre
+                claseBase: claseBase
+                implementaClases: implementaClases
+                extiendeClases: extiendeClases
+                declaraciones: cuerpo
+            finclonar
+        finfuncion,
+        (seq:
+            (try': (kw: {clase})),
+            grId,
+            (opt': (try': (kw: {hereda})), (delay: funcion devolver grExpr finfuncion)),
+            (rep0: (try': (kw: {implementa})), (delay: funcion devolver grExpr finfuncion)),
+            (rep0: (try': (kw: {extiende})), (delay: funcion devolver grExpr finfuncion)),
+            (until:
+                (try': (kw: {finclase})),
+                grCuerpoDeClase))
+
+variable grFunción
+fijar grFunción a
+    Comb#Efecto:
+        funcion: res
+            variables nombre, params, cuerpo
+            fijar nombre a res#en: 1
+            fijar nombre#esDefinición a VERDADERO
+            fijar nombre#esDefiniciónAutoejecutable a VERDADERO
+            fijar params a res#en: 2
+            fijar cuerpo a res#en: 3
+            devolver clonar CST#NodoFunción#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 4)
+                nombre: nombre
+                parámetros: params
+                cuerpo: cuerpo
+            finclonar
+        finfuncion,
+        (msjerror: {En una función o procedimiento:},
+            (seq:
+                (alt:
+                    (try': (kw: {funcion})),
+                    (try': (kw: {procedimiento}))),
+                grId,
+                grParámetrosDeFunción,
+                (msjerror: {En el cuerpo de la función/procedimiento:}, bloque'),
+                (alt:
+                    (try': (kw: {finfuncion})),
+                    (try': (kw: {finprocedimiento})),
+                    (try': (kw: {finfun})))))
+
+variable grNecesitas
+fijar grNecesitas a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoNecesitas#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 1)
+                expresión: res#en: 1
+            finclonar
+        finfuncion,
+        (msjerror: {En `necesitas`:},
+            (seq: (try': (kw: {necesitas})), grExpr))
+
+variable grDevolver
+fijar grDevolver a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoDevolver#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 1)
+                expresión: res#en: 1
+            finclonar
+        finfuncion,
+        (msjerror: {En `devolver`:},
+            (seq: (try': (kw: {devolver})), grExpr))
+
+variable grSi
+fijar grSi a
+    Comb#Efecto:
+        funcion: res
+            variables cond, verdadero, falso
+            fijar cond a res#en: 1
+            fijar verdadero a res#en: 2
+            si (res#en: 3)#longitud > 0
+                fijar falso a (res#en: 3)#en: 1
+            sino
+                fijar falso a CST#NodoBloque#crear
+                fijar falso#instrucciones a Arreglo#vacio
+                variable pos
+                fijar pos a (PuertoConPos#PosiciónTextual#crear: {<desconocido>}, 1, 0, 0)
+                fijar falso#áreaTextual a Tokens#ÁreaTextual#crear: pos, pos
+            finsi
+            devolver clonar CST#NodoSi#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 4)
+                condicional: cond
+                siVerdadero: verdadero
+                siFalso: falso
+            finclonar
+        finfuncion,
+        (msjerror: {En condicional `si`},
+            (seq:
+                (try': (kw: {si})),
+                (msjerror: {En la condición}, grExpr),
+                (msjerror: {"Si es verdadero":}, bloque'),
+                (opt':
+                    (try': (kw: {sino})),
+                    (msjerror: {"Si es falso":}, bloque')),
+                (kw: {finsi})))
+
+variable grMientras
+fijar grMientras a
+    Comb#Efecto:
+        funcion: res
+            devolver clonar CST#NodoMientras#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 3)
+                condicional: res#en: 1
+                cuerpo: res#en: 2
+            finclonar
+        finfuncion,
+        (msjerror: {En bucle `mientras`},
+            (seq:
+                (try': (kw: {mientras})),
+                (msjerror: {En el condicional:}, grExpr),
+                (msjerror: {En el cuerpo del bucle:}, bloque'),
+                (kw: {finmientras})))
+
+variable grMétodo
+fijar grMétodo a
+    Comb#Efecto:
+        funcion: res
+            variable nombre
+            fijar nombre a res#en: 4
+            fijar nombre#esLiteral a VERDADERO
+            devolver clonar CST#NodoMétodo#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 7)
+                esEstático: (res#en: 1)#longitud > 0
+                deClase: res#en: 2
+                nombre: nombre
+                parámetros: res#en: 5
+                cuerpo: res#en: 6
+            finclonar
+        finfuncion,
+        (msjerror: {En `metodo` (fuera de clase):},
+            (seq:
+                (try': (kw: {metodo})),
+                (opt': (try': (kw: {estatico}))),
+                grId,
+                (kw: {#}),
+                grId,
+                grParámetrosDeFunción,
+                (msjerror: {En el cuerpo del método:}, bloque'),
+                (kw: {finmetodo})))
+
+variable grAtributos
+fijar grAtributos a
+    Comb#Efecto:
+        funcion: res
+            variables partes, deClase, nombres
+            fijar partes a res#en: 1
+            fijar deClase a (partes#en: 0)#en: 0
+            fijar nombres a Mapear: partes, funcion: parte
+                necesitas (parte#en: 0)#nombre = deClase#nombre
+                variable n
+                fijar n a parte#en: 2
+                fijar n#esLiteral a VERDADERO
+                devolver n
+            finfuncion
+            devolver clonar CST#NodoAtributos#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
+                deClase: deClase
+                nombres: nombres
+            finclonar
+        finfuncion,
+        (msjerror: {En `atributo`/`atributos` (fuera de clase):},
+            (seq:
+                (alt:
+                    (try': (kw: {atributo})),
+                    (try': (kw: {atributos}))),
+                (delim1:
+                    (seq:
+                        grId,
+                        (kw: {#}),
+                        grId),
+                    (try': (kw: {,})))))
+
+variable grUtilizar
+fijar grUtilizar a
+    Comb#Efecto:
+        funcion: res
+            variables módulo, espacioDeNombres, nombresEspecíficos
+
+            fijar módulo a res#en: 1
+            si EsInstancia: módulo, CST#NodoIdentificador
+                fijar módulo#esLiteral a VERDADERO
+            finsi
+
+            si (res#en: 2)#longitud = 0
+                fijar espacioDeNombres a NULO
+            sino
+                fijar espacioDeNombres a (res#en: 2)#en: 1
+                fijar espacioDeNombres#esDefinición a VERDADERO
+                fijar espacioDeNombres#esDefiniciónAutoejecutable a FALSO
+            finsi
+
+            si (res#en: 3)#longitud = 0
+                fijar nombresEspecíficos a NULO
+            sino
+                fijar nombresEspecíficos a Arreglo#vacio
+                ParaCadaElemento: ((res#en: 3)#en: 1), procedimiento: el
+                    si (el#en: 1)#longitud = 0
+                        variable n
+                        fijar n a el#en: 0
+                        fijar n#esDefinición a VERDADERO
+                        nombresEspecíficos#agregarAlFinal: n
+                    sino
+                        variables n, m
+                        fijar n a el#en: 0
+                        fijar m a (el#en: 1)#en: 1
+                        fijar n#esLiteral a VERDADERO
+                        fijar m#esDefinición a VERDADERO
+                        nombresEspecíficos#agregarAlFinal: (Arreglo#crearCon: n, m)
+                    finsi
+                finprocedimiento
+            finsi
+
+            devolver clonar CST#NodoUtilizar#crear con
+                áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
+                módulo: módulo
+                espacioDeNombres: espacioDeNombres
+                nombresEspecíficos: nombresEspecíficos
+            finclonar
+        finfuncion,
+        (msjerror: {En `utilizar`:},
+            (seq:
+                (try': (kw: {utilizar})),
+                (msjerror: {En el nombre del módulo a importar:},
+                    (alt: (try': grId), (try': grTexto))),
+                (opt':
+                    (try': (kw: {como})),
+                    (msjerror: {En el nombre del espacio de nombres:}, grId)),
+                (opt':
+                    (try': (kw: {(})),
+                    (msjerror: {En los nombres a importar},
+                        (delim0:
+                            (seq:
+                                grId,
+                                (opt':
+                                    (try': (kw: {como})),
+                                    grId)),
+                            (try': (kw: {,})))),
+                    (kw: {)}))))
+
+variable grInstrucción
+fijar grInstrucción a
+    (alt:
+        grVariable,
+        grFijar,
+        grEscribir,
+        grNl,
+        grClase,
+        grFunción,
+        grNecesitas,
+        grDevolver,
+        grSi,
+        grMientras,
+        grMétodo,
+        grAtributos,
+        grUtilizar,
+        grExpr)
+
+variable grPrograma
+fijar grPrograma a
+    Comb#Efecto:
+        funcion: res
+            variable cuerpo
+            fijar cuerpo a res#en: 0
+            devolver clonar CST#NodoPrograma#crear con
+                áreaTextual: cuerpo#áreaTextual
+                instrucciones: cuerpo
+            finclonar
+        finfuncion,
+        (seq: bloque', eof)
+
+[DOCUMENTA
+@brief{Muestra un tokenizado.}
+
+@pd{tks} es una instancia de @pd{Comb#Tokens}. Cada token disponible es leído y
+escrito.
+DOCUMENTA]
+procedimiento MostrarTokenizado: tks
+    variable T
+    fijar T a tks#leerToken
+    mientras no T = Puerto#EOF
+        Escribir: T
+        fijar T a tks#leerToken
+    finmientras
+finprocedimiento
+
+[DOCUMENTA
+@brief{Muestra el parseado de @pd{tks}.}
+
+Trata de parsear @pd{tks} utilizando el combinador @pd{gr} tantas veces como
+sea posible, escribiendo el resultado.
+DOCUMENTA]
+procedimiento MostrarParseado: tks, gr
+    variable X
+    fijar X a gr#parsear: tks
+    mientras X#esOk
+        Escribir: X
+        nl
+        fijar X a gr#parsear: tks
+    finmientras
+    Escribir: X
+finprocedimiento
+
+[DOCUMENTA
+@brief{Obtiene el traceback de un error.}
+
+Devuelve un texto, que es el traceback legible por personas del error. Este
+traceback lista todas las causas, sus mensajes y sus lugares.
+DOCUMENTA]
+funcion ErrorComoTraceback: error
+    variables acc, prim
+    fijar acc a {}
+    fijar prim a FALSO
+    mientras no EsNulo: error
+        variable indent
+        si acc#longitud > 0
+            fijar acc a acc#concatenar: {~%}#formatear
+            fijar prim a VERDADERO
+        finsi
+        si prim
+            fijar indent a {    }
+        sino
+            fijar indent a {  }
+        finsi
+        fijar acc a acc#concatenar:
+            ({~t~t: ~t}#formatear: indent, error#lugar, error#mensaje)
+        fijar error a error#causa
+        si no EsNulo: error
+            fijar acc a acc#concatenar: ({~%  Causado por:}#formatear)
+        finsi
+    finmientras
+    devolver {Error:~%}#formatear#concatenar: acc
+finfuncion
+
+procedimiento CrearCST: texto, nombreDelArchivo
+    variables tks, tokens
+    fijar tokens a Tokenizador#TokenizarTexto2: texto, nombreDelArchivo
+    fijar tks a Comb#Tokens#crear: tokens
+
+    variables nodo
+    fijar nodo a grPrograma#parsear: tks
+    si nodo#esError
+        Escribir: (ErrorComoTraceback: nodo#error)
+    finsi
+    necesitas nodo#esOk
+    devolver nodo#valor
+finprocedimiento

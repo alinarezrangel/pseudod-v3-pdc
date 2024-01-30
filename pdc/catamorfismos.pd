@@ -1,0 +1,21 @@
+utilizar bepd/builtins
+
+funcion Buscando': nodo, cond, cuerpo
+    funcion continuar
+        nodo#recursivo: funcion: subnodo
+            devolver Buscando': subnodo, cond, cuerpo
+        finfuncion
+    finfuncion
+
+    si %cond: nodo
+        devolver %cuerpo: nodo, &continuar
+    sino
+        continuar
+    finsi
+finfuncion
+
+funcion Buscando: nodo, cond, cuerpo
+    Buscando': nodo, cond, funcion: nodo, continuar
+        devolver %cuerpo: nodo
+    finfuncion
+finfuncion

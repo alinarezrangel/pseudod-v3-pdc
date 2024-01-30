@@ -1,0 +1,4 @@
+variable X, Y
+fijar X a 1
+fijar Y a 2
+escribir X + Y
