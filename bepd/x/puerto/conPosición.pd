@@ -1,0 +1,125 @@
+utilizar bepd/builtins
+utilizar bepd/x/puerto como Puerto
+
+[DOCUMENTA
+@brief{Representa una posición dentro de un archivo o texto.}
+DOCUMENTA]
+clase PosiciónTextual
+    [DOCUMENTA
+    @brief{Nombre del archivo donde se está.}
+    DOCUMENTA]
+    atributo nombreDelArchivo
+
+    [DOCUMENTA
+    @brief{Número de línea dentro del archivo.}
+
+    Comienza desde 1.
+    DOCUMENTA]
+    atributo línea
+
+    [DOCUMENTA
+    @brief{Número de columna dentro del archivo.}
+
+    Comienza desde 0.
+    DOCUMENTA]
+    atributo columna
+
+    [DOCUMENTA
+    @brief{Offset de la posición desde el inicio del archivo.}
+
+    Indica el número de bytes desde el inicio del archivo que tienes que
+    avanzar para llegar a esta posición.
+    DOCUMENTA]
+    atributo offset
+
+    [DOCUMENTA
+    @brief{Inicializa la posición textual.}
+    DOCUMENTA]
+    metodo inicializar: nombreDelArchivo, línea, columna
+
+    [DOCUMENTA
+    @brief{Devuelve una representación para humanos de la posición textual.}
+    DOCUMENTA]
+    metodo comoTexto
+finclase
+
+metodo PosiciónTextual#inicializar: nombreDelArchivo, línea, columna, offset
+    fijar yo#nombreDelArchivo a nombreDelArchivo
+    fijar yo#línea a línea
+    fijar yo#columna a columna
+    fijar yo#offset a offset
+finmetodo
+
+metodo PosiciónTextual#comoTexto
+    devolver {«~t:~t:~t @ ~t»}#formatear: yo#nombreDelArchivo, yo#línea, yo#columna, yo#offset
+finmetodo
+
+[DOCUMENTA
+@brief{Un puerto de lectura que mantiene una posición textual.}
+
+Provee la misma interfáz que un @pd{Puerto#PuertoDeLectura}.
+DOCUMENTA]
+clase PuertoConPosiciónTextual hereda Puerto#Puerto
+    metodo inicializar: puerto, nombreDelArchivo
+
+    metodo leerCarácter
+    metodo desleerCarácter
+
+    [DOCUMENTA
+    @brief{Devuelve la posición actual en el puerto.}
+
+    La @pd{PosiciónTextual} devuelta no debe ser modificada.
+    DOCUMENTA]
+    metodo posiciónActual
+finclase
+
+atributos
+    PuertoConPosiciónTextual#puerto,
+    PuertoConPosiciónTextual#línea,
+    PuertoConPosiciónTextual#columna,
+    PuertoConPosiciónTextual#offset,
+    PuertoConPosiciónTextual#nombreDelArchivo,
+    PuertoConPosiciónTextual#viejaLínea,
+    PuertoConPosiciónTextual#viejaColumna,
+    PuertoConPosiciónTextual#viejoOffset
+
+metodo PuertoConPosiciónTextual#inicializar: puerto, nombreDelArchivo
+    fijar yo#puerto a puerto
+    fijar yo#línea a 1
+    fijar yo#columna a 0
+    fijar yo#offset a 0
+    fijar yo#nombreDelArchivo a nombreDelArchivo
+    fijar yo#viejaLínea a 1
+    fijar yo#viejaColumna a 0
+    fijar yo#viejoOffset a 0
+finmetodo
+
+metodo PuertoConPosiciónTextual#leerCarácter
+    variable c
+    fijar c a yo#puerto#leerCarácter
+    fijar yo#viejaLínea a yo#línea
+    fijar yo#viejaColumna a yo#columna
+    fijar yo#viejoOffset a yo#offset
+
+    fijar yo#offset a yo#offset + 1
+    si c = {~%}#formatear
+        fijar yo#línea a yo#línea + 1
+        fijar yo#columna a 0
+    sino
+        fijar yo#columna a yo#columna + 1
+    finsi
+    devolver c
+finmetodo
+
+metodo PuertoConPosiciónTextual#desleerCarácter
+    variable c
+    fijar c a yo#puerto#desleerCarácter
+    fijar yo#línea a yo#viejaLínea
+    fijar yo#columna a yo#viejaColumna
+    fijar yo#offset a yo#viejoOffset
+    devolver c
+finmetodo
+
+metodo PuertoConPosiciónTextual#posiciónActual
+    devolver PosiciónTextual#crear: yo#nombreDelArchivo, yo#línea, yo#columna, yo#offset
+finmetodo

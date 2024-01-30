@@ -1,0 +1,196 @@
+utilizar bepd/builtinsImpl
+
+[DOCUMENTA
+@brief{Determina si @param{texto} contiene al subtexto @param{parte}.}
+
+Si @param{texto} contiene en alguna parte al subtexto @param{parte} devuelve
+@pd{VERDADERO}, de otra forma devuelve @pd{FALSO}.
+DOCUMENTA]
+funcion TextoContiene: texto, parte
+    devolver no ((texto#buscar: 0, parte) = NULO)
+finfuncion
+
+[DOCUMENTA
+@brief{Parte @pd{texto} de acuerdo a @pd{separador}.}
+
+@pd{opciones} es un texto que puede contener los carácteres @code{p} o @code{-}
+pero no ambos:
+
+@itemlist(
+@item{@code{p} activa el @italic{modo perl}. En el modo perl, partes íguales
+del resultado son colapsadas a una sola. Por ejemplo:
+@pd|{Partir': {hola,,mundo,1,1,1,1}, {,}, {p}}| produce
+@pd|{Arreglo#crearCon: {hola}, {}, {mundo}, {1}}|. Nota como los múltiples
+@code{1}s fueron colapsados.}
+@item{@code{-} elimina cualquier parte vacía @code{""} que se pudiese producir.}
+@item{Si @pd{opciones} es un texto vacío, no colapsa ningún valor.}
+)
+
+No deberías utilizar esta función, en cambio, utiliza @pd{Partir},
+@pd{PartirComoPerl} o @pd{PartirSinVacíos}.
+DOCUMENTA]
+funcion Partir': texto, separador, opciones
+    variables siguienteÍndice, partes, índice, comoPerl, sinVacíos, parte, parteAnterior
+
+    fijar partes a Arreglo#vacio
+    fijar índice a 0
+    fijar siguienteÍndice a texto#buscar: 0, separador
+    fijar comoPerl a TextoContiene: opciones, {p}
+    fijar sinVacíos a TextoContiene: opciones, {-}
+
+    necesitas no (comoPerl && sinVacíos)
+
+    procedimiento agregarParte: parte
+        si comoPerl && no ((parte = {}) && (parteAnterior = parte))
+            partes#agregarAlFinal: parte
+        finsi
+        si sinVacíos && no (parte = {})
+            partes#agregarAlFinal: parte
+        finsi
+        si (no sinVacíos) && (no comoPerl)
+            partes#agregarAlFinal: parte
+        finsi
+    finprocedimiento
+
+    mientras no (siguienteÍndice = NULO)
+        fijar parte a texto#parteDelTexto: índice, siguienteÍndice
+        agregarParte: parte
+        fijar parteAnterior a parte
+        fijar índice a siguienteÍndice + separador#longitud
+        fijar siguienteÍndice a texto#buscar: índice, separador
+    finmientras
+
+    agregarParte: (texto#subTexto: índice, texto#longitud)
+
+    devolver partes
+finfuncion
+
+[DOCUMENTA
+@brief{Parte un texto en partes separadas.}
+
+Parte @param{texto} cada vez que encuentra a @param{separador} como subtexto.
+
+Por ejemplo:
+
+@ejemplo|{
+necesitas
+    (Partir: {hola:mundo:separado por:dos puntos}, {:})
+    =
+    (Arreglo#crearCon: {hola}, {mundo}, {separador por}, {dos puntos})
+
+necesitas
+    (Partir: {::hola:mundo}, {:})
+    =
+    (Arreglo#crearCon: {}, {}, {hola}, {mundo})
+
+necesitas
+    (Partir: {solo:dos::dos puntos::seguidos pueden:separar}, {::})
+    =
+    (Arreglo#crearCon: {solo:dos}, {dos puntos}, {seguidos pueden:separar})
+}|
+DOCUMENTA]
+funcion Partir: texto, separador
+    devolver Partir': texto, separador, {}
+finfuncion
+
+[DOCUMENTA
+@brief{Parte un texto sin dejar duplicados.}
+
+Similar a @pd{Partir} pero elimína elementos duplicados. Por ejemplo,
+@pd{PartirComoPerl: "1:1:2:2:3:3", ":"} es @pd{Arreglo#crearCon: "1", "2", "3"}.
+DOCUMENTA]
+funcion PartirComoPerl: texto, separador
+    devolver Partir': texto, separador, {p}
+finfuncion
+
+[DOCUMENTA
+@brief{Parte un texto sin dejar pedazos vacíos.}
+
+Similar a @pd{Partir} pero nunca devuelve un elemento vacío (@pd{«»}).
+DOCUMENTA]
+funcion PartirSinVacíos: texto, separador
+    devolver Partir': texto, separador, {-}
+finfuncion
+
+[DOCUMENTA
+@brief{Une una lista de textos con un separador.}
+
+El inverso de @pd{Partir}.
+
+@ejemplo|{
+necesitas
+    (Unir: (Arreglo#crearCon: {hola}, {mundo}, {separador por}, {dos puntos}), {:})
+    =
+    {hola:mundo:separado por:dos puntos}
+
+necesitas
+    (Unir: (Arreglo#crearCon: {}, {}, {hola}, {mundo}), {:})
+    =
+    {::hola:mundo}
+
+necesitas
+    (Unir: (Arreglo#crearCon: {solo:dos}, {dos puntos}, {seguidos pueden:separar}), {::})
+    =
+    {solo:dos::dos puntos::seguidos pueden:separar}
+}|
+DOCUMENTA]
+funcion Unir: textos, separador
+    si __Impl = {Lua Bootstrap}
+        devolver __Lua: {function(textos, separador)
+assert(rt.pdtypeof(textos) == "objeto")
+assert(textos.__pd_arreglo)
+local vals, n = textos.attrs[rt.ARREGLO_ATTRS_IDX], textos.attrs[rt.ARREGLO_ATTRS_IDX].n
+return table.concat(vals, separador, 0, n - 1)
+end}, textos, separador
+    sino
+        variable res
+        fijar res a Reducir: NULO, funcion: acc, el
+            variable sep
+            si acc = NULO
+                fijar sep a {}
+                fijar acc a {}
+            sino
+                fijar sep a separador
+            finsi
+            devolver {~t~t~t}#formatear: acc, sep, el
+        finfuncion, textos
+
+        si EsNulo: res
+            devolver {}
+        sino
+            devolver res
+        finsi
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Repíte un texto @pd{n} veces.}
+
+Devuelve un texto que es la concatenación de @pd{txt} con sí mismo @pd{n}
+veces.
+DOCUMENTA]
+funcion RepetirTexto: txt, n
+    variables acc, i
+    fijar acc a {}
+    fijar i a 0
+    mientras i < n
+        fijar i a i + 1
+        fijar acc a acc#concatenar: txt
+    finmientras
+    devolver acc
+finfuncion
+
+[DOCUMENTA
+@brief{Mapea cada carácter de un texto.}
+
+Devuelve un nuevo texto en el que cada carácter es el resultado de llamar
+@pd{func} en el carácter de la misma posición en @pd{texto}.
+DOCUMENTA]
+funcion MapearTexto: texto, func
+    variable res
+    fijar res a {}
+    ParaCadaElemento: texto, procedimiento: car
+        fijar res a res#concatenar: (%func: car)
+    finprocedimiento
+    devolver res
+finfuncion

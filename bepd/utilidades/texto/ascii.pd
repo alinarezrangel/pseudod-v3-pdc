@@ -1,0 +1,60 @@
+utilizar bepd/builtinsImpl
+utilizar bepd/utilidades/texto
+
+[DOCUMENTA
+@brief{Todo el alfabeto ASCII en mayúsculas.}
+DOCUMENTA]
+variable ALFABETO_ASCII_MAYÚSCULAS
+fijar ALFABETO_ASCII_MAYÚSCULAS a {ABCDEFGHIJKLMNOPQRSTUVWXYZ}
+
+[DOCUMENTA
+@brief{Todo el alfabeto ASCII en minúsculas.}
+DOCUMENTA]
+variable ALFABETO_ASCII_MINÚSCULAS
+fijar ALFABETO_ASCII_MINÚSCULAS a {abcdefghijklmnopqrstuvwxyz}
+
+[DOCUMENTA
+@brief{Todo el alfabeto ASCII.}
+DOCUMENTA]
+variable ALFABETO_ASCII
+fijar ALFABETO_ASCII a ALFABETO_ASCII_MINÚSCULAS#concatenar: ALFABETO_ASCII_MAYÚSCULAS
+
+[DOCUMENTA
+@brief{Determina si @param{car} es un dígito ASCII decimal.}
+DOCUMENTA]
+funcion EsDígitoDecimal: car
+    devolver TextoContiene: {0123456789}, car
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @param{car} es un carácter alfabético ASCII.}
+DOCUMENTA]
+funcion EsAlfabético: car
+    devolver TextoContiene: ALFABETO_ASCII, car
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte @param{car} (un carácter ASCII) a minúsculas.}
+DOCUMENTA]
+funcion Minúscula: car
+    variable i
+    fijar i a ALFABETO_ASCII_MAYÚSCULAS#buscar: 0, car
+    si EsNulo: i
+        devolver car
+    sino
+        devolver ALFABETO_ASCII_MINÚSCULAS#en: i
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte @param{car} (un carácter ASCII) a mayúsculas.}
+DOCUMENTA]
+funcion Mayúscula: car
+    variable i
+    fijar i a ALFABETO_ASCII_MINÚSCULAS#buscar: 0, car
+    si EsNulo: i
+        devolver car
+    sino
+        devolver ALFABETO_ASCII_MAYÚSCULAS#en: i
+    finsi
+finfuncion

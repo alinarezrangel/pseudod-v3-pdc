@@ -1,0 +1,322 @@
+utilizar bepd/builtins
+utilizar bepd/x/puerto como Puerto
+utilizar bepd/utilidades/texto (MapearTexto)
+utilizar bepd/utilidades/texto/ascii como ASCII
+
+[DOCUMENTA
+@brief{Símbolo de una expresión S.}
+DOCUMENTA]
+clase Símbolo
+    [DOCUMENTA
+    @brief{Crea un símbolo desde el texto @pd{txt}.}
+    DOCUMENTA]
+    metodo estatico desdeTexto: txt
+
+    [DOCUMENTA
+    @brief{Valor textual del token.}
+    DOCUMENTA]
+    atributo valor
+
+    [DOCUMENTA
+    @brief{Alias para el método @code{#valor}.}
+    DOCUMENTA]
+    metodo comoTexto
+finclase
+
+metodo estatico Símbolo#desdeTexto: txt
+    variable x
+    fijar x a yo#crear
+    fijar x#valor a txt
+    devolver x
+finmetodo
+
+metodo Símbolo#comoTexto
+    devolver yo#valor
+finmetodo
+
+[DOCUMENTA
+@brief{Escapa el texto para una expresión S.}
+
+El texto devuelto escapa de manera correcta todos los carácteres especiales
+como "\", '"' y los tabuladores.
+DOCUMENTA]
+funcion EscaparTexto: texto
+    si __Impl = {Lua Bootstrap}
+        devolver __Lua: {function(texto)
+            return string.gsub(texto, "[\\\n\"\t]", function(c)
+                if c == "\t" then
+                    return "\\t"
+                elseif c == "\n" then
+                    return "\\n"
+                else
+                    return "\\" .. c
+                end
+            end)
+        end}, texto
+    sino
+        devolver MapearTexto: texto, funcion: car
+            si car = {\}
+                devolver {\\}
+            finsi
+            si car = {~q}#formatear
+                devolver {\~q}#formatear
+            finsi
+            si car = {~%}#formatear
+                devolver {\n}
+            finsi
+            [ El siguiente tabulador en el texto DEBE SER LITERAL.
+            O, en otras palabras, no lo conviertas a espacios. ]
+            si car = {	}
+                devolver {\t}
+            finsi
+            devolver car
+        finfuncion
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Desescapa el texto de una expresión S.}
+
+Inverso de @pd{EscaparTexto}.
+DOCUMENTA]
+funcion DesescaparTexto: texto
+    variables acc, i
+    fijar acc a {}
+    fijar i a 0
+    mientras i < texto#longitud
+        variable c
+        fijar c a texto#en: i
+        si c = {\}
+            fijar i a i + 1
+            necesitas i < texto#longitud
+            fijar c a texto#en: i
+            variable r
+            si c = {n}
+                fijar r a {~%}#formatear
+            finsi
+            si c = {t}
+                [ Misma advertencia sobre este tabulador. ]
+                fijar r a {	}
+            finsi
+            si c = {~q}#formatear
+                fijar r a {~q}#formatear
+            finsi
+            si c = {\}
+                fijar r a {\}
+            finsi
+            necesitas no EsNulo: r
+            fijar acc a acc#concatenar: r
+        sino
+            fijar acc a acc#concatenar: c
+        finsi
+        fijar i a i + 1
+    finmientras
+    devolver acc
+finfuncion
+
+variable EXTRA_ID
+fijar EXTRA_ID a {+-*/<>=_}
+
+[DOCUMENTA
+@brief{Determina si @pd{ch} es un carácter válido para un símbolo.}
+DOCUMENTA]
+funcion EsCarácterIdentificador: ch
+    devolver (ASCII#EsAlfabético: ch) || (ASCII#EsDígitoDecimal: ch) || (Contiene: EXTRA_ID, ch)
+finfuncion
+
+[DOCUMENTA
+@brief{Obtiene el siguiente carácter en @pd{puerto} sin consumirlo.}
+
+Equivalente a llamar a @code{#leerCarácter} seguido de @code{desleerCarácter},
+excepto que tiene en cuenta el caso en que @code{#leerCarácter} devuelve
+@pd{Puerto#EOF}.
+DOCUMENTA]
+procedimiento SiguienteCarácter: puerto
+    variable ch
+    fijar ch a puerto#leerCarácter
+    si no (ch = Puerto#EOF)
+        puerto#desleerCarácter
+    finsi
+    devolver ch
+finprocedimiento
+
+procedimiento ParsearSímbolo: ch, puerto
+    variable acc
+    fijar acc a ch
+    mientras EsCarácterIdentificador: (SiguienteCarácter: puerto)
+        fijar acc a acc#concatenar: puerto#leerCarácter
+    finmientras
+    si EsNúmeroEntero: acc
+        devolver ConvertirAEntero: acc
+    sino
+        si (acc = {true}) || (acc = {false})
+            devolver acc = {true}
+        sino
+            devolver Símbolo#desdeTexto: acc
+        finsi
+    finsi
+finprocedimiento
+
+procedimiento ParsearLista: puerto
+    variables elementos, cont
+    fijar elementos a Arreglo#vacio
+    fijar cont a VERDADERO
+    mientras cont
+        Puerto#SaltarEspacios: puerto
+        si (SiguienteCarácter: puerto) = {)}
+            puerto#leerCarácter
+            fijar cont a FALSO
+        sino
+            elementos#agregarAlFinal: (ParsearDato: puerto)
+        finsi
+    finmientras
+    devolver elementos
+finprocedimiento
+
+procedimiento ParsearTexto: puerto
+    variable texto
+    fijar texto a {}
+    mientras VERDADERO
+        variable car
+        fijar car a puerto#leerCarácter
+        si car = Puerto#EOF
+            __FallarConMensaje: {eof inesperado leyendo texto de expresión S}
+        finsi
+        si car = {~q}#formatear
+            devolver texto
+        finsi
+        si car = {\}
+            variables esc, ins
+            fijar esc a puerto#leerCarácter
+            si esc = {n}
+                fijar ins a {~%}#formatear
+            finsi
+            si esc = {t}
+                [ Nota: el siguiente tabulador tiene que ser literal ]
+                fijar ins a {	}
+            finsi
+            si esc = {~q}#formatear
+                fijar ins a {~q}#formatear
+            finsi
+            si esc = {\}
+                fijar ins a {\}#formatear
+            finsi
+            si EsNulo: ins
+                __FallarConMensaje: ({Secuencia de escape (\~t) inválida}#formatear: esc)
+            finsi
+            fijar texto a texto#concatenar: ins
+        sino
+            fijar texto a texto#concatenar: car
+        finsi
+    finmientras
+    Inalcanzable
+finprocedimiento
+
+[DOCUMENTA
+@brief{Parsea una expresión S desde el puerto.}
+
+Lee una expresión S de @pd{puerto} y la devuelve como un objeto en PseudoD.
+
+La gramática de las expresiones S implementadas en este módulo es:
+
+@codeblock|{
+datum = list | string | number | bool | symbol
+number = la misma sintáxis que los números en PseudoD
+bool = "true" | "false"
+symbol = (carácteres alfabéticos ASCII, dígitos decimales ASCII, cualquiera de "-", "+", "<", ">")+
+string = '"' (véase más abajo) '"'
+list = "(" datum* ")"
+}|
+
+La sintáxis de las literales textuales (strings) es una secuencia de carácteres
+excepto que los carácteres tabulador, fin de línea, comillas dobles '"' y la
+barra inversa "\" tienen que ser escapadas con una barra inversa "\".
+
+Para distinguir entre textos y símbolos, los textos (strings) son devueltos
+como instancias de @pd{Texto}, mientras que los símbolos como instancias de
+@pd{Símbolo}.
+
+Las listas son transformadas a instancias de @pd{Arreglo}. "true" y "false" a
+@pd{VERDADERO} y @pd{FALSO}, y números a @pd{Numero}.
+DOCUMENTA]
+procedimiento ParsearDato: puerto
+    si __Impl = {Lua Bootstrap}
+        variable parsear
+        fijar parsear a __Lua: {function() return (require 'backends.lua.sexpr').convert end}
+        devolver %parsear: Símbolo, Arreglo, (Puerto#LeerTodo: puerto)
+    sino
+        devolver _ParsearDato: puerto
+    finsi
+finprocedimiento
+
+procedimiento _ParsearDato: puerto
+    variable ch
+    Puerto#SaltarEspacios: puerto
+    fijar ch a puerto#leerCarácter
+    si ch = {(}
+        devolver ParsearLista: puerto
+    finsi
+    si ch = {~q}#formatear
+        devolver ParsearTexto: puerto
+    finsi
+    si EsCarácterIdentificador: ch
+        devolver ParsearSímbolo: ch, puerto
+    finsi
+    __FallarConMensaje: ({Se esperaba una lista, símbolo, texto o número, pero se encontró ~t}#formatear: ch)
+finprocedimiento
+
+procedimiento DesparsearLista: puerto, dato
+    puerto#escribirTexto: {(}
+    ParaCadaElemento: dato, procedimiento: x
+        DesparsearDato: puerto, x
+        puerto#escribirTexto: { }
+    finprocedimiento
+    puerto#escribirTexto: {)}
+finprocedimiento
+
+procedimiento DesparsearBoole: puerto, dato
+    si dato
+        puerto#escribirTexto: {true}
+    sino
+        puerto#escribirTexto: {false}
+    finsi
+finprocedimiento
+
+procedimiento DesparsearNúmero: puerto, dato
+    puerto#escribirTexto: dato#comoTexto
+finprocedimiento
+
+procedimiento DesparsearTexto: puerto, dato
+    puerto#escribirTexto: ({~q~t~q}#formatear: (EscaparTexto: dato))
+finprocedimiento
+
+procedimiento DesparsearSímbolo: puerto, dato
+    puerto#escribirTexto: dato#comoTexto
+finprocedimiento
+
+[DOCUMENTA
+@brief{Serializa un objeto de PseudoD a una expresión S.}
+
+Escribe esta expresión a @pd{puerto}, que debe ser un puerto de escritura.
+
+@pd{dato} debe estar compuesto de los mismos tipos de objeto que los datos
+devueltos por @pd{ParsearDato} (arreglos, booles, números, textos y símbolos).
+DOCUMENTA]
+procedimiento DesparsearDato: puerto, dato
+    si EsInstancia: dato, Arreglo
+        devolver DesparsearLista: puerto, dato
+    finsi
+    si EsInstancia: dato, Boole
+        devolver DesparsearBoole: puerto, dato
+    finsi
+    si EsInstancia: dato, Numero
+        devolver DesparsearNúmero: puerto, dato
+    finsi
+    si EsInstancia: dato, Texto
+        devolver DesparsearTexto: puerto, dato
+    finsi
+    si EsInstancia: dato, Símbolo
+        devolver DesparsearSímbolo: puerto, dato
+    finsi
+    __FallarConMensaje: ({Se esperaba un arreglo, símbolo, texto o número, pero se encontró un ~t}#formatear: (TipoDe: dato))
+finprocedimiento

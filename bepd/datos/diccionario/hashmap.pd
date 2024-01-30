@@ -1,0 +1,234 @@
+utilizar bepd/builtinsImpl
+utilizar bepd/datos/diccionario/interfaz
+
+
+[DOCUMENTA
+@brief{Clase que implementa un HashMap con una tabla en Lua.}
+
+Para su interfaz, véase el módulo @code{backends.lua.exts} del runtime de
+Lua. Si lo que quieres es un HashMap para PseudoD, usa @pd{DiccionarioHashMap}.
+DOCUMENTA]
+variable HashMap
+fijar HashMap a __Lua: {function() return (require 'backends.lua.exts').HashMap end}
+
+
+[DOCUMENTA
+@brief{Un diccionario que usa un HashMap.}
+
+Las llaves de este diccionario pueden ser cualquier objeto
+@italic{hasheable}. Actualmente los únicos objetos hasheables son las
+instancias de:
+
+@itemlist(
+@item{@pd{Numero}.}
+@item{@pd{Texto}.}
+@item{@pd{Boole}.}
+@item{@pd{Procedimiento}.}
+)
+
+El orden de iteración de este diccionario @bold{no está determinado}. Es
+posible para el diccionario iterar de forma aleatoria incluso dentro de la
+ejecución de un mismo programa.
+DOCUMENTA]
+clase DiccionarioHashMap hereda IDiccionario
+    metodo estatico vacío
+    metodo estatico desdeArreglo: arr
+    metodo estatico desdePares: ...valores
+finclase
+
+atributos DiccionarioHashMap#_tabla, DiccionarioHashMap#_numPares
+
+[DOCUMENTA
+@brief{Lanza un error si @pd{llave} no es hasheable.}
+DOCUMENTA]
+procedimiento NecesitasLlavePrimitiva: llave
+    si no HashMap#puedeTenerDeLlave: llave
+        __FallarConMensaje: ({Las llaves de los hashmaps (llave ~t) tienen que ser hashables}#formatear: llave)
+    finsi
+finprocedimiento
+
+metodo estatico DiccionarioHashMap#vacío
+    devolver yo#crear
+finmetodo
+
+metodo estatico DiccionarioHashMap#desdeArreglo: arr
+    variable inst
+    fijar inst a yo#crear
+    ParaCadaElemento: arr, procedimiento: par
+        inst#fijarEn: (par#en: 0), (par#en: 1)
+    finprocedimiento
+    devolver inst
+finmetodo
+
+metodo estatico DiccionarioHashMap#desdePares: ...valores
+    variable inst
+    fijar inst a yo#crear
+    necesitas EsPar: valores#longitud
+    variable i
+    fijar i a 0
+    mientras i < valores#longitud
+        inst#fijarEn: (valores#en: i), (valores#en: (i + 1))
+        fijar i a i + 2
+    finmientras
+    devolver inst
+finmetodo
+
+metodo DiccionarioHashMap#inicializar
+    fijar yo#_tabla a HashMap#vacío
+    fijar yo#_numPares a 0
+finmetodo
+
+metodo DiccionarioHashMap#en: llave
+    NecesitasLlavePrimitiva: llave
+    devolver yo#_tabla#en: llave
+finmetodo
+
+metodo DiccionarioHashMap#fijarEn: llave, valor
+    NecesitasLlavePrimitiva: llave
+    si no yo#contiene: llave
+        fijar yo#_numPares a yo#_numPares + 1
+    finsi
+    yo#_tabla#fijarEn: llave, valor
+finmetodo
+
+metodo DiccionarioHashMap#transformarPar: llave, proc
+    si yo#contiene: llave
+        yo#_tabla#fijarEn: llave, (%proc: (yo#_tabla#en: llave))
+    finsi
+finmetodo
+
+metodo DiccionarioHashMap#eliminar: llave
+    si yo#contiene: llave
+        yo#_tabla#eliminar: llave
+        fijar yo#_numPares a yo#_numPares - 1
+    finsi
+finmetodo
+
+metodo DiccionarioHashMap#contiene: llave
+    devolver yo#_tabla#contiene: llave
+finmetodo
+
+metodo DiccionarioHashMap#vaciar
+    fijar yo#_tabla a HashMap#vacío
+    fijar yo#_numPares a 0
+finmetodo
+
+metodo DiccionarioHashMap#longitud
+    [ TODO: Quitar todo el bucle, solo devolver yo#_numPares ]
+    variable n
+    fijar n a 0
+    yo#paraCadaPar: procedimiento: ll, v
+        fijar n a n + 1
+    finprocedimiento
+    necesitas n = yo#_numPares
+    devolver n
+finmetodo
+
+metodo DiccionarioHashMap#comoTexto
+    variable texto
+    fijar texto a {(DiccionarioHashMap#desdePares: }
+    yo#paraCadaPar: procedimiento: ll, v
+        fijar texto a texto#concatenar: ({~t, ~t, }#formatear: ll, v)
+    finprocedimiento
+    devolver texto#concatenar: {)}
+finmetodo
+
+metodo DiccionarioHashMap#comoArreglo
+    variable arr
+    fijar arr a Arreglo#vacio
+    yo#paraCadaPar: procedimiento: ll, v
+        arr#agregarAlFinal: (Arreglo#crearCon: ll, v)
+    finprocedimiento
+    devolver arr
+finmetodo
+
+metodo DiccionarioHashMap#paraCadaPar: proc
+    devolver yo#_tabla#paraCadaPar: proc
+finmetodo
+
+metodo DiccionarioHashMap#paraCadaLlave: proc
+    devolver yo#paraCadaPar: procedimiento: ll, v
+        devolver %proc: ll
+    finprocedimiento
+finmetodo
+
+metodo DiccionarioHashMap#paraCadaValor: proc
+    devolver yo#paraCadaPar: procedimiento: ll, v
+        devolver %proc: v
+    finprocedimiento
+finmetodo
+
+metodo DiccionarioHashMap#reducir: ini, proc
+    variable acc
+    fijar acc a ini
+    yo#paraCadaPar: procedimiento: ll, v
+        fijar acc a %proc: acc, ll, v
+    finprocedimiento
+    devolver acc
+finmetodo
+
+metodo DiccionarioHashMap#transformar: proc
+    variable nuevoDic
+    fijar nuevoDic a yo#mapear: proc
+    fijar yo#_tabla a nuevoDic#_tabla
+    fijar yo#_numPares a nuevoDic#_numPares
+finmetodo
+
+metodo DiccionarioHashMap#mapear: proc
+    variables nuevaTabla, arregloDePares, arregloDePares', puedeSerHashMap
+    fijar arregloDePares a yo#comoArreglo
+    fijar arregloDePares' a Mapear: arregloDePares, funcion: par
+        devolver %proc: (par#en: 0), (par#en: 1)
+    finfuncion
+    fijar puedeSerHashMap a Todos: (Mapear: arregloDePares', funcion: par
+        devolver HashMap#puedeTenerDeLlave: (par#en: 0)
+    finfuncion)
+    necesitas puedeSerHashMap
+    devolver DiccionarioHashMap#desdeArreglo: arregloDePares'
+finmetodo
+
+metodo DiccionarioHashMap#\clonar\
+    variables clon
+    fijar clon a DiccionarioHashMap#vacío
+    yo#paraCadaPar: procedimiento: ll, v
+        clon#fijarEn: ll#\clonar\, v#\clonar\
+    finprocedimiento
+    devolver clon
+finmetodo
+
+metodo DiccionarioHashMap#igualA: otro
+    si no ((TipoDe: yo) = (TipoDe: otro))
+        devolver FALSO
+    finsi
+    si no (yo#longitud = otro#longitud)
+        devolver FALSO
+    finsi
+
+    [ Sabemos que tienen la misma cantidad de elementos, lo que significa que
+      por el "principio de los cajones" solo basta con iterar sobre uno de los
+      dos y verificar contra el otro.
+
+      Por ejemplo: (a -> 1, b -> 2, c -> 3) y (a -> 1, b -> 3, d -> 5)
+
+      Como tienen el mismo tamaño, sabemos que de ser diferentes en algún
+      momento encontraremos una llave que sea diferente o que no exísta, de
+      otra forma (si falta una llave, o si "sobra" una en el segundo dic. y no
+      la veremos porque solo iteramos sobre el primero) entonces no tendrían el
+      mismo tamaño. ]
+
+    devolver LlamarConEC: procedimiento: \devolver\
+        yo#paraCadaPar: procedimiento: llave, valor
+            si no otro#contiene: llave
+                %\devolver\: FALSO
+            finsi
+            si no ((yo#en: llave) = (otro#en: llave))
+                %\devolver\: FALSO
+            finsi
+        finprocedimiento
+        devolver VERDADERO
+    finprocedimiento
+finmetodo
+
+metodo DiccionarioHashMap#\operador_=\: otro
+    devolver yo#igualA: otro
+finmetodo
