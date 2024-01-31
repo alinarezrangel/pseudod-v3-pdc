@@ -183,12 +183,12 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
 
     si EsInstancia: nodoCst, CST#NodoSi
         devolver AST#NodoSi#crear: nodoCst#áreaTextual,
-            (abstraer: nodoCst#condición), (abstraer: nodoCst#siVerdadero), (abstraer: nodoCst#siFalso)
+            (abstraer: nodoCst#condicional), (abstraer: nodoCst#siVerdadero), (abstraer: nodoCst#siFalso)
     finsi
 
     si EsInstancia: nodoCst, CST#NodoMientras
         devolver AST#NodoMientras#crear: nodoCst#áreaTextual,
-            (abstraer: nodoCst#condiciónal), (abstraer: nodoCst#cuerpo)
+            (abstraer: nodoCst#condicional), (abstraer: nodoCst#cuerpo)
     finsi
 
     si EsInstancia: nodoCst, CST#NodoMétodo
