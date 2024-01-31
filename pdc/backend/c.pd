@@ -15,6 +15,7 @@ utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
+utilizar pdc/backend/c/lowerer (Opcode, FunciónIR, Etiqueta, Emisor, EscribirEmisor)
 
 
 procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
@@ -22,133 +23,6 @@ procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
         variable j
         fijar j a (arr#longitud - 1) - i
         devolver %proc: (arr#en: j), j
-    finprocedimiento
-finprocedimiento
-
-
-variable Opcode
-fijar Opcode a Enum: {Opcode},
-    {csaltar},
-    {saltar},
-    {enviarMensaje},
-    {etiqueta},
-    {variadic},
-    {fijarLocal},
-    {fijarLocalC},
-    {obtenerLocal},
-    {obtenerLocalC},
-    {caja},
-    {fijarCaja},
-    {fijarCajaC},
-    {obtenerCaja},
-    {obtenerCajaC},
-    {prn},
-    {prnl},
-    {assert},
-    {devolverN},
-    {empujarNúmero},
-    {empujarTexto},
-    {empujarNulo},
-    {negar},
-    {sonIdénticos},
-    {obtenerObjeto},
-    {capturas},
-    {locales},
-    {mkclz}
-
-clase Etiqueta
-    atributo id
-    metodo estatico vacía
-finclase
-
-metodo estatico Etiqueta#vacía
-    devolver yo#crear
-finmetodo
-
-metodo Etiqueta#comoTexto
-    devolver {etq:~t}#formatear: yo#id
-finmetodo
-
-clase FunciónIR
-    atributos id, instrucciones
-finclase
-
-metodo FunciónIR#inicializar: instrucciones
-    fijar yo#instrucciones a instrucciones
-finmetodo
-
-clase Emisor
-    atributos instrucciones, funciones, idDeEtiqueta, idDeFunción
-
-    metodo emitir: opcode, ...args
-    metodo moverAFunción
-    metodo combinar: subEmisor
-    metodo ajustarEtiqueta: etiqueta
-finclase
-
-metodo estatico Emisor#subEmisor: emisorPadre
-    variable c
-    fijar c a yo#crear
-    fijar c#idDeEtiqueta a emisorPadre#idDeEtiqueta
-    fijar c#idDeFunción a emisorPadre#idDeFunción
-    devolver c
-finmetodo
-
-metodo Emisor#inicializar
-    fijar yo#instrucciones a Arreglo#vacio
-    fijar yo#funciones a Arreglo#vacio
-    fijar yo#idDeEtiqueta a Caja#crear: 0
-    fijar yo#idDeFunción a Caja#crear: 0
-finmetodo
-
-metodo Emisor#emitir: ...tupla
-    necesitas tupla#longitud > 0
-    yo#instrucciones#agregarAlFinal: tupla
-finmetodo
-
-metodo Emisor#moverAFunción
-    variable func
-    fijar func a FunciónIR#crear: yo#instrucciones
-    fijar func#id a yo#idDeFunción#valor
-    fijar yo#idDeFunción#valor a yo#idDeFunción#valor + 1
-    yo#funciones#agregarAlFinal: func
-    fijar yo#instrucciones a Arreglo#vacio
-    devolver func
-finmetodo
-
-metodo Emisor#combinar: subEmisor
-    ParaCadaElemento: subEmisor#funciones, procedimiento: func
-        yo#funciones#agregarAlFinal: func
-    finprocedimiento
-finmetodo
-
-metodo Emisor#ajustarEtiqueta: etiqueta
-    fijar etiqueta#id a yo#idDeEtiqueta#valor
-    fijar yo#idDeEtiqueta#valor a yo#idDeEtiqueta#valor + 1
-    yo#emitir: Opcode#etiqueta, etiqueta#id
-finmetodo
-
-
-procedimiento EscribirEmisor: emisor
-    procedimiento escribirInstrucciones: pref, instrs
-        ParaCadaElemento: instrs, procedimiento: instr
-            escribir pref#comoTexto
-            escribir {    }
-            escribir (instr#en: 0)#nombre
-            ParaCadaNúmero: 1, instr#longitud, procedimiento: i
-                escribir {	}
-                escribir (instr#en: i)#comoTexto
-            finprocedimiento
-            nl
-        finprocedimiento
-    finprocedimiento
-
-    Escribir: {.instrucciones}
-    escribirInstrucciones: {}, emisor#instrucciones
-    Escribir: {.funciones}
-    ParaCadaElemento: emisor#funciones, procedimiento: func
-        Escribir: {  .func}, func#id
-        escribirInstrucciones: {  }, func#instrucciones
     finprocedimiento
 finprocedimiento
 

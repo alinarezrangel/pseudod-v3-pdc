@@ -1,0 +1,9 @@
+variable X
+fijar X a 0
+mientras X < 10
+    escribir X#comoTexto
+    nl
+    fijar X a X + 1
+finmientras
+escribir {fin}
+nl
