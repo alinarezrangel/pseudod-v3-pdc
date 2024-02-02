@@ -1,179 +1,189 @@
 utilizar bepd/builtins
-utilizar bepd/datos/caja (Caja)
-utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
-utilizar bepd/utilidades/arreglo (Únicos)
-utilizar bepd/x/enum (EnumConValores)
-utilizar bepd/x/adhoc (ObjetoAdHoc)
+
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
 
 
-variable Opcode
-fijar Opcode a EnumConValores: {Opcode},
-    {csaltar},       VERDADERO,
-    {saltar},        VERDADERO,
-    {enviarMensaje}, VERDADERO,
-    {etiqueta},      VERDADERO,
-    {variadic},      FALSO,
-    {fijarLocal},    FALSO,
-    {fijarLocalC},   FALSO,
-    {obtenerLocal},  FALSO,
-    {obtenerLocalC}, FALSO,
-    {caja},          FALSO,
-    {fijarCaja},     FALSO,
-    {fijarCajaC},    FALSO,
-    {obtenerCaja},   FALSO,
-    {obtenerCajaC},  FALSO,
-    {prn},           VERDADERO,
-    {prnl},          FALSO,
-    {assert},        FALSO,
-    {devolverN},     FALSO,
-    {empujarNúmero}, FALSO,
-    {empujarTexto},  FALSO,
-    {empujarNulo},   FALSO,
-    {negar},         FALSO,
-    {sonIdénticos},  FALSO,
-    {obtenerObjeto}, VERDADERO,
-    {capturas},      FALSO,
-    {locales},       FALSO,
-    {mkclz},         FALSO,
-    {continuar},     FALSO
+procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, programa
+    ParaCadaElemento: programa#funciones, procedimiento: func
+        CompilarFunción: puertoDeEscritura, identificadorDelMódulo, func
+    finprocedimiento
+    ParaCadaElemento: programa#continuaciones, procedimiento: k
+        CompilarContinuación: puertoDeEscritura, identificadorDelMódulo, k
+    finprocedimiento
+finprocedimiento
 
-metodo Opcode#requiereContinuación
-    devolver yo#valor
-finmetodo
+procedimiento Emitir: puerto, ...valores
+    ParaCadaElemento: valores, procedimiento: valor
+        puerto#escribirTexto: valor#comoTexto
+    finprocedimiento
+finprocedimiento
 
+procedimiento EmitirLínea: puerto, ...valores
+    Emitir: puerto, ...valores
+    puerto#escribirTexto: {~%}#formatear
+finprocedimiento
 
-clase Etiqueta
-    atributo id
-    metodo estatico vacía
-finclase
+funcion NombreDeLaFunción: identificadorDelMódulo, id
+    devolver {pdc_m~t_f~t}#formatear: identificadorDelMódulo, id
+finfuncion
 
-metodo estatico Etiqueta#vacía
-    devolver yo#crear
-finmetodo
+funcion NombreDeLaContinuación: identificadorDelMódulo, id
+    devolver {pdc_m~t_k~t}#formatear: identificadorDelMódulo, id
+finfuncion
 
-metodo Etiqueta#comoTexto
-    devolver {etq:~t}#formatear: yo#id
-finmetodo
+funcion EscaparTexto: txt
+    devolver ({"}#concatenar: txt)#concatenar: {"}
+finfuncion
 
+procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
+    EmitirLínea: puerto, {pdcrt_kp }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, pdcrt_k k)}
+    EmitirLínea: puerto, «{»
+    EmitirLínea: puerto, {pdcrt_marco* m = pdcrt_crear_marco(ctx);}
+    ParaCadaElemento: func#instrucciones, procedimiento: tupla
+        CompilarTupla: puerto, identificadorDelMódulo, tupla
+    finprocedimiento
+    EmitirLínea: puerto, «}»
+finprocedimiento
 
-clase FunciónIR
-    atributos id, instrucciones
-finclase
+procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
+    EmitirLínea: puerto, {pdcrt_kp }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m)}
+    EmitirLínea: puerto, «{»
+    ParaCadaElemento: k#instrucciones, procedimiento: tupla
+        CompilarTupla: puerto, identificadorDelMódulo, tupla
+    finprocedimiento
+    EmitirLínea: puerto, «}»
+finprocedimiento
 
-metodo FunciónIR#inicializar: instrucciones
-    fijar yo#instrucciones a instrucciones
-finmetodo
-
-clase ContinuaciónIR
-    atributos id, instrucciones
-finclase
-
-metodo ContinuaciónIR#inicializar: instrucciones
-    fijar yo#instrucciones a instrucciones
-finmetodo
-
-
-clase Emisor
-    atributos cabecera, instrucciones
-    atributos idDeContinuaciónActual
-    atributos funciones, continuaciones
-    atributos idDeFunción, idDeContinuación
-
-    metodo emitir: opcode, ...args
-    metodo moverAFunción
-    metodo combinar: subEmisor
-    metodo ajustarEtiqueta: etiqueta
-finclase
-
-metodo estatico Emisor#subEmisor: emisorPadre
-    variable c
-    fijar c a yo#crear
-    fijar c#continuaciones a emisorPadre#continuaciones
-    fijar c#idDeFunción a emisorPadre#idDeFunción
-    fijar c#idDeContinuación a emisorPadre#idDeContinuación
-    devolver c
-finmetodo
-
-metodo Emisor#inicializar
-    fijar yo#instrucciones a Arreglo#vacio
-    fijar yo#cabecera a yo#instrucciones
-    fijar yo#funciones a Arreglo#vacio
-    fijar yo#continuaciones a Arreglo#vacio
-    fijar yo#idDeContinuaciónActual a NULO
-    fijar yo#idDeFunción a Caja#crear: 0
-    fijar yo#idDeContinuación a Caja#crear: 0
-finmetodo
-
-metodo Emisor#emitir: ...tupla
-    necesitas tupla#longitud > 0
+procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     variable opcode
     fijar opcode a tupla#en: 0
-    si son diferentes opcode y Opcode#etiqueta
-        yo#instrucciones#agregarAlFinal: tupla
+
+    si opcode = Opcode#csaltar
+        EmitirLínea: puerto, {if(pdcrt_saltar_condicional(ctx))}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
+        EmitirLínea: puerto, {else}
+        EmitirLínea: puerto, {return pdcrt_continuar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
     finsi
-    si opcode#requiereContinuación
-        variable k
-        fijar k a ContinuaciónIR#crear: Arreglo#vacio
-        fijar k#id a yo#idDeContinuación#valor
-        fijar yo#idDeContinuaciónActual a k#id
-        fijar yo#idDeContinuación#valor a yo#idDeContinuación#valor + 1
-        si son iguales opcode y Opcode#etiqueta
-            yo#instrucciones#agregarAlFinal: (Arreglo#crearCon: Opcode#continuar, k#id)
-        finsi
-        tupla#agregarAlFinal: k#id
-        fijar yo#instrucciones a k#instrucciones
-        yo#continuaciones#agregarAlFinal: k
+
+    si opcode = Opcode#saltar
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
     finsi
-finmetodo
 
-metodo Emisor#moverAFunción
-    variable func
-    fijar func a FunciónIR#crear: yo#cabecera
-    fijar func#id a yo#idDeFunción#valor
-    fijar yo#idDeFunción#valor a yo#idDeFunción#valor + 1
-    yo#funciones#agregarAlFinal: func
-    fijar yo#instrucciones a Arreglo#vacio
-    fijar yo#cabecera a yo#instrucciones
-    fijar yo#idDeContinuaciónActual a NULO
-    devolver func
-finmetodo
-
-metodo Emisor#combinar: subEmisor
-    ParaCadaElemento: subEmisor#funciones, procedimiento: func
-        yo#funciones#agregarAlFinal: func
-    finprocedimiento
-finmetodo
-
-metodo Emisor#ajustarEtiqueta: etiqueta
-    yo#emitir: Opcode#etiqueta, etiqueta
-    fijar etiqueta#id a yo#idDeContinuaciónActual
-finmetodo
-
-
-procedimiento EscribirEmisor: emisor
-    procedimiento escribirInstrucciones: pref, instrs
-        ParaCadaElemento: instrs, procedimiento: instr
-            escribir pref#comoTexto
-            escribir {    }
-            escribir (instr#en: 0)#nombre
-            ParaCadaNúmero: 1, instr#longitud, procedimiento: i
-                escribir {	}
-                escribir (instr#en: i)#comoTexto
-            finprocedimiento
-            nl
+    si opcode = Opcode#enviarMensaje
+        EmitirLínea: puerto, {static const int proto[] =}
+        EmitirLínea: puerto, «{»
+        ParaCadaElemento: (tupla#en: 2), procedimiento: esVariadic
+            Emitir: puerto, (esVariadic#escojer: {1}, {0}), {, }
         finprocedimiento
-    finprocedimiento
+        EmitirLínea: puerto, «};»
+        variable k
+        fijar k a tupla#en: 3
+        EmitirLínea: puerto, {return pdcrt_enviar_mensaje(ctx, }, (EscaparTexto: (tupla#en: 1)), {, proto, }, (NombreDeLaContinuación: identificadorDelMódulo, k), {);}
+    finsi
 
-    Escribir: {.instrucciones}
-    escribirInstrucciones: {}, emisor#cabecera
-    Escribir: {.funciones}
-    ParaCadaElemento: emisor#funciones, procedimiento: func
-        Escribir: {  .func}, func#id
-        escribirInstrucciones: {  }, func#instrucciones
-    finprocedimiento
-    Escribir: {.continuaciones}
-    ParaCadaElemento: emisor#continuaciones, procedimiento: k
-        Escribir: {  .cont}, k#id
-        escribirInstrucciones: {  }, k#instrucciones
-    finprocedimiento
+    si opcode = Opcode#variadic
+        EmitirLínea: puerto, {pdcrt_variadic(ctx, }, (tupla#en: 1), {);}
+    finsi
+
+    si opcode = Opcode#fijarLocal
+        EmitirLínea: puerto, {m->locales[}, (tupla#en: 1), {] = pdcrt_sacar_de_la_pila(ctx);}
+    finsi
+
+    si opcode = Opcode#fijarLocalC
+        EmitirLínea: puerto, {m->capturas[}, (tupla#en: 1), {] = pdcrt_sacar_de_la_pila(ctx);}
+    finsi
+
+    si opcode = Opcode#obtenerLocal
+        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->locales[}, (tupla#en: 1), {]);}
+    finsi
+
+    si opcode = Opcode#obtenerLocalC
+        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->capturas[}, (tupla#en: 1), {]);}
+    finsi
+
+    si opcode = Opcode#caja
+        EmitirLínea: puerto, {pdcrt_caja(ctx);}
+    finsi
+
+    si opcode = Opcode#fijarCaja
+        EmitirLínea: puerto, {m->locales[}, (tupla#en: 1), {]->caja = pdcrt_sacar_de_la_pila(ctx);}
+    finsi
+
+    si opcode = Opcode#fijarCajaC
+        EmitirLínea: puerto, {m->capturas[}, (tupla#en: 1), {]->caja = pdcrt_sacar_de_la_pila(ctx);}
+    finsi
+
+    si opcode = Opcode#obtenerCaja
+        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->locales[}, (tupla#en: 1), {]->caja);}
+    finsi
+
+    si opcode = Opcode#obtenerCajaC
+        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->capturas[}, (tupla#en: 1), {]->caja);}
+    finsi
+
+    si opcode = Opcode#prn
+        EmitirLínea: puerto, {return pdcrt_prn(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
+    finsi
+
+    si opcode = Opcode#prnl
+        EmitirLínea: puerto, {pdcrt_prnl(ctx);}
+    finsi
+
+    si opcode = Opcode#assert
+        EmitirLínea: puerto, {pdcrt_assert(ctx);}
+    finsi
+
+    si opcode = Opcode#devolverN
+        EmitirLínea: puerto, {return pdcrt_devolver(ctx, }, (tupla#en: 1), {);}
+    finsi
+
+    si opcode = Opcode#empujarNúmero
+        variable n
+        fijar n a tupla#en: 1
+        si n#techo = n
+            EmitirLínea: puerto, {pdcrt_empujar_entero(ctx, }, n, {);}
+        sino
+            EmitirLínea: puerto, {pdcrt_empujar_float(ctx, }, n, {);}
+        finsi
+    finsi
+
+    si opcode = Opcode#empujarTexto
+        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, }, (EscaparTexto: (tupla#en: 1)), {);}
+    finsi
+
+    si opcode = Opcode#empujarNulo
+        EmitirLínea: puerto, {pdcrt_empujar_nulo(ctx);}
+    finsi
+
+    si opcode = Opcode#negar
+        EmitirLínea: puerto, {pdcrt_negar(ctx);}
+    finsi
+
+    si opcode = Opcode#sonIdénticos
+        EmitirLínea: puerto, {pdcrt_son_identicos(ctx);}
+    finsi
+
+    si opcode = Opcode#obtenerObjeto
+        EmitirLínea: puerto, {pdcrt_obtener_clase_objeto(ctx);}
+    finsi
+
+    si opcode = Opcode#mkclz
+        EmitirLínea: puerto, {pdcrt_empujar_closure(ctx, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 1)), {, }, (tupla#en: 2), {);}
+    finsi
+
+    si opcode = Opcode#continuar
+        EmitirLínea: puerto, {return pdcrt_continuar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
+    finsi
+
+    si opcode = Opcode#empujarEspacioDeNombres
+        EmitirLínea: puerto, {pdcrt_empujar_espacio_de_nombres(ctx);}
+    finsi
+
+    si opcode = Opcode#agregarNombre
+        EmitirLínea: puerto, {pdcrt_agregar_nombre(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, ((tupla#en: 2)#escojer: {true}, {false}), {);}
+    finsi
+
+    si opcode = Opcode#exportar
+        EmitirLínea: puerto, {return pdcrt_exportar(ctx);}
+    finsi
 finprocedimiento

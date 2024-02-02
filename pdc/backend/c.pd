@@ -4,6 +4,7 @@ utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 utilizar bepd/utilidades/arreglo (Únicos)
 utilizar bepd/x/enum (Enum)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
+utilizar bepd/x/puerto (SalidaEstándar)
 
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
@@ -15,7 +16,120 @@ utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
-utilizar pdc/backend/c/lowerer (Opcode, FunciónIR, Etiqueta, Emisor, EscribirEmisor)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/backend/c/lowerer (CompilarPrograma)
+
+
+clase Emisor
+    atributos cabecera, instrucciones
+    atributos idDeContinuaciónActual
+    atributos funciones, continuaciones
+    atributos idDeFunción, idDeContinuación
+
+    metodo emitir: opcode, ...args
+    metodo moverAFunción
+    metodo combinar: subEmisor
+    metodo ajustarEtiqueta: etiqueta
+finclase
+
+metodo estatico Emisor#subEmisor: emisorPadre
+    variable c
+    fijar c a yo#crear
+    fijar c#continuaciones a emisorPadre#continuaciones
+    fijar c#idDeFunción a emisorPadre#idDeFunción
+    fijar c#idDeContinuación a emisorPadre#idDeContinuación
+    devolver c
+finmetodo
+
+metodo Emisor#inicializar
+    fijar yo#instrucciones a Arreglo#vacio
+    fijar yo#cabecera a yo#instrucciones
+    fijar yo#funciones a Arreglo#vacio
+    fijar yo#continuaciones a Arreglo#vacio
+    fijar yo#idDeContinuaciónActual a NULO
+    fijar yo#idDeFunción a Caja#crear: 0
+    fijar yo#idDeContinuación a Caja#crear: 0
+finmetodo
+
+metodo Emisor#emitir: ...tupla
+    necesitas tupla#longitud > 0
+    variable opcode
+    fijar opcode a tupla#en: 0
+    si son diferentes opcode y Opcode#etiqueta
+        yo#instrucciones#agregarAlFinal: tupla
+    finsi
+    si opcode#requiereContinuación
+        variable k
+        fijar k a ContinuaciónIR#crear: Arreglo#vacio
+        fijar k#id a yo#idDeContinuación#valor
+        fijar yo#idDeContinuaciónActual a k#id
+        fijar yo#idDeContinuación#valor a yo#idDeContinuación#valor + 1
+        si opcode = Opcode#etiqueta
+            yo#instrucciones#agregarAlFinal: (Arreglo#crearCon: Opcode#continuar, k#id)
+        finsi
+        tupla#agregarAlFinal: k#id
+        fijar yo#instrucciones a k#instrucciones
+        yo#continuaciones#agregarAlFinal: k
+    finsi
+finmetodo
+
+metodo Emisor#moverAFunción
+    variable func
+    fijar func a FunciónIR#crear: yo#cabecera
+    fijar func#id a yo#idDeFunción#valor
+    fijar yo#idDeFunción#valor a yo#idDeFunción#valor + 1
+    yo#funciones#agregarAlFinal: func
+    fijar yo#instrucciones a Arreglo#vacio
+    fijar yo#cabecera a yo#instrucciones
+    fijar yo#idDeContinuaciónActual a NULO
+    devolver func
+finmetodo
+
+metodo Emisor#moverAPrograma
+    variable funcPrincipal
+    fijar funcPrincipal a yo#moverAFunción
+    devolver ProgramaIR#crear: funcPrincipal#id, yo#funciones, yo#continuaciones
+finmetodo
+
+metodo Emisor#combinar: subEmisor
+    ParaCadaElemento: subEmisor#funciones, procedimiento: func
+        yo#funciones#agregarAlFinal: func
+    finprocedimiento
+finmetodo
+
+metodo Emisor#ajustarEtiqueta: etiqueta
+    yo#emitir: Opcode#etiqueta, etiqueta
+    fijar etiqueta#id a yo#idDeContinuaciónActual
+finmetodo
+
+
+procedimiento EscribirEmisor: emisor
+    procedimiento escribirInstrucciones: pref, instrs
+        ParaCadaElemento: instrs, procedimiento: instr
+            escribir pref#comoTexto
+            escribir {    }
+            escribir (instr#en: 0)#nombre
+            ParaCadaNúmero: 1, instr#longitud, procedimiento: i
+                escribir {	}
+                escribir (instr#en: i)#comoTexto
+            finprocedimiento
+            nl
+        finprocedimiento
+    finprocedimiento
+
+    Escribir: {.instrucciones}
+    escribirInstrucciones: {}, emisor#cabecera
+    Escribir: {.funciones}
+    ParaCadaElemento: emisor#funciones, procedimiento: func
+        Escribir: {  .func}, func#id
+        escribirInstrucciones: {  }, func#instrucciones
+    finprocedimiento
+    Escribir: {.continuaciones}
+    ParaCadaElemento: emisor#continuaciones, procedimiento: k
+        Escribir: {  .cont}, k#id
+        escribirInstrucciones: {  }, k#instrucciones
+    finprocedimiento
+finprocedimiento
 
 
 procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
@@ -62,6 +176,7 @@ metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
             yo#emisor#emitir: Opcode#fijarCajaC, (yo#capturas#en: reg#binding)
         finsi
     finsi
+    devolver reg#binding
 finmetodo
 
 metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
@@ -83,6 +198,7 @@ metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
             yo#emisor#emitir: Opcode#obtenerCajaC, (yo#capturas#en: reg#binding)
         finsi
     finsi
+    devolver reg#binding
 finmetodo
 
 metodo EstadoDeEmisión#subestado: emisor, locales, capturas
@@ -239,7 +355,7 @@ metodo EstadoDeEmisión#emitir: ast
             yo#emitir: arg#expresión
         finfuncion
         fijar proto a Mapear: ast#argumentos, funcion: arg
-            devolver arg#esVariadic#escojer: 1, 0
+            devolver arg#esVariadic
         finfuncion
         yo#emisor#emitir: Opcode#enviarMensaje, ast#mensaje, proto
         devolver NULO
@@ -289,6 +405,18 @@ metodo EstadoDeEmisión#emitir: ast
     si EsInstancia: ast, AST#NodoBuiltin
         si ast#nombre = {objeto}
             yo#emisor#emitir: Opcode#obtenerObjeto
+            devolver NULO
+        finsi
+        si ast#nombre = {exportar}
+            yo#emisor#emitir: Opcode#empujarEspacioDeNombres
+            ParaCadaElemento: ast#argumentos, procedimiento: arg
+                variables binding, reg
+                necesitas no arg#esVariadic
+                fijar binding a yo#emitirObtenerIdentificador: arg#expresión
+                fijar reg a yo#tablasRnAst#tablaNombres#buscarÚnico: {binding}, binding
+                yo#emisor#emitir: Opcode#agregarNombre, arg#expresión#nombre, reg#esAutoejecutable
+            finprocedimiento
+            yo#emisor#emitir: Opcode#exportar
             devolver NULO
         finsi
         Escribir: {Builtin}, ast#nombre
@@ -362,9 +490,11 @@ EscribirTabla: tablaCaps
 Escribir: { LOCS ================================================== }
 EscribirTabla: tablaLoc
 
-variables emisor, estado
+variables emisor, estado, programa
 fijar emisor a Emisor#crear
 fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor
 estado#emitir: ast
+fijar programa a estado#emisor#moverAPrograma
 
-EscribirEmisor: emisor
+[ EscribirPrograma: programa ]
+CompilarPrograma: SalidaEstándar, {mod}, programa

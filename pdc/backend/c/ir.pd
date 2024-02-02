@@ -1,0 +1,123 @@
+utilizar bepd/builtins
+utilizar bepd/x/enum (EnumConValores)
+
+
+variable Opcode
+fijar Opcode a EnumConValores: {Opcode},
+    {csaltar},                 VERDADERO,
+    {saltar},                  VERDADERO,
+    {enviarMensaje},           VERDADERO,
+    {etiqueta},                VERDADERO,
+    {variadic},                FALSO,
+    {fijarLocal},              FALSO,
+    {fijarLocalC},             FALSO,
+    {obtenerLocal},            FALSO,
+    {obtenerLocalC},           FALSO,
+    {caja},                    FALSO,
+    {fijarCaja},               FALSO,
+    {fijarCajaC},              FALSO,
+    {obtenerCaja},             FALSO,
+    {obtenerCajaC},            FALSO,
+    {prn},                     VERDADERO,
+    {prnl},                    FALSO,
+    {assert},                  FALSO,
+    {devolverN},               FALSO,
+    {empujarNúmero},           FALSO,
+    {empujarTexto},            FALSO,
+    {empujarNulo},             FALSO,
+    {negar},                   FALSO,
+    {sonIdénticos},            FALSO,
+    {obtenerObjeto},           VERDADERO,
+    {capturas},                FALSO,
+    {locales},                 FALSO,
+    {mkclz},                   FALSO,
+    {continuar},               FALSO,
+    {empujarEspacioDeNombres}, FALSO,
+    {agregarNombre},           FALSO,
+    {exportar},                FALSO
+
+metodo Opcode#requiereContinuación
+    devolver yo#valor
+finmetodo
+
+
+clase Etiqueta
+    atributo id
+    metodo estatico vacía
+finclase
+
+metodo estatico Etiqueta#vacía
+    devolver yo#crear
+finmetodo
+
+metodo Etiqueta#comoTexto
+    devolver {etq:~t}#formatear: yo#id
+finmetodo
+
+
+clase FunciónIR
+    atributos id, instrucciones, númLocales, númCapturas
+finclase
+
+metodo FunciónIR#inicializar: instrucciones
+    fijar yo#instrucciones a instrucciones
+    fijar yo#númLocales a 0
+    fijar yo#númCapturas a 0
+    ParaCadaElemento: instrucciones, procedimiento: tupla
+        variable opcode
+        fijar opcode a tupla#en: 0
+        si opcode = Opcode#capturas
+            fijar yo#númCapturas a tupla#en: 1
+        finsi
+        si opcode = Opcode#locales
+            fijar yo#númLocales a tupla#en: 1
+        finsi
+    finprocedimiento
+finmetodo
+
+clase ContinuaciónIR
+    atributos id, instrucciones
+finclase
+
+metodo ContinuaciónIR#inicializar: instrucciones
+    fijar yo#instrucciones a instrucciones
+finmetodo
+
+
+clase ProgramaIR
+    atributo idDeLaFunciónPrincipal
+    atributos funciones, continuaciones
+finclase
+
+metodo ProgramaIR#inicializar: idDeLaFunciónPrincipal, funciones, continuaciones
+    fijar yo#idDeLaFunciónPrincipal a idDeLaFunciónPrincipal
+    fijar yo#funciones a funciones
+    fijar yo#continuaciones a continuaciones
+finmetodo
+
+procedimiento EscribirPrograma: programa
+    procedimiento escribirInstrucciones: pref, instrs
+        ParaCadaElemento: instrs, procedimiento: instr
+            escribir pref#comoTexto
+            escribir {    }
+            escribir (instr#en: 0)#nombre
+            ParaCadaNúmero: 1, instr#longitud, procedimiento: i
+                escribir {	}
+                escribir (instr#en: i)#comoTexto
+            finprocedimiento
+            nl
+        finprocedimiento
+    finprocedimiento
+
+    Escribir: {.principal}, programa#idDeLaFunciónPrincipal
+    Escribir: {.funciones}
+    ParaCadaElemento: programa#funciones, procedimiento: func
+        Escribir: {  .func}, func#id, func#númCapturas, func#númLocales
+        escribirInstrucciones: {  }, func#instrucciones
+    finprocedimiento
+    Escribir: {.continuaciones}
+    ParaCadaElemento: programa#continuaciones, procedimiento: k
+        Escribir: {  .cont}, k#id
+        escribirInstrucciones: {  }, k#instrucciones
+    finprocedimiento
+finprocedimiento

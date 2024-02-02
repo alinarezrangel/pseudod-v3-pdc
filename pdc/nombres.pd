@@ -41,6 +41,7 @@ clase Ámbito
     metodo intentaResolver: nombre
     metodo esAutoejecutable: binding
     metodo obtenerBinding
+    metodo paraCadaNombreExportado: proc
 finclase
 
 atributos Ámbito#tablaNombres, Ámbito#_porNombre, Ámbito#_númBindings, Ámbito#_ámbitoSuperior
@@ -106,6 +107,12 @@ metodo Ámbito#comoTexto
     devolver {(Ámbito ~t ~t)}#formatear:
         ((no EsNulo: yo#_ámbitoSuperior)#escojer: {(con sup.)}, {}),
         (Unir: nombres, {, })
+finmetodo
+
+metodo Ámbito#paraCadaNombreExportado: proc
+    yo#_porNombre#paraCadaPar: procedimiento: nombre, datos
+        devolver %proc: nombre, datos
+    finprocedimiento
 finmetodo
 
 clase TablasDeResoluciónDeNombres

@@ -41,7 +41,20 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     finfuncion
 
     si EsInstancia: nodoCst, CST#NodoPrograma
-        devolver AST#NodoPrograma#crear: nodoCst#áreaTextual, (abstraer: nodoCst#instrucciones)
+        variables ámbito, bloque, exportaciones
+        fijar bloque a abstraer: nodoCst#instrucciones
+        fijar ámbito a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#instrucciones#id
+        fijar exportaciones a Arreglo#vacio
+        ámbito#ámbito#paraCadaNombreExportado: procedimiento: nombre, datos
+            variable id
+            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombre
+            registrarParche: procedimiento
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, datos#binding)
+            finprocedimiento
+            exportaciones#agregarAlFinal: (AST#NodoArgumento#crear: nodoCst#áreaTextual, id, FALSO)
+        finprocedimiento
+        bloque#cuerpo#agregarAlFinal: (AST#NodoBuiltin#crear: nodoCst#áreaTextual, {exportar}, exportaciones)
+        devolver AST#NodoPrograma#crear: nodoCst#áreaTextual, bloque
     finsi
 
     si EsInstancia: nodoCst, CST#NodoBloque
@@ -94,7 +107,7 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
             fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
             registrarParche: procedimiento
-                tablasRnAst#tablaUsos#agregar: (DefiniciónDeNombre#crear: usoNombre'#id, reg#binding)
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: usoNombre'#id, reg#binding)
             finprocedimiento
             devolver usoNombre'
         finfuncion
@@ -106,7 +119,7 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
         si no EsNulo: nodoCst#claseBase
             fijar base a abstraer: nodoCst#claseBase
         sino
-            fijar base a AST#NodoBuiltin#crear: nodoCst#áreaTextual, {objeto}
+            fijar base a AST#NodoBuiltin#crear: nodoCst#áreaTextual, {objeto}, Arreglo#vacio
         finsi
         cuerpo#agregarAlFinal:
             (AST#NodoFijar#crear: nodoCst#áreaTextual,
@@ -149,7 +162,7 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
             fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
             registrarParche: procedimiento
-                tablasRnAst#tablaUsos#agregar: (DefiniciónDeNombre#crear: usoNombre'#id, reg#binding)
+                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: usoNombre'#id, reg#binding)
             finprocedimiento
             devolver usoNombre'
         finfuncion

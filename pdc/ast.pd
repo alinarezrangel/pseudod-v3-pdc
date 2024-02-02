@@ -387,17 +387,19 @@ metodo NodoSonIdénticos#comoTexto
 finmetodo
 
 clase NodoBuiltin hereda Nodo
-    atributo nombre
+    atributos nombre, argumentos
 finclase
 
-metodo NodoBuiltin#inicializar: área, nombre
+metodo NodoBuiltin#inicializar: área, nombre, argumentos
     fijar yo#áreaTextual a área
     fijar yo#nombre a nombre
+    fijar yo#argumentos a argumentos
 finmetodo
 
 metodo NodoBuiltin#recursivo: f
+    ParaCadaElemento: yo#argumentos, f
 finmetodo
 
 metodo NodoBuiltin#comoTexto
-    devolver {(NodoBuiltin ~t)}#formatear: yo#nombre
+    devolver {(NodoBuiltin ~t: ~t)}#formatear: yo#nombre, yo#argumentos
 finmetodo
