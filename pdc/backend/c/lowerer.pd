@@ -4,12 +4,28 @@ utilizar pdc/backend/c/ir (Opcode, FunciónIR, ContinuaciónIR, ProgramaIR, Etiq
 
 
 procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, programa
+    EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
+    EmitirLínea: puertoDeEscritura, {#include "pdcrt.h"}
+
+    ParaCadaElemento: programa#funciones, procedimiento: func
+        DeclararFunción: puertoDeEscritura, identificadorDelMódulo, func
+    finprocedimiento
+    ParaCadaElemento: programa#continuaciones, procedimiento: k
+        DeclararContinuación: puertoDeEscritura, identificadorDelMódulo, k
+    finprocedimiento
+
     ParaCadaElemento: programa#funciones, procedimiento: func
         CompilarFunción: puertoDeEscritura, identificadorDelMódulo, func
     finprocedimiento
     ParaCadaElemento: programa#continuaciones, procedimiento: k
         CompilarContinuación: puertoDeEscritura, identificadorDelMódulo, k
     finprocedimiento
+
+    EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_ENTRYPOINT(}, identificadorDelMódulo, {, }, (NombreDeLaFunción: identificadorDelMódulo, programa#idDeLaFunciónPrincipal), {)}
+
+    EmitirLínea: puertoDeEscritura, {#ifdef PDCRT_MAIN}
+    EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_MAIN(}, identificadorDelMódulo, {)}
+    EmitirLínea: puertoDeEscritura, {#endif}
 finprocedimiento
 
 procedimiento Emitir: puerto, ...valores
@@ -35,10 +51,18 @@ funcion EscaparTexto: txt
     devolver ({"}#concatenar: txt)#concatenar: {"}
 finfuncion
 
+procedimiento DeclararFunción: puerto, identificadorDelMódulo, func
+    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k);}
+finprocedimiento
+
+procedimiento DeclararContinuación: puerto, identificadorDelMódulo, k
+    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m);}
+finprocedimiento
+
 procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
-    EmitirLínea: puerto, {pdcrt_kp }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, pdcrt_k k)}
+    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k)}
     EmitirLínea: puerto, «{»
-    EmitirLínea: puerto, {pdcrt_marco* m = pdcrt_crear_marco(ctx);}
+    EmitirLínea: puerto, {pdcrt_marco* m = pdcrt_crear_marco(ctx, }, func#númLocales, {, }, func#númCapturas, {, args, k);}
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -46,8 +70,11 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
 finprocedimiento
 
 procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
-    EmitirLínea: puerto, {pdcrt_kp }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m)}
+    variable nombre
+    fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
+    EmitirLínea: puerto, {pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
     EmitirLínea: puerto, «{»
+    EmitirLínea: puerto, «if(pdcrt_stack_lleno(ctx)) return (pdcrt_k) { .kf = », nombre, «, .m = m };»
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -58,27 +85,31 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     variable opcode
     fijar opcode a tupla#en: 0
 
+    si opcode = Opcode#params
+        EmitirLínea: puerto, {return pdcrt_params(ctx, m, }, (tupla#en: 1), {, }, ((tupla#en: 2)#escojer: {1}, {0}), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {);}
+    finsi
+
     si opcode = Opcode#csaltar
         EmitirLínea: puerto, {if(pdcrt_saltar_condicional(ctx))}
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
         EmitirLínea: puerto, {else}
-        EmitirLínea: puerto, {return pdcrt_continuar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
     finsi
 
     si opcode = Opcode#saltar
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
     finsi
 
     si opcode = Opcode#enviarMensaje
         EmitirLínea: puerto, {static const int proto[] =}
-        EmitirLínea: puerto, «{»
+        Emitir: puerto, «{ »
         ParaCadaElemento: (tupla#en: 2), procedimiento: esVariadic
             Emitir: puerto, (esVariadic#escojer: {1}, {0}), {, }
         finprocedimiento
         EmitirLínea: puerto, «};»
         variable k
         fijar k a tupla#en: 3
-        EmitirLínea: puerto, {return pdcrt_enviar_mensaje(ctx, }, (EscaparTexto: (tupla#en: 1)), {, proto, }, (NombreDeLaContinuación: identificadorDelMódulo, k), {);}
+        EmitirLínea: puerto, {return pdcrt_enviar_mensaje(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, proto, }, (tupla#en: 2)#longitud, {, }, (NombreDeLaContinuación: identificadorDelMódulo, k), {);}
     finsi
 
     si opcode = Opcode#variadic
@@ -122,7 +153,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#prn
-        EmitirLínea: puerto, {return pdcrt_prn(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
+        EmitirLínea: puerto, {return pdcrt_prn(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
     finsi
 
     si opcode = Opcode#prnl
@@ -134,7 +165,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#devolverN
-        EmitirLínea: puerto, {return pdcrt_devolver(ctx, }, (tupla#en: 1), {);}
+        EmitirLínea: puerto, {return pdcrt_devolver(ctx, m, }, (tupla#en: 1), {);}
     finsi
 
     si opcode = Opcode#empujarNúmero
@@ -172,7 +203,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#continuar
-        EmitirLínea: puerto, {return pdcrt_continuar(ctx, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
     finsi
 
     si opcode = Opcode#empujarEspacioDeNombres
@@ -184,6 +215,6 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#exportar
-        EmitirLínea: puerto, {return pdcrt_exportar(ctx);}
+        EmitirLínea: puerto, {return pdcrt_exportar(ctx, m);}
     finsi
 finprocedimiento

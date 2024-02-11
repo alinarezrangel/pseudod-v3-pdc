@@ -362,10 +362,22 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoFunciónAnónima
-        variables sub, caps, emisor, func
+        variables sub, caps, emisor, func, paramsSinVariadic, tieneVariadic
         fijar emisor a Emisor#subEmisor: yo#emisor
         fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst, emisor
         fijar sub a yo#subestado: emisor, caps#locales, caps#capturas
+
+        fijar paramsSinVariadic a 0
+        fijar tieneVariadic a FALSO
+        ParaCadaElemento: ast#parámetros, procedimiento: param
+            si param#esVariadic
+                fijar tieneVariadic a VERDADERO
+            sino
+                fijar paramsSinVariadic a paramsSinVariadic + 1
+            finsi
+        finprocedimiento
+        sub#emisor#emitir: Opcode#params, paramsSinVariadic, tieneVariadic
+
         ParaCadaElementoEnReversaConÍndice: ast#parámetros, procedimiento: param, i
             si param#esVariadic
                 sub#emisor#emitir: Opcode#variadic, i

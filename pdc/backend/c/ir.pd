@@ -4,6 +4,7 @@ utilizar bepd/x/enum (EnumConValores)
 
 variable Opcode
 fijar Opcode a EnumConValores: {Opcode},
+    {params},                  VERDADERO,
     {csaltar},                 VERDADERO,
     {saltar},                  VERDADERO,
     {enviarMensaje},           VERDADERO,
