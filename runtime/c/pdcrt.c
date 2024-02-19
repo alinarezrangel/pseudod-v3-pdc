@@ -28,11 +28,13 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
 #define pdcrt_objeto_booleano(b) ((pdcrt_obj) { .recv = &pdcrt_recv_booleano, .bval = (b) })
 #define pdcrt_objeto_marco(m) ((pdcrt_obj) { .recv = &pdcrt_recv_marco, .marco = (m) })
+#define pdcrt_objeto_texto(txt) ((pdcrt_obj) { .recv = &pdcrt_recv_texto, .texto = (txt) })
 
 
 static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj);
@@ -75,6 +77,11 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
             pdcrt_gc_marcar(ctx, m->locales_y_capturas[i]);
         break;
     }
+    case PDCRT_TGC_TEXTO:
+        if(h->generacion == ctx->gc.generacion)
+            break;
+        h->generacion = ctx->gc.generacion;
+        break;
     }
 }
 
@@ -91,6 +98,9 @@ static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
         return;
     case PDCRT_TOBJ_MARCO:
         h = PDCRT_CABECERA_GC(obj.marco);
+        break;
+    case PDCRT_TOBJ_TEXTO:
+        h = PDCRT_CABECERA_GC(obj.texto);
         break;
     }
     pdcrt_gc_marcar_cabecera(ctx, h);
@@ -123,6 +133,23 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
             if(h == ctx->gc.ultimo)
                 ctx->gc.ultimo = NULL;
 
+            if(h->tipo == PDCRT_TGC_TEXTO)
+            {
+                // Elimínalo de la lista de textos
+                for(size_t i = 0; i < ctx->tam_textos; i++)
+                {
+                    if(ctx->textos[i] == (pdcrt_texto *) h)
+                    {
+                        for(size_t j = i + 1; j < ctx->tam_textos; j++)
+                        {
+                            ctx->textos[j - 1] = ctx->textos[j];
+                        }
+                        ctx->tam_textos -= 1;
+                        break;
+                    }
+                }
+            }
+
             free(h);
         }
         h = s;
@@ -138,6 +165,85 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx)
 
     pdcrt_gc_marcar_todo(ctx);
     pdcrt_gc_recolectar(ctx);
+}
+
+
+static pdcrt_texto* pdcrt_crear_nuevo_texto(pdcrt_ctx *ctx, const char *str, size_t len)
+{
+    pdcrt_texto *txt = pdcrt_alojar_obj(ctx, PDCRT_TGC_TEXTO, sizeof(pdcrt_texto) + len + 1);
+    if(!txt)
+        pdcrt_enomem(ctx);
+    txt->longitud = len;
+    if(len > 0)
+        memcpy(txt->contenido, str, len);
+    txt->contenido[len] = '\0';
+    return txt;
+}
+
+static int pdcrt_comparar_str(const char *s1, size_t l1, const char *s2, size_t l2)
+{
+    if(l1 < l2)
+        return -1;
+    else if(l1 > l2)
+        return 1;
+    else
+        return memcmp(s1, s2, l1);
+}
+
+static pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, const char *str, size_t len)
+{
+    size_t lo = 0, hi = ctx->tam_textos;
+    size_t p;
+#define PDCRT_RECALCULAR_PIVOTE() p = (hi - lo) / 2 + lo
+    PDCRT_RECALCULAR_PIVOTE();
+    while(lo < hi)
+    {
+        pdcrt_texto *txt = ctx->textos[p];
+        int c = pdcrt_comparar_str(txt->contenido, txt->longitud, str, len);
+        if(c < 0)
+        {
+            hi = p;
+            PDCRT_RECALCULAR_PIVOTE();
+        }
+        else if(c > 0)
+        {
+            lo = p + 1;
+            PDCRT_RECALCULAR_PIVOTE();
+        }
+        else
+        {
+            return txt;
+        }
+    }
+#undef PDCRT_RECALCULAR_PIVOTE
+
+    if(ctx->cap_textos <= ctx->tam_textos)
+    {
+        size_t ncap = ctx->cap_textos * 2;
+        if(ncap == 0)
+            ncap = 1;
+        pdcrt_texto **textos = realloc(ctx->textos, sizeof(pdcrt_texto *) * ncap);
+        if(!textos)
+            pdcrt_enomem(ctx);
+        ctx->textos = textos;
+        ctx->cap_textos = ncap;
+    }
+
+    const size_t exp_ind = lo;
+    pdcrt_texto *txt = pdcrt_crear_nuevo_texto(ctx, str, len);
+    for(ssize_t i = ctx->tam_textos; i > (ssize_t) exp_ind; i--)
+    {
+        ctx->textos[i + 1] = ctx->textos[i];
+    }
+    ctx->textos[exp_ind] = txt;
+    ctx->tam_textos += 1;
+    return txt;
+}
+
+static int pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b)
+{
+    return pdcrt_comparar_str(a->contenido, a->longitud,
+                              b->contenido, b->longitud);
 }
 
 
@@ -165,6 +271,13 @@ static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k)
     assert(0 && "sin implementar");
 }
 
+static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    assert(0 && "sin implementar");
+}
+
+
 static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
 {
     if(o.recv == &pdcrt_recv_entero)
@@ -182,6 +295,10 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     else if(o.recv == &pdcrt_recv_marco)
     {
         return PDCRT_TOBJ_MARCO;
+    }
+    else if(o.recv == &pdcrt_recv_texto)
+    {
+        return PDCRT_TOBJ_TEXTO;
     }
     else
     {
@@ -212,19 +329,28 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
 pdcrt_ctx *pdcrt_crear_contexto(void)
 {
     pdcrt_ctx *ctx = malloc(sizeof(pdcrt_ctx));
+
     ctx->tam_pila = 0;
     ctx->pila = NULL;
     ctx->cap_pila = 0;
+
     ctx->gc.primero = ctx->gc.ultimo = NULL;
     ctx->gc.generacion = 0;
     ctx->cnt = 0;
+
+    ctx->tam_textos = ctx->cap_textos = 0;
+    ctx->textos = NULL;
+
     volatile int x;
     ctx->inicio_del_stack = (uintptr_t) &x;
     ctx->tam_stack = 1 * 1024 * 1024; // 1 MiB
-    ctx->mensaje_de_error = NULL;
+
     ctx->hay_un_manejador_de_errores = false;
+    ctx->mensaje_de_error = NULL;
+
     ctx->hay_una_salida_del_trampolin = false;
     ctx->continuacion_actual = (pdcrt_k) { .kf = NULL, .marco = NULL };
+
     return ctx;
 }
 
@@ -237,6 +363,7 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
         h = s;
     }
 
+    free(ctx->textos);
     free(ctx->pila);
     free(ctx);
 }
@@ -276,6 +403,13 @@ void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx)
     pdcrt_empujar(ctx, pdcrt_objeto_entero(1));
 }
 
+void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_texto *txt = pdcrt_crear_texto(ctx, str, len);
+    pdcrt_empujar(ctx, pdcrt_objeto_texto(txt));
+}
+
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx)
 {
     pdcrt_obj o = pdcrt_sacar(ctx);
@@ -309,7 +443,7 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
         assert(proto[i] == 0);
         ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
     }
-    ctx->pila[((ctx->tam_pila++) - nproto) - 1] = pdcrt_objeto_entero(-1);
+    ctx->pila[((ctx->tam_pila++) - nproto) - 1] = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, msj, strlen(msj)));
     pdcrt_obj t = ctx->pila[(ctx->tam_pila - nproto) - 2];
     return (*t.recv)(ctx, nproto, k);
 }

@@ -179,7 +179,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#empujarTexto
-        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, }, (EscaparTexto: (tupla#en: 1)), {);}
+        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {);}
     finsi
 
     si opcode = Opcode#empujarNulo

@@ -37,6 +37,7 @@ struct pdcrt_k
 typedef enum pdcrt_tipo_obj_gc
 {
     PDCRT_TGC_MARCO,
+    PDCRT_TGC_TEXTO,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -53,6 +54,13 @@ typedef struct pdcrt_gc
 } pdcrt_gc;
 
 
+typedef struct pdcrt_texto
+{
+    pdcrt_cabecera_gc gc;
+    size_t longitud;
+    char contenido[];
+} pdcrt_texto;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -62,6 +70,7 @@ typedef struct pdcrt_obj
         pdcrt_float fval;
         bool bval;
         pdcrt_marco *marco;
+        pdcrt_texto *texto;
     };
 } pdcrt_obj;
 
@@ -71,6 +80,7 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_FLOAT,
     PDCRT_TOBJ_BOOLEANO,
     PDCRT_TOBJ_MARCO,
+    PDCRT_TOBJ_TEXTO,
 } pdcrt_tipo;
 
 
@@ -98,6 +108,10 @@ struct pdcrt_ctx
 
     unsigned int cnt;
 
+    pdcrt_texto **textos;
+    size_t tam_textos;
+    size_t cap_textos;
+
     uintptr_t inicio_del_stack;
     size_t tam_stack;
 
@@ -114,6 +128,7 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
+void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
