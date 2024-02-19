@@ -129,9 +129,9 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
             if(h->siguiente)
                 h->siguiente->anterior = h->anterior;
             if(h == ctx->gc.primero)
-                ctx->gc.primero = NULL;
+                ctx->gc.primero = h->siguiente;
             if(h == ctx->gc.ultimo)
-                ctx->gc.ultimo = NULL;
+                ctx->gc.ultimo = h->anterior;
 
             if(h->tipo == PDCRT_TGC_TEXTO)
             {
