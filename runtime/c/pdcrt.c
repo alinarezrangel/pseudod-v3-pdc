@@ -72,7 +72,8 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
             break;
         h->generacion = ctx->gc.generacion;
         pdcrt_marco *m = (pdcrt_marco *) h;
-        pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m->k.marco));
+        if(m->k.marco)
+            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m->k.marco));
         for(size_t i = 0; i < (m->num_locales + m->num_capturas); i++)
             pdcrt_gc_marcar(ctx, m->locales_y_capturas[i]);
         break;
