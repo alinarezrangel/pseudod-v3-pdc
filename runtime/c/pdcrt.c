@@ -125,6 +125,17 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
         pdcrt_cabecera_gc *s = h->siguiente;
         if(h->generacion != ctx->gc.generacion)
         {
+            if(h->tipo == PDCRT_TGC_MARCO)
+            {
+                pdcrt_marco *m = (pdcrt_marco *) h;
+                if(m->activo)
+                {
+                    // El marco esta siendo usado por la pila de C.
+                    h = s;
+                    continue;
+                }
+            }
+
             if(h->anterior)
                 h->anterior->siguiente = h->siguiente;
             if(h->siguiente)
@@ -313,6 +324,7 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     pdcrt_marco *m = pdcrt_alojar_obj(ctx, PDCRT_TGC_MARCO, sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (locales + capturas));
     if(!m)
         pdcrt_enomem(ctx);
+    m->activo = true;
     m->args = args;
     m->k = k;
     m->num_locales = locales;
@@ -488,6 +500,7 @@ void pdcrt_prnl(pdcrt_ctx *ctx)
 pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
 {
     (void) ctx;
+    m->activo = false;
     assert(rets == 1);
     return m->k;
 }
@@ -496,6 +509,7 @@ pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     // TODO
     (void) ctx;
+    m->activo = false;
     return m->k;
 }
 

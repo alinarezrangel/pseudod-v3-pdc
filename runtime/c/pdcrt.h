@@ -87,6 +87,7 @@ typedef enum pdcrt_tipo
 struct pdcrt_marco
 {
     pdcrt_cabecera_gc gc;
+    bool activo;
     int args;
     pdcrt_k k;
     size_t num_locales;
