@@ -42,7 +42,7 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx);
 
 static void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_tipo_obj_gc tipo, size_t sz)
 {
-    if(ctx->cnt % 100 == 0)
+    if(ctx->cnt % 2 == 0)
     {
         pdcrt_recolectar_basura_simple(ctx);
     }
