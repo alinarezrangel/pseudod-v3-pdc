@@ -452,7 +452,27 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
 pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
 {
     pdcrt_obj o = pdcrt_sacar(ctx);
-    printf("%p %ld %f", (void*) o.recv, o.ival, o.fval);
+    switch(pdcrt_tipo_de_obj(o))
+    {
+    case PDCRT_TOBJ_BOOLEANO:
+        printf("%s", o.bval? "VERDADERO" : "FALSO");
+        break;
+    case PDCRT_TOBJ_ENTERO:
+        printf("%ld", o.ival);
+        break;
+    case PDCRT_TOBJ_FLOAT:
+        printf("%f", o.fval);
+        break;
+    case PDCRT_TOBJ_TEXTO:
+        for(size_t i = 0; i < o.texto->longitud; i++)
+        {
+            putchar(o.texto->contenido[i]);
+        }
+        break;
+    case PDCRT_TOBJ_MARCO:
+        printf("Marco %p", (void *) o.marco);
+        break;
+    }
     return (pdcrt_k) {
         .kf = kf,
         .marco = m,
