@@ -74,7 +74,7 @@ procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
     EmitirLínea: puerto, {pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
     EmitirLínea: puerto, «{»
-    EmitirLínea: puerto, «if(pdcrt_stack_lleno(ctx)) return (pdcrt_k) { .kf = », nombre, «, .m = m };»
+    EmitirLínea: puerto, «if(pdcrt_stack_lleno(ctx)) return (pdcrt_k) { .kf = », nombre, «, .marco = m };»
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
