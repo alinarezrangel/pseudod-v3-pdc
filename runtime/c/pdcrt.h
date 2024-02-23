@@ -139,7 +139,7 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
 pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
-                             const char* msj,
+                             const char* msj, size_t tam_msj,
                              const int* proto, size_t nproto,
                              pdcrt_kf kf);
 pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);

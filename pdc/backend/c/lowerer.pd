@@ -109,7 +109,16 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         EmitirLínea: puerto, «};»
         variable k
         fijar k a tupla#en: 3
-        EmitirLínea: puerto, {return pdcrt_enviar_mensaje(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, proto, }, (tupla#en: 2)#longitud, {, }, (NombreDeLaContinuación: identificadorDelMódulo, k), {);}
+        EmitirLínea: puerto,
+            {return pdcrt_enviar_mensaje(ctx, m, },
+            (EscaparTexto: (tupla#en: 1)),
+            {, },
+            (tupla#en: 1)#longitud,
+            {, proto, },
+            (tupla#en: 2)#longitud,
+            {, },
+            (NombreDeLaContinuación: identificadorDelMódulo, k),
+            {);}
     finsi
 
     si opcode = Opcode#variadic

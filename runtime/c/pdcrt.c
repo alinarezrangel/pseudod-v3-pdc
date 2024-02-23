@@ -443,7 +443,7 @@ pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
 }
 
 pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
-                             const char* msj,
+                             const char* msj, size_t tam_msj,
                              const int* proto, size_t nproto,
                              pdcrt_kf kf)
 {
@@ -452,12 +452,13 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
         .kf = kf,
         .marco = m,
     };
-    for(ssize_t i = nproto - 1; i >= 0; i++)
+    pdcrt_obj msj_o = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, msj, tam_msj));
+    for(ssize_t i = nproto - 1; i >= 0; i--)
     {
         assert(proto[i] == 0);
         ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
     }
-    ctx->pila[((ctx->tam_pila++) - nproto) - 1] = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, msj, strlen(msj)));
+    ctx->pila[((ctx->tam_pila++) - nproto) - 1] = msj_o;
     pdcrt_obj t = ctx->pila[(ctx->tam_pila - nproto) - 2];
     return (*t.recv)(ctx, nproto, k);
 }
