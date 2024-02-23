@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <limits.h>
 
+#define PDCRT_INTERNO
 #include "pdcrt.h"
 
 
