@@ -138,6 +138,16 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
 #ifdef PDCRT_INTERNO
 
+#define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
+#define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
+
+#define pdcrt_obtener_local(ctx, m, idx) (m)->locales_y_capturas[(idx)]
+#define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]
+#define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
+#define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
+
+void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
+
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
 pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,

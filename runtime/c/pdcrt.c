@@ -391,7 +391,8 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
     free(ctx);
 }
 
-static void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem)
+
+void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem)
 {
     if((num_elem + ctx->tam_pila) > ctx->cap_pila)
     {
@@ -403,9 +404,6 @@ static void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem)
         ctx->cap_pila = nueva_cap;
     }
 }
-
-#define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
-#define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
 
 void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i)
 {

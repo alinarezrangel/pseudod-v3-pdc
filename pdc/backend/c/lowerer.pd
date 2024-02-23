@@ -126,19 +126,21 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#fijarLocal
-        EmitirLínea: puerto, {m->locales[}, (tupla#en: 1), {] = pdcrt_sacar_de_la_pila(ctx);}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_sacar(ctx));}
     finsi
 
     si opcode = Opcode#fijarLocalC
-        EmitirLínea: puerto, {m->capturas[}, (tupla#en: 1), {] = pdcrt_sacar_de_la_pila(ctx);}
+        EmitirLínea: puerto, {pdcrt_fijar_captura(ctx, m, }, (tupla#en: 1), {, pdcrt_sacar(ctx));}
     finsi
 
     si opcode = Opcode#obtenerLocal
-        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->locales[}, (tupla#en: 1), {]);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {));}
     finsi
 
     si opcode = Opcode#obtenerLocalC
-        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->capturas[}, (tupla#en: 1), {]);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_captura(ctx, m, }, (tupla#en: 1), {));}
     finsi
 
     si opcode = Opcode#caja
@@ -146,19 +148,21 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#fijarCaja
-        EmitirLínea: puerto, {m->locales[}, (tupla#en: 1), {]->caja = pdcrt_sacar_de_la_pila(ctx);}
+        EmitirLínea: puerto, {pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {)->caja = pdcrt_sacar(ctx);}
     finsi
 
     si opcode = Opcode#fijarCajaC
-        EmitirLínea: puerto, {m->capturas[}, (tupla#en: 1), {]->caja = pdcrt_sacar_de_la_pila(ctx);}
+        EmitirLínea: puerto, {pdcrt_obtener_captura(ctx, m, }, (tupla#en: 1), {)->caja = pdcrt_sacar(ctx);}
     finsi
 
     si opcode = Opcode#obtenerCaja
-        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->locales[}, (tupla#en: 1), {]->caja);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {)->caja);}
     finsi
 
     si opcode = Opcode#obtenerCajaC
-        EmitirLínea: puerto, {pdcrt_empujar_en_la_pila(ctx, m->capturas[}, (tupla#en: 1), {]->caja);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_captura(ctx, m, }, (tupla#en: 1), {)->caja);}
     finsi
 
     si opcode = Opcode#prn
