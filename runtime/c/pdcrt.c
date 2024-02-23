@@ -115,12 +115,16 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx)
 {
     for(size_t i = 0; i < ctx->tam_pila; i++)
         pdcrt_gc_marcar(ctx, ctx->pila[i]);
+    for(pdcrt_marco *m = ctx->primer_marco_activo; m; m = m->siguiente)
+        pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m));
     if(ctx->continuacion_actual.marco)
     {
         pdcrt_obj obj = pdcrt_objeto_marco(ctx->continuacion_actual.marco);
         pdcrt_gc_marcar(ctx, obj);
     }
 }
+
+static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
 {
@@ -129,17 +133,6 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
         pdcrt_cabecera_gc *s = h->siguiente;
         if(h->generacion != ctx->gc.generacion)
         {
-            if(h->tipo == PDCRT_TGC_MARCO)
-            {
-                pdcrt_marco *m = (pdcrt_marco *) h;
-                if(m->activo)
-                {
-                    // El marco esta siendo usado por la pila de C.
-                    h = s;
-                    continue;
-                }
-            }
-
             if(h->anterior)
                 h->anterior->siguiente = h->siguiente;
             if(h->siguiente)
@@ -149,7 +142,12 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
             if(h == ctx->gc.ultimo)
                 ctx->gc.ultimo = h->anterior;
 
-            if(h->tipo == PDCRT_TGC_TEXTO)
+            if(h->tipo == PDCRT_TGC_MARCO)
+            {
+                pdcrt_marco *m = (pdcrt_marco *) h;
+                assert(m->anterior == NULL && m->siguiente == NULL);
+            }
+            else if(h->tipo == PDCRT_TGC_TEXTO)
             {
                 // Elimínalo de la lista de textos
                 for(size_t i = 0; i < ctx->tam_textos; i++)
@@ -334,7 +332,6 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     pdcrt_marco *m = pdcrt_alojar_obj(ctx, PDCRT_TGC_MARCO, sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (locales + capturas));
     if(!m)
         pdcrt_enomem(ctx);
-    m->activo = true;
     m->args = args;
     m->k = k;
     m->num_locales = locales;
@@ -345,7 +342,29 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
         m->locales_y_capturas[locales + i] = ctx->pila[(top - capturas) + i];
     }
     ctx->tam_pila -= capturas;
+
+    if(!ctx->primer_marco_activo)
+        ctx->primer_marco_activo = m;
+    m->siguiente = NULL;
+    m->anterior = ctx->ultimo_marco_activo;
+    if(m->anterior)
+        m->anterior->siguiente = m;
+    ctx->ultimo_marco_activo = m;
+
     return m;
+}
+
+static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    if(m->anterior)
+        m->anterior->siguiente = m->siguiente;
+    if(m->siguiente)
+        m->siguiente->anterior = m->anterior;
+    if(m == ctx->primer_marco_activo)
+        ctx->primer_marco_activo = ctx->primer_marco_activo->siguiente;
+    if(m == ctx->ultimo_marco_activo)
+        ctx->ultimo_marco_activo = ctx->ultimo_marco_activo->anterior;
+    m->anterior = m->siguiente = NULL;
 }
 
 
@@ -359,6 +378,7 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->gc.primero = ctx->gc.ultimo = NULL;
     ctx->gc.generacion = 0;
+    ctx->primer_marco_activo = ctx->ultimo_marco_activo = NULL;
     ctx->cnt = 0;
 
     ctx->tam_textos = ctx->cap_textos = 0;
@@ -518,7 +538,7 @@ void pdcrt_prnl(pdcrt_ctx *ctx)
 pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
 {
     (void) ctx;
-    m->activo = false;
+    pdcrt_desactivar_marco(ctx, m);
     assert(rets == 1);
     return m->k;
 }
@@ -533,7 +553,7 @@ pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     // TODO
     (void) ctx;
-    m->activo = false;
+    pdcrt_desactivar_marco(ctx, m);
     return m->k;
 }
 

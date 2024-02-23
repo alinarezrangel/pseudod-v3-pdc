@@ -88,7 +88,7 @@ typedef enum pdcrt_tipo
 struct pdcrt_marco
 {
     pdcrt_cabecera_gc gc;
-    bool activo;
+    pdcrt_marco *siguiente, *anterior;
     int args;
     pdcrt_k k;
     size_t num_locales;
@@ -107,6 +107,9 @@ struct pdcrt_ctx
 
     pdcrt_gc gc;
     pdcrt_k continuacion_actual;
+
+    pdcrt_marco *primer_marco_activo;
+    pdcrt_marco *ultimo_marco_activo;
 
     unsigned int cnt;
 
