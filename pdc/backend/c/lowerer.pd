@@ -220,7 +220,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#agregarNombre
-        EmitirLínea: puerto, {pdcrt_agregar_nombre(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, ((tupla#en: 2)#escojer: {true}, {false}), {);}
+        EmitirLínea: puerto, {pdcrt_agregar_nombre(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {, }, ((tupla#en: 2)#escojer: {true}, {false}), {);}
     finsi
 
     si opcode = Opcode#exportar

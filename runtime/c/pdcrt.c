@@ -525,6 +525,12 @@ pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
     return m->k;
 }
 
+void pdcrt_agregar_nombre(pdcrt_ctx *ctx, const char *nombre, size_t tam_nombre, bool autoejec)
+{
+    // TODO
+    (void) pdcrt_sacar(ctx);
+}
+
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     // TODO

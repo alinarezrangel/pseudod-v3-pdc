@@ -147,6 +147,7 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
 pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
 void pdcrt_prnl(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
+void pdcrt_agregar_nombre(pdcrt_ctx *ctx, const char *nombre, size_t tam_nombre, bool autoejec);
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
