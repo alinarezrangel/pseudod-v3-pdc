@@ -30,12 +30,14 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
 #define pdcrt_objeto_booleano(b) ((pdcrt_obj) { .recv = &pdcrt_recv_booleano, .bval = (b) })
 #define pdcrt_objeto_marco(m) ((pdcrt_obj) { .recv = &pdcrt_recv_marco, .marco = (m) })
 #define pdcrt_objeto_texto(txt) ((pdcrt_obj) { .recv = &pdcrt_recv_texto, .texto = (txt) })
+#define pdcrt_objeto_nulo() ((pdcrt_obj) { .recv = &pdcrt_recv_nulo })
 
 
 static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj);
@@ -94,6 +96,7 @@ static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
     pdcrt_cabecera_gc *h;
     switch(pdcrt_tipo_de_obj(obj))
     {
+    case PDCRT_TOBJ_NULO:
     case PDCRT_TOBJ_ENTERO:
     case PDCRT_TOBJ_FLOAT:
     case PDCRT_TOBJ_BOOLEANO:
@@ -290,6 +293,12 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
     assert(0 && "sin implementar");
 }
 
+static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    assert(0 && "sin implementar");
+}
+
 
 static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
 {
@@ -424,6 +433,12 @@ void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len)
     pdcrt_empujar(ctx, pdcrt_objeto_texto(txt));
 }
 
+void pdcrt_empujar_nulo(pdcrt_ctx *ctx)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_empujar(ctx, pdcrt_objeto_nulo());
+}
+
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx)
 {
     pdcrt_obj o = pdcrt_sacar(ctx);
@@ -468,6 +483,9 @@ pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
     pdcrt_obj o = pdcrt_sacar(ctx);
     switch(pdcrt_tipo_de_obj(o))
     {
+    case PDCRT_TOBJ_NULO:
+        printf("NULO");
+        break;
     case PDCRT_TOBJ_BOOLEANO:
         printf("%s", o.bval? "VERDADERO" : "FALSO");
         break;

@@ -81,6 +81,7 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_BOOLEANO,
     PDCRT_TOBJ_MARCO,
     PDCRT_TOBJ_TEXTO,
+    PDCRT_TOBJ_NULO,
 } pdcrt_tipo;
 
 
@@ -130,6 +131,7 @@ void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
+void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
