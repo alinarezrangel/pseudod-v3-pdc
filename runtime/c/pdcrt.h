@@ -98,6 +98,15 @@ struct pdcrt_marco
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 
+#define PDCRT_TABLA_TEXTOS(X)                   \
+    X(concatenar, "concatenar")
+
+typedef struct pdcrt_textos
+{
+#define PDCRT_X(nombre, _texto) pdcrt_texto *nombre;
+    PDCRT_TABLA_TEXTOS(PDCRT_X)
+#undef PDCRT_X
+} pdcrt_textos;
 
 struct pdcrt_ctx
 {
@@ -116,6 +125,7 @@ struct pdcrt_ctx
     pdcrt_texto **textos;
     size_t tam_textos;
     size_t cap_textos;
+    pdcrt_textos textos_globales;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;

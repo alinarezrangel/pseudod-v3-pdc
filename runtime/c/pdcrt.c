@@ -24,6 +24,16 @@ static void pdcrt_enomem(pdcrt_ctx *ctx)
     pdcrt_error(ctx, "Sin memoria");
 }
 
+static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o);
+
+static void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
+{
+    if(pdcrt_tipo_de_obj(obj) != t)
+    {
+        pdcrt_error(ctx, "Valor de tipo inesperado");
+    }
+}
+
 
 static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k);
@@ -89,8 +99,6 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
     }
 }
 
-static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o);
-
 static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
 {
     pdcrt_cabecera_gc *h;
@@ -115,13 +123,21 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx)
 {
     for(size_t i = 0; i < ctx->tam_pila; i++)
         pdcrt_gc_marcar(ctx, ctx->pila[i]);
+
     for(pdcrt_marco *m = ctx->primer_marco_activo; m; m = m->siguiente)
         pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m));
+
     if(ctx->continuacion_actual.marco)
     {
         pdcrt_obj obj = pdcrt_objeto_marco(ctx->continuacion_actual.marco);
         pdcrt_gc_marcar(ctx, obj);
     }
+
+#define PDCRT_X(nombre, _texto)                                         \
+    if(ctx->textos_globales.nombre)                                     \
+        pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(ctx->textos_globales.nombre));
+    PDCRT_TABLA_TEXTOS(PDCRT_X);
+#undef PDCRT_X
 }
 
 static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m);
@@ -245,7 +261,7 @@ static pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, const char *str, size_t le
 
     const size_t exp_ind = lo;
     pdcrt_texto *txt = pdcrt_crear_nuevo_texto(ctx, str, len);
-    for(ssize_t i = ctx->tam_textos; i > (ssize_t) exp_ind; i--)
+    for(ssize_t i = ctx->tam_textos - 1; i >= (ssize_t) exp_ind; i--)
     {
         ctx->textos[i + 1] = ctx->textos[i];
     }
@@ -254,46 +270,98 @@ static pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, const char *str, size_t le
     return txt;
 }
 
+#define pdcrt_crear_texto_desde_cstr(ctx, cstr) \
+    pdcrt_crear_texto(ctx, cstr, sizeof(cstr) - 1)
+
 static int pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b)
 {
     return pdcrt_comparar_str(a->contenido, a->longitud,
-                              b->contenido, b->longitud);
+                              b->contenido, b->longitud) == 0;
 }
 
+
+#define PDCRT_CALC_INICIO() (ctx->tam_pila - args) - 2;
 
 static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
     assert(0 && "sin implementar");
 }
 
 static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
     assert(0 && "sin implementar");
 }
 
 static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
     assert(0 && "sin implementar");
 }
 
 static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
     assert(0 && "sin implementar");
 }
 
 static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.concatenar))
+    {
+        if(args != 1)
+        {
+            pdcrt_error(ctx, "Texto: concatenar necesita 1 argumento");
+        }
+        pdcrt_obj arg = ctx->pila[argp];
+        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        size_t bufflen = yo.texto->longitud + arg.texto->longitud;
+        char *buff = malloc(bufflen);
+        if(!buff)
+            pdcrt_enomem(ctx);
+        memcpy(buff, yo.texto->contenido, yo.texto->longitud);
+        memcpy(buff + yo.texto->longitud, arg.texto->contenido, arg.texto->longitud);
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_texto *res = pdcrt_crear_texto(ctx, buff, bufflen);
+        free(buff);
+        pdcrt_empujar(ctx, pdcrt_objeto_texto(res));
+        return k.kf(ctx, k.marco);
+    }
+
     assert(0 && "sin implementar");
 }
 
 static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
     assert(0 && "sin implementar");
 }
 
@@ -319,6 +387,10 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     else if(o.recv == &pdcrt_recv_texto)
     {
         return PDCRT_TOBJ_TEXTO;
+    }
+    else if(o.recv == &pdcrt_recv_nulo)
+    {
+        return PDCRT_TOBJ_NULO;
     }
     else
     {
@@ -393,6 +465,13 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->hay_una_salida_del_trampolin = false;
     ctx->continuacion_actual = (pdcrt_k) { .kf = NULL, .marco = NULL };
+
+#define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = NULL;
+    PDCRT_TABLA_TEXTOS(PDCRT_X);
+#undef PDCRT_X
+#define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = pdcrt_crear_texto_desde_cstr(ctx, texto);
+    PDCRT_TABLA_TEXTOS(PDCRT_X);
+#undef PDCRT_X
 
     return ctx;
 }
@@ -491,7 +570,7 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
         assert(proto[i] == 0);
         ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
     }
-    ctx->pila[((ctx->tam_pila++) - nproto) - 1] = msj_o;
+    ctx->pila[(ctx->tam_pila++) - nproto] = msj_o;
     pdcrt_obj t = ctx->pila[(ctx->tam_pila - nproto) - 2];
     return (*t.recv)(ctx, nproto, k);
 }
