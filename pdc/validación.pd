@@ -6,6 +6,13 @@ utilizar pdc/catamorfismos (Buscando, Buscando')
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback)
 
+[DOCUMENTA
+@brief{Valida que solo se llamen a identificadores autoejecutables.}
+
+Falla con un error si en algún momento se llama a un identificador que no es
+autoejecutable en el CST dado. @pd{tablasRnCst} deben ser las @pd(#:utilizar
+pdc/nombres){TablasDeResoluciónDeNombres} del CST.
+DOCUMENTA]
 funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst
     Buscando': cst, funcion: cst
         devolver EsInstancia: cst, CST#NodoLlamarProcedimiento
@@ -25,6 +32,12 @@ funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst
     finfuncion
 finfuncion
 
+[DOCUMENTA
+@brief{Valida que no halla ninguna instrucción @code{devolver} fuera de una función.}
+
+Falla con un error si en algún lugar del AST se encuentra un @code{devolver}
+fuera de una función.
+DOCUMENTA]
 funcion ValidaDevolverFueraDeFunción: ast
     Buscando: ast, funcion: ast
         devolver (EsInstancia: ast, AST#NodoFunciónAnónima)

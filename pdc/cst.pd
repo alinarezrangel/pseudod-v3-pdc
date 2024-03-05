@@ -8,10 +8,16 @@ clase Nodo
     [DOCUMENTA
     @brief{Área textual de este token.}
 
-    Es una instancia de @pd{ÁreaTextual}.
+    Es una instancia de @pd(#:utilizar pdc/tokens){ÁreaTextual}.
     DOCUMENTA]
     atributo áreaTextual
 
+    [DOCUMENTA
+    @brief{ID del nodo.}
+
+    No necesitas especificarlo al crear un nodo, ya que @pd(#:utilizar
+    pdc/tabla){EntablarÁrbol} le dará un valor apropiado.
+    DOCUMENTA]
     atributo id
 finclase
 
@@ -274,6 +280,9 @@ finmetodo
 contiene un @pd{NodoIdentificador}).
 
 @pd{cuerpo} es el cuerpo de la función. Un @pd{NodoBloque}.
+
+@pd{ámbito} será llenado por el pase de resolución de nombres con el ámbito de
+esta función.
 DOCUMENTA]
 clase NodoFunción hereda NodoInstrucción
     atributos nombre, parámetros, cuerpo, ámbito
@@ -392,6 +401,9 @@ método pertenece.
 @pd{NodoFunción}.
 
 @pd{cuerpo} es un @pd{NodoBloque}.
+
+@pd{ámbito} será llenado por el pase de resolución de nombres con el ámbito de
+esta función.
 DOCUMENTA]
 clase NodoMétodo hereda NodoInstrucción
     atributos deClase, esEstático, nombre, parámetros, cuerpo, ámbito
@@ -449,8 +461,8 @@ Corresponde a la sintáxis:
 utilizar MODULO (NOMBRE1, NOMBRE2 como NOMBRE3, NOMBRE4) como ESPACIO
 }|
 
-@pd{módulo} es un @pd{NodoTextoLiteral} o un @pd{NodoIdentificador} y es el
-módulo a importar.
+@pd{módulo} es un @pd{NodoTextoLiteral} (con una ruta relativa a un archivo) o
+un @pd{NodoIdentificador} (con el nombre del módulo) y es el módulo a importar.
 
 @pd{espacioDeNombres} es @pd{NULO} o un @pd{NodoIdentificador} y es el espacio
 de nombres en el que se deberá importar el módulo.
@@ -500,6 +512,21 @@ finclase
 @brief{Un identificador.}
 
 @pd{nombre} es un texto que es el nombre del identificador.
+
+@pd{esLiteral} indica si el identificador es literal: algunos identificadores
+(los literales) en el CST no representan variables sino textos.
+
+@pd{esDefinición} indica si el identificador está en su definición. Es decir,
+si es verdadero este identificador está definiendo una variable.
+
+@pd{esDefiniciónAutoejecutable} determina si se está definiendo a una variable
+autoejecutable.
+
+@pd{aplicaAutoejecución} es si la autoejecución aplica en este contexto. Esto
+significa que esta variable, de ser autoejecutable, debería representar una
+llamada en vez de un acceso. Por ejemplo, para la variable @pd{Hola} en
+@pd{Hola + 1} aplica la autoejecución, mientras que para @pd{Adios} en
+@pd{Adios: 12} no aplica.
 DOCUMENTA]
 clase NodoIdentificador hereda NodoExpresion
     atributos nombre, esLiteral, esDefinición, esDefiniciónAutoejecutable, aplicaAutoejecución
@@ -668,6 +695,9 @@ con la palabra clave @pd{metodo} (en cuyo caso debe tener una variable
 @pd{parámetros} tiene el mismo formato que en @pd{NodoFunción}.
 
 @pd{cuerpo} es un arreglo de instrucciones.
+
+@pd{ámbito} será llenado por el pase de resolución de nombres con el ámbito de
+esta función.
 DOCUMENTA]
 clase NodoFunciónAnónima hereda NodoExpresion
     atributos esMétodo, parámetros, cuerpo, ámbito

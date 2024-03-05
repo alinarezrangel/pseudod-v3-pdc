@@ -67,13 +67,94 @@ Cada token tiene un tipo (véase @pd{TipoDeToken}), su contenido (cuyo tipo
 depende del tipo de token) y un área textual (véase @pd{ÁreaTextual}).
 DOCUMENTA]
 clase Token
+    [DOCUMENTA
+    @brief{El tipo del token.}
+
+    Un @pd{TipoDeToken}.
+    DOCUMENTA]
     atributo tipo
+
+    [DOCUMENTA
+    @brief{El @pd{ÁreaTextual} del token.}
+    DOCUMENTA]
     atributo áreaTextual
+
+    [DOCUMENTA
+    @brief{El contenido del token.}
+
+    El @pd{Texto} que este token contiene.
+    DOCUMENTA]
     atributo contenido
 
+    [DOCUMENTA
+    @brief{Crea un token con un tipo, área y contenido dados.}
+    DOCUMENTA]
     metodo estatico crear: tipo, área, contenido
 
+    [DOCUMENTA
+    @brief{Crea un token de tipo numérico.}
+    DOCUMENTA]
+    metodo estatico número: área, contenido
+
+    [DOCUMENTA
+    @brief{Crea un token de tipo textual.}
+    DOCUMENTA]
+    metodo estatico texto: área, contenido
+
+    [DOCUMENTA
+    @brief{Crea un token de tipo identificador.}
+    DOCUMENTA]
+    metodo estatico identificador: área, contenido
+
+    [DOCUMENTA
+    @brief{Crea un token de tipo palabra clave.}
+    DOCUMENTA]
+    metodo estatico palabraClave: área, contenido
+
+    [DOCUMENTA
+    @brief{Crea un token de tipo operador.}
+    DOCUMENTA]
+    metodo estatico operador: área, contenido
+
+    [DOCUMENTA
+    @brief{Crea un token de tipo comentario.}
+    DOCUMENTA]
+    metodo estatico comentario: área, contenido
+
+    [DOCUMENTA
+    @brief{Obtiene la representación textual del token.}
+    DOCUMENTA]
     metodo comoTexto
+
+    [DOCUMENTA
+    @brief{Determina si este token es de tipo numérico.}
+    DOCUMENTA]
+    metodo esNúmero
+
+    [DOCUMENTA
+    @brief{Determina si este token es de tipo textual.}
+    DOCUMENTA]
+    metodo esTexto
+
+    [DOCUMENTA
+    @brief{Determina si este token es de tipo identificador.}
+    DOCUMENTA]
+    metodo esIdentificador
+
+    [DOCUMENTA
+    @brief{Determina si este token es la palabra clave dada.}
+    DOCUMENTA]
+    metodo esPalabraClave: palabra
+
+    [DOCUMENTA
+    @brief{Determina si este token es de tipo operador.}
+    DOCUMENTA]
+    metodo esOperador
+
+    [DOCUMENTA
+    @brief{Determina si este token es de tipo comentario.}
+    DOCUMENTA]
+    metodo esComentario
 finclase
 
 metodo estatico Token#número: área, contenido

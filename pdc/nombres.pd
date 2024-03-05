@@ -10,6 +10,42 @@ utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/catamorfismos (Buscando)
 
 
+[ Cada identificador del programa que representa una variable se le es asignado
+  un binding. El binding es un número entero único en cada módulo compilado.
+
+  Por ejemplo, en el siguente programa:
+
+      variables Hola, Mundo
+      fijar Hola a 1
+      fijar Mundo a Hola + 2
+
+  Todos los usos de Hola serán asociados a un binding y todos los usos de Mundo
+  a otro (incluyendo sus declaraciones).
+
+  El propósito de los bindings es hacer que determinar si dos variables son la
+  misma sea mucho más fácil, por ejemplo, en el siguiente programa:
+
+      funcion F: Hola
+      finfuncion
+      funcion G: Hola
+      finfuncion
+
+  Los dos parámetros se llaman Hola, pero son variables distintas. ]
+
+[DOCUMENTA
+@brief{Un binding en el módulo.}
+
+Un tipo de registro con los siguientes campos:
+
+@itemlist(
+@item{@code{binding}: El binding de la variable. Es el único campo indexado.}
+
+@item{@code{nombre}: El nombre de esta variable.}
+
+@item{@code{esAutoejecutable}: Un @pd{Boole} que indica si es autoejecutable o
+no.}
+)
+DOCUMENTA]
 variable NombreResuelto
 fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
     {binding}, VERDADERO,
@@ -18,33 +54,119 @@ fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
     {importadoDesde}, FALSO,
     {seLlamaba}, FALSO
 
+[DOCUMENTA
+@brief{El uso de una variable.}
+
+@itemlist(
+@item{@code{idNodo}: El id del nodo en el cual se está usando esta variable.}
+
+@item{@code{binding}: El binding de la variable usada.}
+)
+DOCUMENTA]
 variable UsoDeNombre
 fijar UsoDeNombre a CrearTipoDeRegistro: {UsoDeNombre},
     {idNodo}, VERDADERO,
     {binding}, FALSO
 
+[DOCUMENTA
+@brief{La definición de una variable.}
+
+@itemlist(
+@item{@code{idNodo}: El id del nodo en el cual se está definiendo esta
+variable.}
+
+@item{@code{binding}: El binding de la variable usada.}
+)
+DOCUMENTA]
 variable DefiniciónDeNombre
 fijar DefiniciónDeNombre a CrearTipoDeRegistro: {DefiniciónDeNombre},
     {idNodo}, VERDADERO,
     {binding}, VERDADERO
 
+[DOCUMENTA
+@brief{Un nodo con un ámbito}
+
+Asocia cada nodo que introduce un ámbito con dicho ámbito.
+
+@itemlist(
+@item{@code{idNodo}: El id del nodo en el cual se introduce un ámbito.}
+
+@item{@code{ámbito}: El ámbito.}
+)
+DOCUMENTA]
 variable Ámbitos
 fijar Ámbitos a CrearTipoDeRegistro: {Ámbitos},
     {idNodo}, VERDADERO,
     {ámbito}, FALSO
 
+[DOCUMENTA
+@brief{Un ámbito del programa.}
+
+Cada ámbito contiene las variables y bindings de un bloque.
+
+Los ámbitos pueden tener un @italic{ámbito superior}. Cuando una variable no
+sea encontrada en el ámbito, también se buscará en su ámbito superior.
+
+Los ámbitos registran todas las variables en una @pd{Tabla} de nombres que contiene
+@pd{NombreResuelto}s.
+DOCUMENTA]
 clase Ámbito
-    metodo estatico desde: tablaNombres, ámbitoSuperior
+    [DOCUMENTA
+    @brief{Crea el ámbito desde la tabla de nombres y un ámbito superior.}
+    DOCUMENTA]
+    metodo estatico desde: ámbitoSuperior
+
+    [DOCUMENTA
+    @brief{Crea el ámbito inicial.}
+
+    No tiene ámbito superior, si una variable no existe entonces no se busca en
+    ningún otro lugar.
+    DOCUMENTA]
     metodo estatico inicial: tablaNombres
 
+    [DOCUMENTA
+    @brief{Crea una variable en este ámbito.}
+
+    Devuelve el @pd{NombreResuelto} asociado a la variable.
+    DOCUMENTA]
     metodo crear: nombre, esAutoejecutable
+
+    [DOCUMENTA
+    @brief{Intenta resolver un nombre dado.}
+
+    @pd{nombre} es un @pd{Texto} que es el nombre de la variable a buscar. Si
+    la variable no existe, devuelve @pd{NULO}. Si si existe, devuelve su
+    @pd{NombreResuelto}.
+    DOCUMENTA]
     metodo intentaResolver: nombre
+
+    [DOCUMENTA
+    @brief{Determina si la variable con el binding dado es autoejecutable.}
+    DOCUMENTA]
     metodo esAutoejecutable: binding
-    metodo obtenerBinding
+
+    [DOCUMENTA
+    @brief{Itera sobre cada nombre de este ámbito que debería ser exportado.}
+
+    Itera sobre cada nombre de este ámbito que no es de un ámbito superior.
+    DOCUMENTA]
     metodo paraCadaNombreExportado: proc
+
+    [DOCUMENTA
+    @brief{Obtiene la tabla de nombres de este ámbito.}
+    DOCUMENTA]
+    metodo tablaNombres
 finclase
 
-atributos Ámbito#tablaNombres, Ámbito#_porNombre, Ámbito#_númBindings, Ámbito#_ámbitoSuperior
+atributos Ámbito#tablaNombres,
+          [ Diccionario de los nombres de variables a sus nombres resueltos ]
+          Ámbito#_porNombre,
+          [ Caja con el número de bindings. Compartida entre todos los ámbitos
+            de forma que crear una variable en cualquier ámbito lo actualiza en
+            todos los demás ]
+          Ámbito#_númBindings,
+          [ El ámbito superior o NULO ]
+          Ámbito#_ámbitoSuperior
 
 metodo estatico Ámbito#desde: ámbitoSuperior
     devolver yo#crear: ámbitoSuperior#tablaNombres, ámbitoSuperior
@@ -65,6 +187,7 @@ metodo Ámbito#inicializar: tablaNombres, ámbitoSuperior
     finsi
 finmetodo
 
+[ Obtiene el siguiente binding del ámbito ]
 metodo Ámbito#obtenerBinding
     variable binding
     fijar binding a yo#_númBindings#valor
@@ -115,10 +238,45 @@ metodo Ámbito#paraCadaNombreExportado: proc
     finprocedimiento
 finmetodo
 
+[DOCUMENTA
+@brief{Todas las tablas útiles al resolver los nombres de un programa.}
+DOCUMENTA]
 clase TablasDeResoluciónDeNombres
-    atributos tablaNombres, tablaUsos, tablaDefiniciones, tablaÁmbitos
+    [DOCUMENTA
+    @brief{Tabla de @pd{NombreResuelto}s.}
+    DOCUMENTA]
+    atributo tablaNombres
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{UsoDeNombre}s.}
+    DOCUMENTA]
+    atributo tablaUsos
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{DefiniciónDeNombre}s.}
+    DOCUMENTA]
+    atributo tablaDefiniciones
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{Ámbitos}s.}
+    DOCUMENTA]
+    atributo tablaÁmbitos
 finclase
 
+[DOCUMENTA
+@brief{Resuelve todos los nombres de un programa.}
+
+@pd{cst} es el CST a resolver. @pd{tablas} es la instancia de
+@pd{TablasDeResoluciónDeNombres} con todas las tablas usadas. @pd{ámbito} es el
+ámbito actual y @pd{paraFinDelÁmbito} es un arreglo que se llenará con
+funciones (sin parámetros) que se deberán llamar cuando se termine el ámbito
+actual.
+
+Este arreglo es usado, por ejemplo, para resolver los nombres de las funciones:
+cada función puede acceder a variables declaradas @bold{después} de la función,
+por lo cual es importante que el cuerpo de la función se resuelva al final del
+ámbito, cuando todos los demás nombres ya están resueltos.
+DOCUMENTA]
 funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
     Buscando: cst, funcion: nodo
         si EsInstancia: nodo, CST#NodoIdentificador

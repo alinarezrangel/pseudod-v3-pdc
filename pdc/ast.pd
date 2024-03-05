@@ -1,10 +1,35 @@
 utilizar bepd/builtins
 
+[DOCUMENTA
+@brief{Un nodo del AST.}
+
+El AST representa una versión abstracta y de alto nivel del CST, con toda la
+azúcar sintáctica eliminada y muchas estructuras implícitas hechas explicitas.
+DOCUMENTA]
 clase Nodo
-    atributos id, áreaTextual
+    [DOCUMENTA
+    @brief{ID del nodo.}
+
+    No necesitas especificarlo al crear un nodo, ya que @pd(#:utilizar
+    pdc/tabla){EntablarÁrbol} le dará un valor apropiado.
+    DOCUMENTA]
+    atributo id
+
+    [DOCUMENTA
+    @brief{Área textual de este token.}
+
+    Es una instancia de @pd(#:utilizar pdc/tokens){ÁreaTextual}.
+    DOCUMENTA]
+    atributo áreaTextual
 finclase
 
+[DOCUMENTA
+@brief{Un bloque de instrucciones.}
+DOCUMENTA]
 clase NodoBloque hereda Nodo
+    [DOCUMENTA
+    @brief{Arreglo de instrucciones.}
+    DOCUMENTA]
     atributo cuerpo
 finclase
 
@@ -21,7 +46,13 @@ metodo NodoBloque#comoTexto
     devolver {(NodoBloque ~t)}#formatear: yo#cuerpo
 finmetodo
 
+[DOCUMENTA
+@brief{Nodo con todo el programa.}
+DOCUMENTA]
 clase NodoPrograma hereda Nodo
+    [DOCUMENTA
+    @brief{Un @pd{NodoBloque} con el cuerpo del programa.}
+    DOCUMENTA]
     atributo cuerpo
 finclase
 
@@ -38,9 +69,24 @@ metodo NodoPrograma#comoTexto
     devolver {(NodoPrograma ~t)}#formatear: yo#cuerpo
 finmetodo
 
+[DOCUMENTA
+@brief{Un identificador de una variable.}
+DOCUMENTA]
 clase NodoIdentificador hereda Nodo
+    [DOCUMENTA
+    @brief{Nombre de la variable. Un @pd{Texto}.}
+    DOCUMENTA]
     atributo nombre
-    atributos esUso, esDeclaración
+
+    [DOCUMENTA
+    @brief{Indica si es un uso de variable.}
+    DOCUMENTA]
+    atributo esUso
+
+    [DOCUMENTA
+    @brief{Indica si es una declaración de la variable.}
+    DOCUMENTA]
+    atributo esDeclaración
 finclase
 
 metodo NodoIdentificador#inicializar: área, nombre, esUso, esDeclaración
@@ -57,7 +103,13 @@ metodo NodoIdentificador#comoTexto
     devolver {(NodoIdentificador ~t)}#formatear: yo#nombre
 finmetodo
 
+[DOCUMENTA
+@brief{Declara una variable.}
+DOCUMENTA]
 clase NodoVariable hereda Nodo
+    [DOCUMENTA
+    @brief{@pd{NodoIdentificador} de la variable a crear.}
+    DOCUMENTA]
     atributo nombre
 finclase
 
@@ -74,8 +126,19 @@ metodo NodoVariable#comoTexto
     devolver {(NodoVariable ~t)}#formatear: yo#nombre
 finmetodo
 
+[DOCUMENTA
+@brief{Fija una variable a una expresión.}
+DOCUMENTA]
 clase NodoFijar hereda Nodo
-    atributo objetivo, expresión
+    [DOCUMENTA
+    @brief{@pd{NodoIdentificador} con la variable a fijar.}
+    DOCUMENTA]
+    atributo objetivo
+
+    [DOCUMENTA
+    @brief{Expresión con el nuevo valor de la variable.}
+    DOCUMENTA]
+    atributo expresión
 finclase
 
 metodo NodoFijar#inicializar: área, objetivo, expresión
@@ -93,7 +156,13 @@ metodo NodoFijar#comoTexto
     devolver {(NodoFijar ~t a ~t)}#formatear: yo#objetivo, yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Escribe un valor a la salida estándar.}
+DOCUMENTA]
 clase NodoEscribir hereda Nodo
+    [DOCUMENTA
+    @brief{Expresión a escribir.}
+    DOCUMENTA]
     atributo expresión
 finclase
 
@@ -110,6 +179,9 @@ metodo NodoEscribir#comoTexto
     devolver {(NodoEscribir ~t)}#formatear: yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Escribe un fin de línea a la salida estándar.}
+DOCUMENTA]
 clase NodoNl hereda Nodo
 finclase
 
@@ -120,8 +192,19 @@ metodo NodoNl#comoTexto
     devolver {(NodoNl)}
 finmetodo
 
+[DOCUMENTA
+@brief{Un parámetro al declarar una función.}
+DOCUMENTA]
 clase NodoParámetro hereda Nodo
-    atributos identificador, esVariadic
+    [DOCUMENTA
+    @brief{@pd{NodoIdentificador} con el nombre del parámetro.}
+    DOCUMENTA]
+    atributo identificador
+
+    [DOCUMENTA
+    @brief{@pd{Boole} que indica si es un parámetro variadic o no.}
+    DOCUMENTA]
+    atributo esVariadic
 finclase
 
 metodo NodoParámetro#inicializar: área, identificador, esVariadic
@@ -138,7 +221,13 @@ metodo NodoParámetro#comoTexto
     devolver {(NodoParámetro ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#identificador
 finmetodo
 
+[DOCUMENTA
+@brief{Falla con un error si la expresión no es verdadera.}
+DOCUMENTA]
 clase NodoNecesitas hereda Nodo
+    [DOCUMENTA
+    @brief{Expresión a comparar.}
+    DOCUMENTA]
     atributo expresión
 finclase
 
@@ -155,7 +244,15 @@ metodo NodoNecesitas#comoTexto
     devolver {(NodoNecesitas ~t)}#formatear: yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Devuelve un valor de la función actual.}
+
+Solo puede aparecer dentro de un @pd{NodoFunciónAnónima}.
+DOCUMENTA]
 clase NodoDevolver hereda Nodo
+    [DOCUMENTA
+    @brief{Expresión a devolver}
+    DOCUMENTA]
     atributo expresión
 finclase
 
@@ -172,8 +269,24 @@ metodo NodoDevolver#comoTexto
     devolver {(NodoDevolver ~t)}#formatear: yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Condicional booleano.}
+DOCUMENTA]
 clase NodoSi hereda Nodo
-    atributos condición, cuerpoSiVerdadero, cuerpoSiFalso
+    [DOCUMENTA
+    @brief{Expresión que controlará el condicional.}
+    DOCUMENTA]
+    atributo condición
+
+    [DOCUMENTA
+    @brief{@pd{NodoBloque} con el cuerpo si la condición se cumple.}
+    DOCUMENTA]
+    atributo cuerpoSiVerdadero
+
+    [DOCUMENTA
+    @brief{@pd{NodoBloque} con el cuerpo si la condición no se cumple.}
+    DOCUMENTA]
+    atributo cuerpoSiFalso
 finclase
 
 metodo NodoSi#inicializar: área, condición, cuerpoSiVerdadero, cuerpoSiFalso
@@ -194,8 +307,19 @@ metodo NodoSi#comoTexto
         yo#condición, yo#cuerpoSiVerdadero, yo#cuerpoSiFalso
 finmetodo
 
+[DOCUMENTA
+@brief{Bucle mientras.}
+DOCUMENTA]
 clase NodoMientras hereda Nodo
-    atributo condición, cuerpo
+    [DOCUMENTA
+    @brief{Expresión con la condición a ejecutar.}
+    DOCUMENTA]
+    atributo condición
+
+    [DOCUMENTA
+    @brief{@pd{NodoBloque} con el cuerpo del bucle.}
+    DOCUMENTA]
+    atributo cuerpo
 finclase
 
 metodo NodoMientras#inicializar: área, condición, cuerpo
@@ -213,8 +337,32 @@ metodo NodoMientras#comoTexto
     devolver {(NodoMientras ~t entonces ~t)}#formatear: yo#condición, yo#cuerpo
 finmetodo
 
+[DOCUMENTA
+@brief{Importa un módulo.}
+DOCUMENTA]
 clase NodoUtilizar hereda Nodo
-    atributos módulo, espacioDeNombres, nombresEspecíficos
+    [DOCUMENTA
+    @brief{@pd{NodoLiteralTextual} con el módulo a importar.}
+    DOCUMENTA]
+    atributo módulo
+
+    [DOCUMENTA
+    @brief{El espacio de nombres bajo el cual importar el módulo.}
+
+    Puede ser @pd{NULO}, en cuyo caso no se debe usar un espacio de nombres
+    para importar el módulo. En otro caso es un @pd{NodoIdentificador} con el
+    nombre de la variable a crear.
+    DOCUMENTA]
+    atributo espacioDeNombres
+
+    [DOCUMENTA
+    @brief{Los nombres específicos a importar.}
+
+    Puede ser @pd{NULO}, en cuyo caso todos los nombres exportados por el
+    módulo deben ser importados. Si no es nulo es un arreglo de
+    @pd{NodoNombreEspecífico}s con los nombres a importar.
+    DOCUMENTA]
+    atributo nombresEspecíficos
 finclase
 
 metodo NodoUtilizar#inicializar: área, módulo, espacioDeNombres, nombresEspecíficos
@@ -239,8 +387,30 @@ metodo NodoUtilizar#comoTexto
         yo#módulo, yo#espacioDeNombres, yo#nombresEspecíficos
 finmetodo
 
+[DOCUMENTA
+@brief{Un nombre a importar de otro módulo.}
+DOCUMENTA]
 clase NodoNombreEspecífico hereda Nodo
-    atributos debeRenombrarse, nombre, renombre
+    [DOCUMENTA
+    @brief{Si este nombre debe renombrarse despues de importarse.}
+
+    Si es verdadero, @pd{renombre} tendrá el nuevo nombre de la variable.
+
+    Si es falso, @pd{renombre} será @pd{NULO}.
+    DOCUMENTA]
+    atributo debeRenombrarse
+
+    [DOCUMENTA
+    @brief{Nombre de la variable a importar.}
+    DOCUMENTA]
+    atributo nombre
+
+    [DOCUMENTA
+    @brief{Nuevo nombre de la variable a importar.}
+
+    Puede ser @pd{NULO} si @pd{debeRenombrarse} es falso.
+    DOCUMENTA]
+    atributo renombre
 finclase
 
 metodo NodoNombreEspecífico#inicializar: área, nombre, renombre
@@ -261,7 +431,13 @@ metodo NodoNombreEspecífico#comoTexto
     devolver {(NodoNombreEspecífico ~t ~t)}#formatear: yo#nombre, yo#renombre
 finmetodo
 
+[DOCUMENTA
+@brief{Literal numérica.}
+DOCUMENTA]
 clase NodoLiteralNumérica hereda Nodo
+    [DOCUMENTA
+    @brief{El valor como un @pd{Numero}.}
+    DOCUMENTA]
     atributo valor
 finclase
 
@@ -277,7 +453,13 @@ metodo NodoLiteralNumérica#comoTexto
     devolver {(NodoLiteralNumérica ~t)}#formatear: yo#valor
 finmetodo
 
+[DOCUMENTA
+@brief{Literal textual.}
+DOCUMENTA]
 clase NodoLiteralTextual hereda Nodo
+    [DOCUMENTA
+    @brief{El valor como un @pd{Texto}.}
+    DOCUMENTA]
     atributo valor
 finclase
 
@@ -293,8 +475,21 @@ metodo Nodo#comoTexto
     devolver {(NodoLiteralTextual ~t)}#formatear: yo#valor
 finmetodo
 
+[DOCUMENTA
+@brief{Argumento al enviar un mensaje.}
+DOCUMENTA]
 clase NodoArgumento hereda Nodo
-    atributos expresión, esVariadic
+    [DOCUMENTA
+    @brief{Expresión con el valor a usar.}
+    DOCUMENTA]
+    atributo expresión
+
+    [DOCUMENTA
+    @brief{Si este argumento es variadic.}
+
+    De ser verdadero corresponde a la sintaxis @pd{Ejemplo: ...A, ...B, ...C}.
+    DOCUMENTA]
+    atributo esVariadic
 finclase
 
 metodo NodoArgumento#inicializar: área, expresión, esVariadic
@@ -311,8 +506,24 @@ metodo NodoArgumento#comoTexto
     devolver {(NodoArgumento ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Enviar un mensaje a un objeto.}
+DOCUMENTA]
 clase NodoEnviarMensaje hereda Nodo
-    atributos objeto, mensaje, argumentos
+    [DOCUMENTA
+    @brief{Expresión a la que se le enviará el mensaje.}
+    DOCUMENTA]
+    atributo objeto
+
+    [DOCUMENTA
+    @brief{@pd{Texto} con el mensaje a enviar.}
+    DOCUMENTA]
+    atributo mensaje
+
+    [DOCUMENTA
+    @brief{Arreglo de @pd{NodoArgumento}s con los argumentos a usar.}
+    DOCUMENTA]
+    atributo argumentos
 finclase
 
 metodo NodoEnviarMensaje#inicializar: área, objeto, mensaje, argumentos
@@ -331,8 +542,19 @@ metodo NodoEnviarMensaje#comoTexto
     devolver {(NodoEnviarMensaje ~t # ~t : ~t)}#formatear: yo#objeto, yo#mensaje, yo#argumentos
 finmetodo
 
+[DOCUMENTA
+@brief{Una función anónima o lambda.}
+DOCUMENTA]
 clase NodoFunciónAnónima hereda Nodo
-    atributos parámetros, cuerpo
+    [DOCUMENTA
+    @brief{Arreglo de @pd{NodoParámetro}s con los parámetros de esta función.}
+    DOCUMENTA]
+    atributo parámetros
+
+    [DOCUMENTA
+    @brief{@pd{NodoBloque} con el cuerpo de la función.}
+    DOCUMENTA]
+    atributo cuerpo
 finclase
 
 metodo NodoFunciónAnónima#inicializar: área, parámetros, cuerpo
@@ -350,7 +572,13 @@ metodo NodoFunciónAnónima#comoTexto
     devolver {(NodoFunciónAnónima ~t ~t)}#formatear: yo#parámetros, yo#cuerpo
 finmetodo
 
+[DOCUMENTA
+@brief{Niega el valor booleano de una expresión.}
+DOCUMENTA]
 clase NodoNo hereda Nodo
+    [DOCUMENTA
+    @brief{Expresión a negar.}
+    DOCUMENTA]
     atributo expresión
 finclase
 
@@ -367,6 +595,11 @@ metodo NodoNo#comoTexto
     devolver {(NodoNo ~t)}#formatear: yo#expresión
 finmetodo
 
+[DOCUMENTA
+@brief{Determina si dos valores son el mismo objeto.}
+
+Determina si @pd{lhs} y @pd{rhs} (ambos expresiones) son el mismo objeto.
+DOCUMENTA]
 clase NodoSonIdénticos hereda Nodo
     atributo lhs, rhs
 finclase
@@ -386,8 +619,24 @@ metodo NodoSonIdénticos#comoTexto
     devolver {(NodoSonIdénticos ~t y ~t)}#formatear: yo#lhs, yo#rhs
 finmetodo
 
+[DOCUMENTA
+@brief{Un builtin del compilador.}
+
+Los builtins son puntos de extensión del compilador, son como nodos
+personalizados del AST.
+DOCUMENTA]
 clase NodoBuiltin hereda Nodo
-    atributos nombre, argumentos
+    [DOCUMENTA
+    @brief{@pd{Texto} con el nombre de este builtin.}
+    DOCUMENTA]
+    atributo nombre
+
+    [DOCUMENTA
+    @brief{Arreglo con los argumentos del builtin.}
+
+    El tipo de los elementos depende del builtin que se desee usar.
+    DOCUMENTA]
+    atributo argumentos
 finclase
 
 metodo NodoBuiltin#inicializar: área, nombre, argumentos

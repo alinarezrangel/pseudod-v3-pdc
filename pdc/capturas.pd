@@ -13,24 +13,100 @@ utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 
 
+[DOCUMENTA
+@brief{Marca una variable como capturada.}
+
+Un tipo de registro con los siguientes campos:
+
+@itemlist(
+@item{@code{binding}: El binding de la variable. Es un campo indexado.}
+)
+DOCUMENTA]
 variable EsCapturada
 fijar EsCapturada a CrearTipoDeRegistro: {EsCapturada},
     {binding}, VERDADERO
 
+[DOCUMENTA
+@brief{Contiene todas las capturas de una función.}
+
+Un tipo de registro con los siguientes campos:
+
+@itemlist(
+@item{@code{idNodo}: ID del @pd{AST#NodoFunciónAnónima} que esta capturando a
+las variables. Es un campo indexado.}
+
+@item{@code{bindingsCapturados}: @pd{Arreglo} con todos los bindings que son
+capturados por esta función.}
+)
+DOCUMENTA]
 variable CapturasDeFunción
 fijar CapturasDeFunción a CrearTipoDeRegistro: {CapturasDeFunción},
     {idNodo}, VERDADERO,
     {bindingsCapturados}, FALSO
 
+[DOCUMENTA
+@brief{Contiene todos los locales de una función.}
+
+Un tipo de registro con los siguientes campos:
+
+@itemlist(
+@item{@code{idNodo}: ID del @pd{AST#NodoFunciónAnónima} que contiene estas
+variables. Es un campo indexado.}
+
+@item{@code{bindingsLocales}: @pd{Arreglo} con todos los bindings que son
+locales a esta función.}
+)
+DOCUMENTA]
 variable LocalesDeFunción
 fijar LocalesDeFunción a CrearTipoDeRegistro: {LocalesDeFunción},
     {idNodo}, VERDADERO,
     {bindingsLocales}, FALSO
 
+[DOCUMENTA
+@brief{Todas las tablas útiles al marcar las capturas.}
+DOCUMENTA]
 clase TablasDeCapturas
-    atributos tablaEsCapturada, tablaCapturas, tablaLocales
+    [DOCUMENTA
+    @brief{Tabla de @pd{EsCapturada}.}
+    DOCUMENTA]
+    atributo tablaEsCapturada
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{CapturasDeFunción}.}
+    DOCUMENTA]
+    atributo tablaCapturas
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{LocalesDeFunción}.}
+    DOCUMENTA]
+    atributo tablaLocales
 finclase
 
+[DOCUMENTA
+@brief{Marca las capturas de un AST.}
+
+Llena las tablas de @pd{tablasMcAst}, una instancia de @pd{TablasDeCapturas},
+con la información de capturas del programa contenido en @pd{ast'}.
+
+@dp{tablasRnAst} debe ser una instancia de @pd{TablasDeResoluciónDeNombres} con
+las tablas de resolución de nombres del AST (@bold{no del CST}).
+
+@pd{posiblesCapturas} es un diccionario que será llenado con los bindings que
+quizás sean capturas de la función actual.
+
+@pd{definitivamenteNoCapturas} es un arreglo con los bindings que
+definitivamente no son capturas de la función actual.
+
+Si un binding se encuentra tanto en @pd{posiblesCapturas} como en
+@pd{definitivamenteNoCapturas}, este último toma prioridad y no es una captura.
+
+En general, no necesitas preocuparte por @pd{posiblesCapturas} ni por
+@pd{definitivamenteNoCapturas} y puedes pasar un diccionario/arreglo vacío al
+inicio. Esto es debido a que esta función maneja especialmente los
+@pd{AST#NodoPrograma}s y les dará valores apropiados a estos parámetros si
+@pd{ast'} es un programa completo. Solo necesitas saber como usarlos si vas a
+marcar las capturas de un fragmento de programa.
+DOCUMENTA]
 procedimiento MarcarCapturas: ast', tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
     procedimiento rec: nodo, posiblesCapturas', definitivamenteNoCapturas'
         MarcarCapturas: nodo, tablasRnAst, tablasMcAst, posiblesCapturas', definitivamenteNoCapturas'

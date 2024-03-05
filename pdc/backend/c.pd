@@ -467,7 +467,7 @@ ResolverNombres: cst, tablasRnCst, (Ámbito#inicial: tablaNombres), fin
 ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
 ValidaLlamadasAutoejecutables: cst, tablasRnCst
 
-fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parches
+fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parches, NULO
 fijar tablaAst a EntablarÁrbol: ast
 ParaCadaElemento: parches, (MétodoComoFunción: {llamar})
 ValidaDevolverFueraDeFunción: ast

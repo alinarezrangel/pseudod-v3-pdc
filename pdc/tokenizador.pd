@@ -170,10 +170,21 @@ funcion TokenizarTexto: texto, nombreDelArchivo
     devolver tokens
 finfuncion
 
+[DOCUMENTA
+@brief{Obtiene el carácter en la posición @pd{pos} del @pd{texto}.}
+
+Es lo mismo que @pd{texto#subTexto: pos, 1}.
+DOCUMENTA]
 funcion ObtenerCarácter: texto, pos
     devolver texto#subTexto: pos, 1
 finfuncion
 
+[DOCUMENTA
+@brief{Devuelve el índice de @pd{texto} en el que termina la palabra.}
+
+Lee una palabra de PseudoD comenzando en el índice @pd{pos}. Devuelve el índice
+en el que esta termina.
+DOCUMENTA]
 funcion AvanzarPalabra: texto, pos
     mientras (pos < texto#longitud)
         && (no EsFinDePalabra: (ObtenerCarácter: texto, pos))
@@ -183,6 +194,13 @@ funcion AvanzarPalabra: texto, pos
     devolver pos
 finfuncion
 
+[DOCUMENTA
+@brief{Devuelve el índice en el que ya no hay espacios en blanco.}
+
+Salta todos los espacios en blanco de @pd{texto}, comenzando en el índice
+@pd{pos}. Devuelve el índice del primer carácter que no es un espacio en
+blanco.
+DOCUMENTA]
 funcion AvanzarEspaciosEnBlanco: texto, pos
     mientras (pos < texto#longitud) && EsEspacioEnBlanco: (ObtenerCarácter: texto, pos)
         fijar pos a pos + 1
@@ -190,6 +208,12 @@ funcion AvanzarEspaciosEnBlanco: texto, pos
     devolver pos
 finfuncion
 
+[DOCUMENTA
+@brief{Devuelve el índice de @pd{texto} que termina el operador.}
+
+Lee un operador comenzando en el índice @pd{pos}. Devuelve el índice en el que
+este termina.
+DOCUMENTA]
 funcion AvanzarOperador: texto, pos
     mientras (pos < texto#longitud) && EsOperador: (ObtenerCarácter: texto, pos)
         fijar pos a pos + 1
@@ -197,11 +221,18 @@ funcion AvanzarOperador: texto, pos
     devolver pos
 finfuncion
 
+[DOCUMENTA
+@brief{Devuelve la posición del @pd{texto} justo después de la primera
+ocurrencia de @pd{terminador}.}
+
+Busca la primera ocurrencia de @pd{terminador} en @pd{texto} comenzando en el
+índice @pd{pos}. Devuelve la posición justo después del final del terminador.
+DOCUMENTA]
 funcion AvanzarHasta: texto, pos, terminador
     variable inic
     fijar inic a pos
     mientras (pos < texto#longitud)
-        && son diferentes (texto#subTexto: pos, terminador#longitud) y terminador
+        && sean diferentes (texto#subTexto: pos, terminador#longitud) y terminador
         fijar pos a pos + 1
     finmientras
     si pos >= texto#longitud
@@ -291,6 +322,12 @@ finprocedimiento
   estos procedimientos son pasados como el texto "tx", mientras que la posición
   textual del principio como posIni. ]
 
+[DOCUMENTA
+@brief{Lee una literal numérica desde el puerto dado.}
+
+@pd{tx} debe ser lo que ya se leyó de la literal, mientras que @pd{posIni} es
+la posición inicial del puerto.
+DOCUMENTA]
 procedimiento LeerLiteralNumérica: posIni, tx, puerto
     variables texto, posFin, area, punto
     fijar texto a LeerPalabra: tx, puerto
@@ -309,6 +346,12 @@ procedimiento LeerLiteralNumérica: posIni, tx, puerto
     devolver Tokens#Token#número: area, (ConvertirANúmero: texto)
 finprocedimiento
 
+[DOCUMENTA
+@brief{Lee un identificador desde el puerto dado.}
+
+@pd{tx} debe ser lo que ya se leyó del identificador, mientras que @pd{posIni}
+es la posición inicial del puerto.
+DOCUMENTA]
 procedimiento LeerIdentificador: posIni, tx, puerto
     variables texto, posFin, area
     fijar texto a LeerPalabra: tx, puerto
@@ -327,8 +370,7 @@ finprocedimiento
 [DOCUMENTA
 @brief{Lee un token del puerto.}
 
-No ignora espacios en blanco. Es la verdadera implementación de
-@pd{Tokenizador#siguienteLexema}.
+No ignora espacios en blanco al inicio.
 DOCUMENTA]
 procedimiento LeerLexema: puerto
     variables car, posIni
@@ -423,6 +465,14 @@ procedimiento LeerLexema: puerto
     devolver LeerIdentificador: posIni, car, puerto
 finprocedimiento
 
+[DOCUMENTA
+@brief{Lee todos los tokens del puerto.}
+
+Ignora espacios en blanco al inicio.
+
+@pd{nombreDelArchivo} es el nombre del archivo del cual se leyó el @pd{texto} a
+tokenizar. Devuelve un @pd{Arreglo} con todos los tokens.
+DOCUMENTA]
 funcion TokenizarTexto2: texto, nombreDelArchivo
     variables puerto, token, tokens
     fijar puerto a PuertoConPos#PuertoConPosiciónTextual#crear: (Puerto#TextoComoPuerto: texto), nombreDelArchivo

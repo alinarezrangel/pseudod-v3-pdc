@@ -1,16 +1,82 @@
 utilizar bepd/builtins
 utilizar bepd/utilidades/texto (Unir)
 
-clase Tabla
-    atributos índices, esquema, valores
+[DOCUMENTA
+@brief{Tabla relacional de valores.}
 
+La tabla es una sequencia sin órden de valores conocidos como los registros. La
+diferencia entre una tabla y un arreglo es que la tabla puede @italic{indexar}
+estos registros: al poner un índice sobre el campo @code{x}, podrás buscar
+valores de @code{x} sin tener que inspeccionar todos los registros de la tabla
+(puedes imaginar un índice como un diccionario, mapeando todos los valores a
+sus respectivos registros).
+
+Para saber que campos son indexados y cuales no, la tabla utiliza un
+@italic{esquema}. Este esquema sabe que campos son indexados en cada registro.
+DOCUMENTA]
+clase Tabla
+    [DOCUMENTA
+    @brief{Obtén el esquema de esta tabla.}
+    DOCUMENTA]
+    metodo esquema
+
+    [DOCUMENTA
+    @brief{Crea una tabla vacía con el esquema dado.}
+
+    La tabla no tendrá ningún registro.
+    DOCUMENTA]
     metodo estatico vacíaConEsquema: esquema
 
+    [DOCUMENTA
+    @brief{Agrega un registro a la tabla.}
+    DOCUMENTA]
     metodo agregar: registro
+
+    [DOCUMENTA
+    @brief{Intenta buscar un registro usando un índice.}
+
+    Trata de obtener el registro cuyo @pd{campo} (un @pd{Texto}) tiene el
+    @pd{valor} dado. El campo debe ser indexado. Si se encuentra tal registro,
+    devuelve @pd{NULO}.
+
+    Por ejemplo:
+
+    @codeblock|{
+    variables tabla, esquema
+    fijar esquema a CrearTipoDeRegistro: {esquema},
+        {nombre}, VERDADERO,
+        {valor}, FALSO
+    fijar tabla a Tabla#vacíaConEsquema: esquema
+    tabla#agregar: (esquema#crear: {nombre}, {hola}, {valor}, 1)
+    tabla#agregar: (esquema#crear: {nombre}, {adios}, {valor}, 2)
+    tabla#agregar: (esquema#crear: {nombre}, {mundo}, {valor}, 3)
+    necesitas (tabla#intentaBuscarÚnico: {nombre}, {hola})#valor = 1
+    necesitas (tabla#intentaBuscarÚnico: {nombre}, {adios})#valor = 2
+    necesitas (tabla#intentaBuscarÚnico: {nombre}, {mundo})#valor = 3
+    necesitas EsNulo: (tabla#intentaBuscarÚnico: {nombre}, {hola mundo})
+    }|
+    DOCUMENTA]
     metodo intentaBuscarÚnico: campo, valor
+
+    [DOCUMENTA
+    @brief{Busca un registro usando un índice.}
+
+    Es como @code{#intentaBuscarÚnico}, pero si el registro buscado no es
+    encontrado lanza un error en vez de devolver @pd{NULO}.
+    DOCUMENTA]
     metodo buscarÚnico: campo, valor
+
+    [DOCUMENTA
+    @brief{Inspecciona todos los registros de la tabla.}
+
+    Llama a @pd{f} de la forma @pd{%f: registro} con cada registro de la
+    tabla. El orden no está especificado y @bold{no es necesariamente el orden
+    de inserción}.
+    DOCUMENTA]
     metodo escaneoLineal: f
 finclase
+
+atributos Tabla#índices, Tabla#valores, Tabla#esquema
 
 metodo estatico Tabla#vacíaConEsquema: esquema
     devolver yo#crear: esquema
@@ -56,6 +122,47 @@ metodo Tabla#escaneoLineal: f
     ParaCadaElemento: yo#valores, f
 finmetodo
 
+[DOCUMENTA
+@brief{Crea un tipo de registro para usarse junto a una @pd{Tabla}.}
+
+Devuelve una nueva clase, de nombre @pd{nombre} (un @pd{Texto}). @pd{pares}
+deben ser pares de valores, donde el primero es un @pd{Texto} que es el nombre
+del campo del tipo, y el segundo un @pd{Boole} que indica si el campo es o no
+es indexado.
+
+Por ejemplo:
+
+@codeblock|{
+variable Usuario
+fijar Usuario a CrearTipoDeRegistro: {Usuario},
+    {nombre}, VERDADERO,
+    {contraseña}, FALSO,
+    {email}, VERDADERO,
+    {biografía}, FALSO,
+    {esPúblico}, FALSO
+}|
+
+La clase devuelta tendrá un constructor que acepta valores para su
+inicialización:
+
+@codeblock|{
+variable miguel
+fijar miguel a Usuario#crear:
+    {mg},
+    {abc123},
+    {miguel@example.com},
+    {¡Hola a todos!},
+    VERDADERO
+}|
+
+Tu puedes crear tus propios métodos adicionales:
+
+@codeblock|{
+metodo Usuario#referencia
+    devolver {@~t}#formatear: yo#nombre
+finmetodo
+}|
+DOCUMENTA]
 funcion CrearTipoDeRegistro: nombre, ...pares
     variables campos, i
     fijar campos a Arreglo#vacio
@@ -103,11 +210,26 @@ funcion CrearTipoDeRegistro: nombre, ...pares
     devolver TipoDeRegistro
 finfuncion
 
+[DOCUMENTA
+@brief{Tipo de registro que representa el resultado de entablar un nodo de un
+árbol.}
+
+Tiene dos campos, @code{id} (indexado) que es un número entero y @code{nodo}
+(no indexado) que es el nodo con dicho id.
+DOCUMENTA]
 variable NodoDeÁrbol
 fijar NodoDeÁrbol a CrearTipoDeRegistro: {NodoDeÁrbol},
     {id}, VERDADERO,
     {nodo}, FALSO
 
+[DOCUMENTA
+@brief{Convierte un árbol en una tabla.}
+
+Va por cada nodo del árbol (usando el método @code{#recursivo: f} que deben
+tener todos los nodos) y le asocia un ID único, el cual va guardando en una
+tabla de @pd{NodoDeÁrbol} y en el atributo @code{id} del mismo nodo. Devuelve
+dicha tabla.
+DOCUMENTA]
 funcion EntablarÁrbol: árbol
     variables tabla, id
     fijar tabla a Tabla#vacíaConEsquema: NodoDeÁrbol
@@ -122,6 +244,9 @@ funcion EntablarÁrbol: árbol
     devolver tabla
 finfuncion
 
+[DOCUMENTA
+@brief{Escribe cada registro de una tabla a la salida estándar.}
+DOCUMENTA]
 procedimiento EscribirTabla: tabla
     tabla#esquema#paraCadaCampo: procedimiento: campo
         escribir campo

@@ -1,5 +1,15 @@
 utilizar bepd/builtins
 
+[DOCUMENTA
+@brief{Busca todos los nodos que cumplan con una condición.}
+
+Busca todos los nodos de @pd{nodo} (@pd{nodo} incluido) que cumplan con la
+condición @pd{cond} (llamado como @pd{%cond: subnodo}).
+
+Para cada uno de estos subnodos, se llamará a @pd{cuerpo} de la forma
+@pd{%cuerpo: subnodo, continuar}, donde @pd{continuar} es una función que, al
+llamarse, continúa la búsqueda con los subnodos de @pd{subnodo}.
+DOCUMENTA]
 funcion Buscando': nodo, cond, cuerpo
     funcion continuar
         nodo#recursivo: funcion: subnodo
@@ -14,6 +24,12 @@ funcion Buscando': nodo, cond, cuerpo
     finsi
 finfuncion
 
+[DOCUMENTA
+@brief{Busca todos los nodos que cumplan con una condición.}
+
+Idéntico a @pd{Buscando'}, pero al llamar a @pd{cuerpo} no pasa el
+procedimiento @pd{continuar}.
+DOCUMENTA]
 funcion Buscando: nodo, cond, cuerpo
     Buscando': nodo, cond, funcion: nodo, continuar
         devolver %cuerpo: nodo

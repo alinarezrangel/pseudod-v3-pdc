@@ -9,6 +9,24 @@ utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
 
 
+[DOCUMENTA
+@brief{Convierte un CST en un AST.}
+
+@pd{nodoCst} es el CST a convertir. Devuelve el AST equivalente.
+
+@pd{tablasRnCst} es un @pd{TablasDeResoluciónDeNombres} con la información de
+nombres del CST.
+
+@pd{tablasRnAst} es un @pd{TablasDeResoluciónDeNombres} con tablas que serán
+llenadas con la información de nombres del AST recién creado.
+
+@pd{parches} es un arreglo que se llenará con funciones sin parámetros que
+deben ser llamadas al final del proceso de abstracción. Tu eres responsable de
+llamar a todas las funciones que se guardarán allí.
+
+@pd{ámbitoActual} es el ámbito actual del CST. Si vas a convertir un programa
+entero puede ser @pd{NULO}.
+DOCUMENTA]
 funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     procedimiento registrarParche: parche
         parches#agregarAlFinal: parche

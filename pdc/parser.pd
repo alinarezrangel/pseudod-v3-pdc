@@ -1109,6 +1109,12 @@ funcion ErrorComoTraceback: error
     devolver {Error:~%}#formatear#concatenar: acc
 finfuncion
 
+[DOCUMENTA
+@brief{Crea un CST desde un @pd{texto}.}
+
+@pd{nombreDelArchivo} es el nombre del archivo del cual se leyó @pd{texto}, que
+es el texto a parsear. Si no se puede parsear el texto, lanza un error.
+DOCUMENTA]
 procedimiento CrearCST: texto, nombreDelArchivo
     variables tks, tokens
     fijar tokens a Tokenizador#TokenizarTexto2: texto, nombreDelArchivo
