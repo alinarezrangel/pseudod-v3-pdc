@@ -46,8 +46,8 @@ finclase
 
 atributos Ámbito#tablaNombres, Ámbito#_porNombre, Ámbito#_númBindings, Ámbito#_ámbitoSuperior
 
-metodo estatico Ámbito#desde: tablaNombres, ámbitoSuperior
-    devolver yo#crear: tablaNombres, ámbitoSuperior
+metodo estatico Ámbito#desde: ámbitoSuperior
+    devolver yo#crear: ámbitoSuperior#tablaNombres, ámbitoSuperior
 finmetodo
 
 metodo estatico Ámbito#inicial: tablaNombres
@@ -154,7 +154,7 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
         si EsInstancia: nodo, CST#NodoBloque
             variable fin
             fijar fin a Arreglo#vacio
-            fijar nodo#ámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+            fijar nodo#ámbito a Ámbito#desde: ámbito
             tablas#tablaÁmbitos#agregar: (Ámbitos#crear: nodo#id, nodo#ámbito)
             nodo#recursivo: procedimiento: subnodo
                 devolver ResolverNombres: subnodo, tablas, nodo#ámbito, fin
@@ -180,7 +180,7 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
                 ResolverNombres: nodo#nombre, tablas, ámbito, paraElFinDelÁmbito
             finsi
 
-            fijar nodo#ámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+            fijar nodo#ámbito a Ámbito#desde: ámbito
             si tieneYo
                 variable reg
                 fijar reg a nodo#ámbito#crear: {yo}, FALSO

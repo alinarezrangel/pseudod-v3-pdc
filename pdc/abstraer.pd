@@ -339,7 +339,7 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
         sino
             variables fn, idParam, idArg, mensajes, nombreParam, ámbito, reg
             fijar nombreParam a {parámetro implícito de &()}
-            fijar ámbito a Ámbito#desde: ámbitoActual#tablaNombres, ámbitoActual
+            fijar ámbito a Ámbito#desde: ámbitoActual
             fijar reg a ámbito#crear: nombreParam, FALSO
 
             fijar idParam a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam
@@ -434,8 +434,8 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
         variables cuerpo, fn, mensajes, nombreVar, ámbito, reg, subámbito, bloque, defVar
         fijar cuerpo a Arreglo#vacio
         fijar nombreVar a {variable implícita de clonar}
-        fijar ámbito a Ámbito#desde: ámbitoActual#tablaNombres, ámbitoActual
-        fijar subámbito a Ámbito#desde: ámbito#tablaNombres, ámbito
+        fijar ámbito a Ámbito#desde: ámbitoActual
+        fijar subámbito a Ámbito#desde: ámbito
         fijar reg a ámbito#crear: nombreVar, FALSO
 
         fijar defVar a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar
