@@ -4,6 +4,8 @@
 #include <setjmp.h>
 #include <assert.h>
 #include <string.h>
+#include <inttypes.h>
+#include <float.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,7 +13,49 @@
 
 
 typedef int64_t pdcrt_entero;
-typedef double pdcrt_float;
+
+#define PDCRT_ENTERO_MAX INT64_MAX
+#define PDCRT_ENTERO_MIN INT64_MIN
+#define PDCRT_ENTERO_WIDTH INT64_WIDTH
+#define PDCRT_ENTERO_C(n) INT64_C(n)
+
+#define PDCRT_ENTERO_PRId PRId64
+#define PDCRT_ENTERO_PRIi PRIi64
+#define PDCRT_ENTERO_PRIu PRIu64
+#define PDCRT_ENTERO_PRIo PRIo64
+#define PDCRT_ENTERO_PRIx PRIx64
+#define PDCRT_ENTERO_PRIX PRIX64
+
+#define PDCRT_ENTERO_SCNd SCNd64
+#define PDCRT_ENTERO_SCNi SCNi64
+#define PDCRT_ENTERO_SCNu SCNu64
+#define PDCRT_ENTERO_SCNo SCNo64
+#define PDCRT_ENTERO_SCNx SCNx64
+
+typedef long double pdcrt_float;
+
+#define PDCRT_FLOAT_C(n) n##L
+
+#define PDCRT_FLOAT_DECIMAL_DIG LDBL_DECIMAL_DIG
+#define PDCRT_FLOAT_MIN LDBL_MIN
+#define PDCRT_FLOAT_MAX LDBL_MAX
+#define PDCRT_FLOAT_EPSILON LDBL_EPSILON
+#define PDCRT_FLOAT_DIG LDBL_DIG
+#define PDCRT_FLOAT_MANT_DIG LDBL_MANT_DIG
+#define PDCRT_FLOAT_MIN_EXP LDBL_MIN_EXP
+#define PDCRT_FLOAT_MIN_10_EXP LDBL_MIN_10_EXP
+#define PDCRT_FLOAT_MAX_EXP LDBL_MAX_EXP
+#define PDCRT_FLOAT_MAX_10_EXP LDBL_MAX_10_EXP
+#define PDCRT_FLOAT_HAS_SUBNORM LDBL_HAS_SUBNORM
+
+#define PDCRT_FLOAT_PRIf "Lf"
+#define PDCRT_FLOAT_PRIF "LF"
+#define PDCRT_FLOAT_PRIg "Lg"
+#define PDCRT_FLOAT_PRIG "LG"
+#define PDCRT_FLOAT_PRIa "La"
+#define PDCRT_FLOAT_PRIA "LA"
+
+#define PDCRT_FLOAT_SCNf "Lf"
 
 
 struct pdcrt_ctx;
@@ -99,7 +143,12 @@ struct pdcrt_marco
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 
 #define PDCRT_TABLA_TEXTOS(X)                   \
-    X(concatenar, "concatenar")
+    X(operador_mas, "operador_+")               \
+        X(operador_menos, "operador_-")         \
+        X(operador_por, "operador_*")           \
+        X(operador_entre, "operador_/")         \
+        X(como_texto, "comoTexto")               \
+        X(concatenar, "concatenar")
 
 typedef struct pdcrt_textos
 {

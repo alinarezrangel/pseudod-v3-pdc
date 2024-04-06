@@ -185,9 +185,9 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         variable n
         fijar n a tupla#en: 1
         si n#techo = n
-            EmitirLínea: puerto, {pdcrt_empujar_entero(ctx, }, n, {);}
+            EmitirLínea: puerto, {pdcrt_empujar_entero(ctx, PDCRT_ENTERO_C(}, n, {));}
         sino
-            EmitirLínea: puerto, {pdcrt_empujar_float(ctx, }, n, {);}
+            EmitirLínea: puerto, {pdcrt_empujar_float(ctx, PDCRT_FLOAT_C(}, n, {));}
         finsi
     finsi
 

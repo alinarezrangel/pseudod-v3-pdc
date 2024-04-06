@@ -286,9 +286,24 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
     size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
     pdcrt_obj yo = ctx->pila[inic];
     pdcrt_obj msj = ctx->pila[inic + 1];
     pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): comoTexto no acepta argumentos");
+        static_assert(sizeof(pdcrt_entero) <= 64, "pdcrt_entero no debe tener más de 64 bits");
+        char texto[21]; // 64 bits => máx. 20 caracteres + '\0'
+        int len = snprintf(texto, sizeof(texto), "%" PDCRT_ENTERO_PRId, yo.ival);
+        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, texto, len));
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar(ctx, txt);
+        return k.kf(ctx, k.marco);
+    }
+
     assert(0 && "sin implementar");
 }
 
@@ -296,9 +311,23 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
     size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
     pdcrt_obj yo = ctx->pila[inic];
     pdcrt_obj msj = ctx->pila[inic + 1];
     pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): comoTexto no acepta argumentos");
+        char texto[21]; // 64 bits => máx. 20 caracteres + '\0'
+        int len = snprintf(texto, sizeof(texto), "%" PDCRT_FLOAT_PRIf, yo.fval);
+        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, texto, len));
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar(ctx, txt);
+        return k.kf(ctx, k.marco);
+    }
+
     assert(0 && "sin implementar");
 }
 
@@ -306,6 +335,7 @@ static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
     size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
     pdcrt_obj yo = ctx->pila[inic];
     pdcrt_obj msj = ctx->pila[inic + 1];
     pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
@@ -316,6 +346,7 @@ static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
     size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
     pdcrt_obj yo = ctx->pila[inic];
     pdcrt_obj msj = ctx->pila[inic + 1];
     pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
@@ -587,10 +618,10 @@ pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
         printf("%s", o.bval? "VERDADERO" : "FALSO");
         break;
     case PDCRT_TOBJ_ENTERO:
-        printf("%ld", o.ival);
+        printf("%" PDCRT_ENTERO_PRId, o.ival);
         break;
     case PDCRT_TOBJ_FLOAT:
-        printf("%f", o.fval);
+        printf("%" PDCRT_FLOAT_PRIf, o.fval);
         break;
     case PDCRT_TOBJ_TEXTO:
         for(size_t i = 0; i < o.texto->longitud; i++)

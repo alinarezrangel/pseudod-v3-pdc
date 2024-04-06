@@ -1,0 +1,8 @@
+escribir 1.2#comoTexto
+nl
+escribir -1.2#comoTexto
+nl
+escribir 1000000000000000000000000000.0#comoTexto
+nl
+escribir -1000000000000000000000000000.0#comoTexto
+nl

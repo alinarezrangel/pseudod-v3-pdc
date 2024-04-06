@@ -1,0 +1,8 @@
+escribir 12#comoTexto
+nl
+escribir -98#comoTexto
+nl
+escribir -9223372036854775808#comoTexto
+nl
+escribir 9223372036854775807#comoTexto
+nl
