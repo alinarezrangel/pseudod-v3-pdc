@@ -516,7 +516,7 @@ funcion ConvertirANúmero: texto
             si i = punto
                 devolver NULO [ Estamos en el {.} ]
             sino [ i > punto ]
-                fijar exponente a 0 - ((i - punto) + 1)
+                fijar exponente a 0 - (i - punto)
             finsi
         finsi
         fijar p a Elevar: 10, exponente
