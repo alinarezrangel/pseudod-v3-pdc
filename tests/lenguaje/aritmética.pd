@@ -1,0 +1,35 @@
+escribir (1 + 2)#comoTexto
+nl
+escribir (4 - 7)#comoTexto
+nl
+escribir (2 * -8)#comoTexto
+nl
+escribir (12 / 6)#comoTexto
+nl
+
+escribir (0.25 + 0.75)#comoTexto
+nl
+escribir (1.25 - 0.25)#comoTexto
+nl
+escribir (5 * 0.75)#comoTexto
+nl
+escribir (12.4 / 6.2)#comoTexto
+nl
+
+escribir (1 + 0.25)#comoTexto
+nl
+escribir (4 - 2.5)#comoTexto
+nl
+escribir (10 * 0.5)#comoTexto
+nl
+escribir (5 / 0.5)#comoTexto
+nl
+
+escribir (0.25 + 1)#comoTexto
+nl
+escribir (2.5 - -4)#comoTexto
+nl
+escribir (0.5 * 10)#comoTexto
+nl
+escribir (0.5 / 10)#comoTexto
+nl

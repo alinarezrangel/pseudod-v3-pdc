@@ -147,7 +147,11 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
         X(operador_menos, "operador_-")         \
         X(operador_por, "operador_*")           \
         X(operador_entre, "operador_/")         \
-        X(como_texto, "comoTexto")               \
+        X(sumar, "sumar")                       \
+        X(restar, "restar")                     \
+        X(multiplicar, "multiplicar")           \
+        X(dividir, "dividir")                   \
+        X(como_texto, "comoTexto")              \
         X(concatenar, "concatenar")
 
 typedef struct pdcrt_textos
@@ -159,6 +163,8 @@ typedef struct pdcrt_textos
 
 struct pdcrt_ctx
 {
+    bool recolector_de_basura_activo;
+
     pdcrt_obj* pila;
     size_t tam_pila;
     size_t cap_pila;
@@ -189,11 +195,16 @@ struct pdcrt_ctx
 pdcrt_ctx *pdcrt_crear_contexto(void);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
+void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
+
 void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
+
+void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, ssize_t pos);
+void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, ssize_t inic, size_t cnt);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
@@ -207,8 +218,6 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 #define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]
 #define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
 #define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
-
-void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
 
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
