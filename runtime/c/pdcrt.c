@@ -785,7 +785,7 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
         {
-            pdcrt_empujar_booleano(ctx, pdcrt_comparar_entero_y_float(yo.fval, arg.ival, PDCRT_IGUAL_A));
+            pdcrt_empujar_booleano(ctx, pdcrt_comparar_entero_y_float(arg.ival, yo.fval, PDCRT_IGUAL_A));
         }
         else
         {
@@ -807,7 +807,7 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
         {
-            pdcrt_empujar_booleano(ctx, !pdcrt_comparar_entero_y_float(yo.fval, arg.ival, PDCRT_IGUAL_A));
+            pdcrt_empujar_booleano(ctx, !pdcrt_comparar_entero_y_float(arg.ival, yo.fval, PDCRT_IGUAL_A));
         }
         else
         {

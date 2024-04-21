@@ -1,0 +1,8 @@
+escribir (1.2 = 1)#comoTexto
+nl
+escribir (1 = 1.2)#comoTexto
+nl
+escribir ((0.5 * 2) = 1)#comoTexto
+nl
+escribir (1 = (0.5 * 2))#comoTexto
+nl
