@@ -1,0 +1,32 @@
+variables V, F, N, N'
+fijar V a 0 = 0
+fijar F a no V
+
+escribir (V = V)#comoTexto
+nl
+escribir (F = V)#comoTexto
+nl
+escribir (V = 0)#comoTexto
+nl
+escribir (0 = 0)#comoTexto
+nl
+escribir (0 = 1)#comoTexto
+nl
+escribir (1 = F)#comoTexto
+nl
+escribir ({hola} = ({ho}#concatenar: {la}))#comoTexto
+nl
+escribir ({hola} = {adios})#comoTexto
+nl
+escribir ({hola} = 0)#comoTexto
+nl
+escribir (N = N')#comoTexto
+nl
+escribir (N = V)#comoTexto
+nl
+escribir (0.1 = 0.1)#comoTexto
+nl
+escribir (0.1 = 0.2)#comoTexto
+nl
+escribir (0.1 = F)#comoTexto
+nl

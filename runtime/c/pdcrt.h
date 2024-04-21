@@ -6,6 +6,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <float.h>
+#include <math.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -32,30 +33,34 @@ typedef int64_t pdcrt_entero;
 #define PDCRT_ENTERO_SCNo SCNo64
 #define PDCRT_ENTERO_SCNx SCNx64
 
-typedef long double pdcrt_float;
+typedef double pdcrt_float;
 
 #define PDCRT_FLOAT_C(n) n##L
 
-#define PDCRT_FLOAT_DECIMAL_DIG LDBL_DECIMAL_DIG
-#define PDCRT_FLOAT_MIN LDBL_MIN
-#define PDCRT_FLOAT_MAX LDBL_MAX
-#define PDCRT_FLOAT_EPSILON LDBL_EPSILON
-#define PDCRT_FLOAT_DIG LDBL_DIG
-#define PDCRT_FLOAT_MANT_DIG LDBL_MANT_DIG
-#define PDCRT_FLOAT_MIN_EXP LDBL_MIN_EXP
-#define PDCRT_FLOAT_MIN_10_EXP LDBL_MIN_10_EXP
-#define PDCRT_FLOAT_MAX_EXP LDBL_MAX_EXP
-#define PDCRT_FLOAT_MAX_10_EXP LDBL_MAX_10_EXP
-#define PDCRT_FLOAT_HAS_SUBNORM LDBL_HAS_SUBNORM
+#define PDCRT_FLOAT_DECIMAL_DIG DBL_DECIMAL_DIG
+#define PDCRT_FLOAT_MIN DBL_MIN
+#define PDCRT_FLOAT_MAX DBL_MAX
+#define PDCRT_FLOAT_EPSILON DBL_EPSILON
+#define PDCRT_FLOAT_DIG DBL_DIG
+#define PDCRT_FLOAT_MANT_DIG DBL_MANT_DIG
+#define PDCRT_FLOAT_MIN_EXP DBL_MIN_EXP
+#define PDCRT_FLOAT_MIN_10_EXP DBL_MIN_10_EXP
+#define PDCRT_FLOAT_MAX_EXP DBL_MAX_EXP
+#define PDCRT_FLOAT_MAX_10_EXP DBL_MAX_10_EXP
+#define PDCRT_FLOAT_HAS_SUBNORM DBL_HAS_SUBNORM
 
-#define PDCRT_FLOAT_PRIf "Lf"
-#define PDCRT_FLOAT_PRIF "LF"
-#define PDCRT_FLOAT_PRIg "Lg"
-#define PDCRT_FLOAT_PRIG "LG"
-#define PDCRT_FLOAT_PRIa "La"
-#define PDCRT_FLOAT_PRIA "LA"
+#define PDCRT_FLOAT_PRIf "f"
+#define PDCRT_FLOAT_PRIF "F"
+#define PDCRT_FLOAT_PRIg "g"
+#define PDCRT_FLOAT_PRIG "G"
+#define PDCRT_FLOAT_PRIa "a"
+#define PDCRT_FLOAT_PRIA "A"
 
-#define PDCRT_FLOAT_SCNf "Lf"
+#define PDCRT_FLOAT_SCNf "f"
+
+#define PDCRT_FLOAT_FLOOR floor
+#define PDCRT_FLOAT_CEIL ceil
+#define PDCRT_FLOAT_FREXP frexp
 
 
 struct pdcrt_ctx;
@@ -147,12 +152,18 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
         X(operador_menos, "operador_-")         \
         X(operador_por, "operador_*")           \
         X(operador_entre, "operador_/")         \
+        X(operador_igual, "operador_=")         \
+        X(operador_distinto, "operador_no=")    \
         X(sumar, "sumar")                       \
         X(restar, "restar")                     \
         X(multiplicar, "multiplicar")           \
         X(dividir, "dividir")                   \
+        X(igual, "igualA")                      \
+        X(distinto, "distíntoDe")               \
         X(como_texto, "comoTexto")              \
-        X(concatenar, "concatenar")
+        X(concatenar, "concatenar")             \
+        X(verdadero, "VERDADERO")               \
+        X(falso, "FALSO")
 
 typedef struct pdcrt_textos
 {
@@ -198,10 +209,13 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
 
 void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
+void pdcrt_empujar_booleano(pdcrt_ctx *ctx, bool v);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
+
+void pdcrt_negar(pdcrt_ctx *ctx);
 
 void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, ssize_t pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, ssize_t inic, size_t cnt);
@@ -213,6 +227,7 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
 #define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
+#define pdcrt_cima(ctx) (ctx)->pila[(ctx)->tam_pila - 1]
 
 #define pdcrt_obtener_local(ctx, m, idx) (m)->locales_y_capturas[(idx)]
 #define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]

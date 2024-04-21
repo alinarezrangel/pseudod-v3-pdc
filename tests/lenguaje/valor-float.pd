@@ -1,0 +1,4 @@
+escribir (0.5#comoTexto = {0.5})#comoTexto
+nl
+escribir (1.2#comoTexto = {1.2})#comoTexto
+nl
