@@ -147,22 +147,30 @@ struct pdcrt_marco
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 
-#define PDCRT_TABLA_TEXTOS(X)                   \
-    X(operador_mas, "operador_+")               \
-        X(operador_menos, "operador_-")         \
-        X(operador_por, "operador_*")           \
-        X(operador_entre, "operador_/")         \
-        X(operador_igual, "operador_=")         \
-        X(operador_distinto, "operador_no=")    \
-        X(sumar, "sumar")                       \
-        X(restar, "restar")                     \
-        X(multiplicar, "multiplicar")           \
-        X(dividir, "dividir")                   \
-        X(igual, "igualA")                      \
-        X(distinto, "distíntoDe")               \
-        X(como_texto, "comoTexto")              \
-        X(concatenar, "concatenar")             \
-        X(verdadero, "VERDADERO")               \
+#define PDCRT_TABLA_TEXTOS(X)                                \
+    X(operador_mas, "operador_+")                            \
+        X(operador_menos, "operador_-")                      \
+        X(operador_por, "operador_*")                        \
+        X(operador_entre, "operador_/")                      \
+        X(operador_igual, "operador_=")                      \
+        X(operador_distinto, "operador_no=")                 \
+        X(sumar, "sumar")                                    \
+        X(restar, "restar")                                  \
+        X(multiplicar, "multiplicar")                        \
+        X(dividir, "dividir")                                \
+        X(igual, "igualA")                                   \
+        X(distinto, "distíntoDe")                            \
+    X(como_texto, "comoTexto")                               \
+    X(concatenar, "concatenar")                              \
+    X(operador_menor_que, "operador_<")                      \
+    X(menor_que, "menorQue")                                 \
+    X(operador_mayor_que, "operador_>")                      \
+    X(mayor_que, "mayorQue")                                 \
+    X(operador_menor_o_igual_a, "operador_=<")               \
+    X(menor_o_igual_a, "menorOIgualA")                       \
+        X(operador_mayor_o_igual_a, "operador_>=")           \
+        X(mayor_o_igual_a, "mayorOIgualA")                   \
+        X(verdadero, "VERDADERO")                            \
         X(falso, "FALSO")
 
 typedef struct pdcrt_textos

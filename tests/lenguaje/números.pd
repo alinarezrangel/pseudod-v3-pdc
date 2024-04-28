@@ -1,0 +1,80 @@
+[ Enteros: ]
+escribir (5 < 7)#comoTexto
+nl
+escribir (7 < 2)#comoTexto
+nl
+escribir (-3 > -5)#comoTexto
+nl
+escribir (-1 > 0)#comoTexto
+nl
+escribir (5 =< 5)#comoTexto
+nl
+escribir (5 =< 6)#comoTexto
+nl
+escribir (9 =< 4)#comoTexto
+nl
+escribir (2 >= 0)#comoTexto
+nl
+escribir (2 >= 2)#comoTexto
+nl
+escribir (6 >= 9)#comoTexto
+nl
+
+[ Floats: ]
+escribir (5.1 < 7.1)#comoTexto
+nl
+escribir (7.5 < 7.1)#comoTexto
+nl
+escribir (-3.1 > -5.1)#comoTexto
+nl
+escribir (-1.1 > 0.1)#comoTexto
+nl
+escribir (5.2 =< 5.2)#comoTexto
+nl
+escribir (5.2 =< 5.3)#comoTexto
+nl
+escribir (9.4 =< 4.4)#comoTexto
+nl
+escribir (2.2 >= 2.1)#comoTexto
+nl
+escribir (2.2 >= 2.2)#comoTexto
+nl
+escribir (6.3 >= 9.4)#comoTexto
+nl
+
+[ Combinados: ]
+[  Float <> Entero  ]
+escribir (1.9 < 2)#comoTexto
+nl
+escribir (2.1 < 2)#comoTexto
+nl
+escribir (1.1 > 1)#comoTexto
+nl
+escribir (0.9 > 1)#comoTexto
+nl
+escribir (1.3 =< 1)#comoTexto
+nl
+escribir (0.9 =< 1)#comoTexto
+nl
+escribir (1.1 >= 1)#comoTexto
+nl
+escribir (0.9 >= 1)#comoTexto
+nl
+
+[  Entero <> Float  ]
+escribir (2 < 2.1)#comoTexto
+nl
+escribir (2 < 1.9)#comoTexto
+nl
+escribir (5 > 4.9)#comoTexto
+nl
+escribir (5 > 5.1)#comoTexto
+nl
+escribir (10 =< 10.1)#comoTexto
+nl
+escribir (10 =< 9.9)#comoTexto
+nl
+escribir (1 >= 0.9)#comoTexto
+nl
+escribir (1 >= 1.1)#comoTexto
+nl

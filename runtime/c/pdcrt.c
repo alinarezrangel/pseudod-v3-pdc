@@ -679,6 +679,27 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+#define PDCRT_COMPARAR_ENTERO(m, opm, ms, opms, cmp, op)                \
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.m)    \
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.opm)) \
+    {                                                                   \
+        if(args != 1)                                                   \
+            pdcrt_error(ctx, "Numero (entero): "opms" / "ms" necesitan 1 argumento"); \
+        pdcrt_extender_pila(ctx, 1);                                    \
+        pdcrt_obj arg = ctx->pila[argp];                                \
+        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                 \
+            pdcrt_empujar_booleano(ctx, yo.ival op arg.ival);            \
+        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)             \
+            pdcrt_empujar_booleano(ctx, pdcrt_comparar_entero_y_float(yo.ival, arg.fval, cmp)); \
+        else                                                            \
+            pdcrt_error(ctx, u8"Numero (entero): "opms" / "ms" solo pueden comparar dos números"); \
+        PDCRT_SACAR_PRELUDIO();                                         \
+        return k.kf(ctx, k.marco);                                      \
+    }
+    PDCRT_COMPARAR_ENTERO(menor_que, operador_menor_que, "menorQue", "operador_<", PDCRT_MENOR_QUE, <)
+    PDCRT_COMPARAR_ENTERO(mayor_que, operador_mayor_que, "mayorQue", "operador_>", PDCRT_MAYOR_QUE, >)
+    PDCRT_COMPARAR_ENTERO(menor_o_igual_a, operador_menor_o_igual_a, "menorOIgualA", "operador_=<", PDCRT_MENOR_O_IGUAL_A, <=)
+    PDCRT_COMPARAR_ENTERO(mayor_o_igual_a, operador_mayor_o_igual_a, "mayorOIgualA", "operador_>=", PDCRT_MAYOR_O_IGUAL_A, >=)
 
     assert(0 && "sin implementar");
 }
@@ -816,6 +837,27 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+#define PDCRT_COMPARAR_FLOAT(m, opm, ms, opms, rcmp, op)                \
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.m)    \
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.opm)) \
+    {                                                                   \
+        if(args != 1)                                                   \
+            pdcrt_error(ctx, "Numero (float): "opms" / "ms" necesitan 1 argumento"); \
+        pdcrt_extender_pila(ctx, 1);                                    \
+        pdcrt_obj arg = ctx->pila[argp];                                \
+        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)                  \
+            pdcrt_empujar_booleano(ctx, yo.fval op arg.fval);           \
+        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)            \
+            pdcrt_empujar_booleano(ctx, pdcrt_comparar_entero_y_float(arg.ival, yo.fval, rcmp)); \
+        else                                                            \
+            pdcrt_error(ctx, u8"Numero (float): "opms" / "ms" solo pueden comparar dos números"); \
+        PDCRT_SACAR_PRELUDIO();                                         \
+        return k.kf(ctx, k.marco);                                      \
+    }
+    PDCRT_COMPARAR_FLOAT(menor_que, operador_menor_que, "menorQue", "operador_<", PDCRT_MAYOR_O_IGUAL_A, <)
+    PDCRT_COMPARAR_FLOAT(mayor_que, operador_mayor_que, "mayorQue", "operador_>", PDCRT_MENOR_O_IGUAL_A, >)
+    PDCRT_COMPARAR_FLOAT(menor_o_igual_a, operador_menor_o_igual_a, "menorOIgualA", "operador_=<", PDCRT_MAYOR_QUE, <=)
+    PDCRT_COMPARAR_FLOAT(mayor_o_igual_a, operador_mayor_o_igual_a, "mayorOIgualA", "operador_>=", PDCRT_MENOR_QUE, >=)
 
     assert(0 && "sin implementar");
 }
