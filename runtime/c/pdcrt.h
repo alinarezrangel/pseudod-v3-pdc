@@ -60,6 +60,7 @@ typedef double pdcrt_float;
 
 #define PDCRT_FLOAT_FLOOR floor
 #define PDCRT_FLOAT_CEIL ceil
+#define PDCRT_FLOAT_TRUNC trunc
 #define PDCRT_FLOAT_FREXP frexp
 
 
@@ -170,6 +171,10 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     X(menor_o_igual_a, "menorOIgualA")                       \
         X(operador_mayor_o_igual_a, "operador_>=")           \
         X(mayor_o_igual_a, "mayorOIgualA")                   \
+        X(negar, "negar")                                    \
+        X(piso, "piso")                                      \
+        X(techo, "techo")                                    \
+        X(truncar, "truncar")                                \
         X(verdadero, "VERDADERO")                            \
         X(falso, "FALSO")
 

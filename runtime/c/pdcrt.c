@@ -700,6 +700,42 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
     PDCRT_COMPARAR_ENTERO(mayor_que, operador_mayor_que, "mayorQue", "operador_>", PDCRT_MAYOR_QUE, >)
     PDCRT_COMPARAR_ENTERO(menor_o_igual_a, operador_menor_o_igual_a, "menorOIgualA", "operador_=<", PDCRT_MENOR_O_IGUAL_A, <=)
     PDCRT_COMPARAR_ENTERO(mayor_o_igual_a, operador_mayor_o_igual_a, "mayorOIgualA", "operador_>=", PDCRT_MAYOR_O_IGUAL_A, >=)
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.negar))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): negar no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, -yo.ival);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.piso))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): piso no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, yo.ival);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.techo))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): techo no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, yo.ival);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.truncar))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): truncar no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, yo.ival);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -858,6 +894,42 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
     PDCRT_COMPARAR_FLOAT(mayor_que, operador_mayor_que, "mayorQue", "operador_>", PDCRT_MENOR_O_IGUAL_A, >)
     PDCRT_COMPARAR_FLOAT(menor_o_igual_a, operador_menor_o_igual_a, "menorOIgualA", "operador_=<", PDCRT_MAYOR_QUE, <=)
     PDCRT_COMPARAR_FLOAT(mayor_o_igual_a, operador_mayor_o_igual_a, "mayorOIgualA", "operador_>=", PDCRT_MENOR_QUE, >=)
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.negar))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): negar no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_float(ctx, -yo.fval);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.piso))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): piso no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_float(ctx, PDCRT_FLOAT_FLOOR(yo.fval));
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.techo))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): techo no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_float(ctx, PDCRT_FLOAT_CEIL(yo.fval));
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.truncar))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): truncar no acepta argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_float(ctx, PDCRT_FLOAT_TRUNC(yo.fval));
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }

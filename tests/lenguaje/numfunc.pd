@@ -1,0 +1,17 @@
+escribir 2#piso#comoTexto
+nl
+escribir 3#techo#comoTexto
+nl
+escribir 4#truncar#comoTexto
+nl
+
+escribir 2.4#piso#comoTexto
+nl
+escribir 2.6#piso#comoTexto
+nl
+escribir 2.4#techo#comoTexto
+nl
+escribir 2.6#techo#comoTexto
+nl
+escribir 4.5#truncar#comoTexto
+nl
