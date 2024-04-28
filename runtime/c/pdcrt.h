@@ -175,6 +175,8 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
         X(piso, "piso")                                      \
         X(techo, "techo")                                    \
         X(truncar, "truncar")                                \
+        X(como_numero_entero, "comoNumeroEntero")            \
+        X(como_numero_real, "comoNumeroReal")                \
         X(verdadero, "VERDADERO")                            \
         X(falso, "FALSO")
 

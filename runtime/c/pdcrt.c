@@ -1006,6 +1006,11 @@ static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k)
     assert(0 && "sin implementar");
 }
 
+static bool pdcrt_es_digito(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
 static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
@@ -1070,6 +1075,55 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_numero_entero))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Texto: comoNumeroEntero no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        const char* s = yo.texto->contenido;
+        if(*s == '-')
+            s += 1;
+        for(; *s; s++)
+            if(!pdcrt_es_digito(*s))
+                goto error_como_entero;
+
+        pdcrt_entero i;
+        i = strtoll(yo.texto->contenido, NULL, 10);
+        pdcrt_empujar_entero(ctx, i);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    error_como_entero:
+        pdcrt_empujar_nulo(ctx);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_numero_real))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Texto: comoNumeroReal no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        const char* s = yo.texto->contenido;
+        if(*s == '-')
+            s += 1;
+        bool dot = false;
+        for(; *s; s++)
+            if(*s == '.' && !dot)
+                dot = true;
+            else if(*s == '.' && dot)
+                goto error_como_real;
+            else if(!pdcrt_es_digito(*s))
+                goto error_como_real;
+
+        pdcrt_float f;
+        f = strtold(yo.texto->contenido, NULL);
+        pdcrt_empujar_float(ctx, f);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    error_como_real:
+        pdcrt_empujar_nulo(ctx);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -1102,6 +1156,15 @@ static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         pdcrt_empujar_booleano(ctx, pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_NULO);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Nulo: comoTexto no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_texto(ctx, "NULO", 4);
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }

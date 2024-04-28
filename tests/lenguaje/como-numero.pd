@@ -1,0 +1,17 @@
+escribir {12}#comoNumeroEntero#comoTexto
+nl
+escribir {-5}#comoNumeroEntero#comoTexto
+nl
+escribir {14.5}#comoNumeroEntero#comoTexto
+nl
+escribir {+65}#comoNumeroEntero#comoTexto
+nl
+
+escribir {14.5}#comoNumeroReal#comoTexto
+nl
+escribir {-7.4}#comoNumeroReal#comoTexto
+nl
+escribir {15}#comoNumeroReal#comoTexto
+nl
+escribir {4.5.6}#comoNumeroReal#comoTexto
+nl
