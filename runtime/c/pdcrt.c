@@ -1124,6 +1124,30 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.longitud))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Texto: longitud no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, yo.texto->longitud);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.en))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Texto: en necesita 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        bool ok = false;
+        pdcrt_entero i = pdcrt_obtener_entero(ctx, -1, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: en necesita un entero como argumento");
+        if(i < 0 || ((size_t) i) >= yo.texto->longitud)
+            pdcrt_error(ctx, "Texto: entero fuera de rango pasado a #en");
+        pdcrt_empujar_texto(ctx, yo.texto->contenido + i, 1);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -1352,6 +1376,126 @@ void pdcrt_empujar_nulo(pdcrt_ctx *ctx)
     pdcrt_empujar(ctx, pdcrt_objeto_nulo());
 }
 
+static inline size_t pdcrt_stp_a_pos(pdcrt_ctx *ctx, pdcrt_stp i)
+{
+    if(i < 0)
+        return ctx->tam_pila + i;
+    else
+        return i;
+}
+
+pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+
+    *ok = false;
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_ENTERO)
+    {
+        *ok = true;
+        return o.ival;
+    }
+    else if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_FLOAT)
+    {
+        int exp = 0;
+        PDCRT_FLOAT_FREXP(o.fval, &exp);
+        if(exp > 0) // El float no tiene parte decimal
+        {
+            if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS)
+            {
+                // Cualquier entero es representable dentro de un float:
+                pdcrt_float max = (pdcrt_float) PDCRT_ENTERO_MAX;
+                pdcrt_float min = (pdcrt_float) PDCRT_ENTERO_MIN;
+                if(o.fval >= min && o.fval <= max)
+                {
+                    *ok = true;
+                    return (pdcrt_entero) o.fval;
+                }
+            }
+            else if((size_t) exp <= PDCRT_ENTERO_BITS)
+            {
+                // Recuerda que exp es la cantidad de bits antes del punto
+                // decimal, esto significa que si exp <= PDCRT_ENTERO_BITS el
+                // float puede ser convertido a un entero.
+                *ok = true;
+                return (pdcrt_entero) o.fval;
+            }
+        }
+    }
+
+    return 0;
+}
+
+pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+
+    *ok = false;
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_ENTERO)
+    {
+        if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS)
+        {
+            *ok = true;
+            return (pdcrt_float) o.ival;
+        }
+        else
+        {
+            // No todos los enteros son representables como floats
+            static const pdcrt_entero max_entero_repr_float = (1ULL << PDCRT_FLOAT_MANT_DIG) - 1U;
+            static const pdcrt_entero min_entero_repr_float = -(1ULL << PDCRT_FLOAT_MANT_DIG);
+            if(o.ival >= min_entero_repr_float && o.ival <= max_entero_repr_float)
+            {
+                *ok = true;
+                return (pdcrt_float) o.ival;
+            }
+        }
+    }
+    else if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_FLOAT)
+    {
+        *ok = true;
+        return o.fval;
+    }
+
+    return 0.0;
+}
+
+bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_BOOLEANO)
+    {
+        *ok = true;
+        return o.bval;
+    }
+    else
+    {
+        *ok = false;
+        return false;
+    }
+}
+
+size_t pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok, char *buffer)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_TEXTO)
+    {
+        *ok = true;
+        if(buffer)
+        {
+            memcpy(buffer, o.texto->contenido, o.texto->longitud);
+        }
+        return o.texto->longitud;
+    }
+    else
+    {
+        *ok = false;
+        return 0;
+    }
+}
+
 void pdcrt_negar(pdcrt_ctx *ctx)
 {
     pdcrt_obj cima = pdcrt_cima(ctx);
@@ -1361,17 +1505,16 @@ void pdcrt_negar(pdcrt_ctx *ctx)
     pdcrt_empujar(ctx, pdcrt_objeto_booleano(!cima.bval));
 }
 
-void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, ssize_t pos)
+void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos)
 {
-    if(pos < 0)
-        pos = ctx->tam_pila + pos;
-    size_t n = (ctx->tam_pila - pos) - 1;
+    size_t rpos = pdcrt_stp_a_pos(ctx, pos);
+    size_t n = (ctx->tam_pila - rpos) - 1;
     if(n > 0)
-        memmove(ctx->pila + pos, ctx->pila + pos + 1, n * sizeof(pdcrt_obj));
+        memmove(ctx->pila + rpos, ctx->pila + rpos + 1, n * sizeof(pdcrt_obj));
     ctx->tam_pila -= 1;
 }
 
-void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, ssize_t inic, size_t cnt)
+void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt)
 {
     for(; cnt > 0; cnt--)
     {

@@ -1,0 +1,11 @@
+escribir {hola mundo}#longitud#comoTexto
+nl
+escribir {}#longitud#comoTexto
+nl
+escribir {adios mundo}#longitud#comoTexto
+nl
+escribir {hola}#en: 0
+escribir {hola}#en: 1
+escribir {hola}#en: 2
+escribir {hola}#en: 3
+nl

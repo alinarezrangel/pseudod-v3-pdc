@@ -177,6 +177,8 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
         X(truncar, "truncar")                                \
         X(como_numero_entero, "comoNumeroEntero")            \
         X(como_numero_real, "comoNumeroReal")                \
+        X(longitud, "longitud")                              \
+        X(en, "en")                                          \
         X(verdadero, "VERDADERO")                            \
         X(falso, "FALSO")
 
@@ -230,10 +232,17 @@ void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
 
+typedef ssize_t pdcrt_stp;
+
+pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
+pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
+bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
+size_t pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok, char *buffer);
+
 void pdcrt_negar(pdcrt_ctx *ctx);
 
-void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, ssize_t pos);
-void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, ssize_t inic, size_t cnt);
+void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
+void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
