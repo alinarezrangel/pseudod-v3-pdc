@@ -1223,6 +1223,99 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.buscar))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, "Texto: buscar necesita 2 argumentos");
+        pdcrt_extender_pila(ctx, 1);
+
+        /* Algoritmo Knuth-Morris-Pratt, sacado de wikipedia:
+         * <https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm>
+         * el 2024-05-05.
+         */
+
+        bool ok = false;
+        pdcrt_entero desde = pdcrt_obtener_entero(ctx, argp, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: buscar necesita un entero como primer argumento");
+        if(desde < 0 || (size_t) desde > yo.texto->longitud)
+            pdcrt_error(ctx, "Texto: buscar primer argumento fuera de rango");
+        size_t buffer_len = pdcrt_obtener_tam_texto(ctx, argp + 1, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: buscar necesita un texto como segundo argumento");
+
+        if(buffer_len == 0)
+        {
+            pdcrt_empujar_entero(ctx, desde);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+
+        char *buffer = malloc(buffer_len + 1);
+        assert(buffer);
+        ok = pdcrt_obtener_texto(ctx, argp + 1, buffer, buffer_len + 1);
+        assert(ok);
+        ssize_t *skip_table = malloc(buffer_len * sizeof(ssize_t));
+        assert(skip_table);
+
+        // Llena la tabla.
+        skip_table[0] = -1;
+        ssize_t buffer_candidato = 0;
+        for(size_t i = 1; i < buffer_len; i++, buffer_candidato++)
+        {
+            if(buffer[i] == buffer[buffer_candidato])
+            {
+                skip_table[i] = skip_table[buffer_candidato];
+            }
+            else
+            {
+                skip_table[i] = buffer_candidato;
+                while(buffer_candidato >= 0 && buffer[buffer_candidato] != buffer[i])
+                {
+                    buffer_candidato = skip_table[buffer_candidato];
+                }
+            }
+        }
+
+        // Busca el texto.
+        size_t yo_pos = desde, buffer_pos = 0;
+
+        while(yo_pos < yo.texto->longitud)
+        {
+            if(yo.texto->contenido[yo_pos] == buffer[buffer_pos])
+            {
+                buffer_pos += 1;
+                yo_pos += 1;
+                if(buffer_pos >= buffer_len)
+                {
+                    pdcrt_empujar_entero(ctx, yo_pos - buffer_pos);
+                    goto buscar_encontrado;
+                }
+            }
+            else
+            {
+                ssize_t el = skip_table[buffer_pos];
+                if(el < 0)
+                {
+                    yo_pos += 1;
+                    buffer_pos += 1;
+                }
+                else
+                {
+                    buffer_pos = el;
+                }
+            }
+        }
+
+        pdcrt_empujar_nulo(ctx);
+    buscar_encontrado:
+
+        free(buffer);
+        free(skip_table);
+
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -1551,23 +1644,39 @@ bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
     }
 }
 
-size_t pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok, char *buffer)
+size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
 {
     size_t p = pdcrt_stp_a_pos(ctx, i);
     pdcrt_obj o = ctx->pila[p];
     if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_TEXTO)
     {
         *ok = true;
-        if(buffer)
-        {
-            memcpy(buffer, o.texto->contenido, o.texto->longitud);
-        }
         return o.texto->longitud;
     }
     else
     {
         *ok = false;
         return 0;
+    }
+}
+
+bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_TEXTO)
+    {
+        if(o.texto->longitud > tam_buffer)
+            return false;
+        if(o.texto->longitud > 0)
+            memcpy(buffer, o.texto->contenido, o.texto->longitud);
+        if(o.texto->longitud < tam_buffer)
+            memset(buffer + o.texto->longitud, '\0', tam_buffer - o.texto->longitud);
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
 

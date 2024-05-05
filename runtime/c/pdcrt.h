@@ -242,7 +242,8 @@ typedef ssize_t pdcrt_stp;
 pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-size_t pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok, char *buffer);
+size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
+bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
 
 void pdcrt_negar(pdcrt_ctx *ctx);
 

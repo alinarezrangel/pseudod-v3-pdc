@@ -1,0 +1,18 @@
+escribir ({hola hola}#buscar: 0, {hola})#comoTexto [ 0 ]
+nl
+escribir ({hola hola}#buscar: 1, {hola})#comoTexto [ 5 ]
+nl
+escribir ({hola hola}#buscar: 5, {hola})#comoTexto [ 5 ]
+nl
+escribir ({hola hola}#buscar: 0, {la ho})#comoTexto [ 2 ]
+nl
+escribir ({holaholahcla}#buscar: 0, {hcla})#comoTexto [ 8 ]
+nl
+escribir ({hola mundo}#buscar: 0, {adios})#comoTexto [ NULO ]
+nl
+escribir ({hola mundo}#buscar: 0, {holam})#comoTexto [ NULO ]
+nl
+escribir ({hola mundo}#buscar: 0, {mundoa})#comoTexto [ NULO ]
+nl
+escribir ({hola mundo}#buscar: 0, {hola mundo})#comoTexto [ 0 ]
+nl
