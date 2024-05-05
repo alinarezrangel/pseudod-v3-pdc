@@ -1,0 +1,22 @@
+escribir {hola mundo}#subTexto: 0, 4
+nl
+escribir {hola mundo}#subTexto: 5, 5
+nl
+escribir {hola}#subTexto: 0, 100
+nl
+escribir {hola mundo}#subTexto: 5, 10
+nl
+escribir {hola}#subTexto: 4, 0
+escribir {hola}#subTexto: 4, 10
+nl
+
+escribir {hola mundo}#parteDelTexto: 0, 5
+nl
+escribir {hola mundo}#parteDelTexto: 5, 11
+nl
+escribir {hola mundo}#parteDelTexto: 5, 20
+nl
+escribir {hola mundo}#parteDelTexto: 0, 0
+escribir {hola mundo}#parteDelTexto: 10, 10
+escribir {hola mundo}#parteDelTexto: 10, 13
+nl

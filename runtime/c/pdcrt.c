@@ -1148,6 +1148,81 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.subtexto))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, "Texto: subTexto necesita 2 argumentos");
+        pdcrt_extender_pila(ctx, 1);
+
+        bool ok = false;
+        pdcrt_entero inicio, longitud;
+        inicio = pdcrt_obtener_entero(ctx, argp, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: subTexto necesita 2 enteros como argumentos");
+        longitud = pdcrt_obtener_entero(ctx, argp + 1, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: subTexto necesita 2 enteros como argumentos");
+
+        if(inicio < 0 || (size_t) inicio > yo.texto->longitud)
+            pdcrt_error(ctx, "Texto: valor fuera de rango para el primer argumento de #subTexto");
+        if(longitud < 0)
+            pdcrt_error(ctx, "Texto: valor fuera de rango para el segundo argumento de #subTexto");
+
+        if((size_t) (inicio + longitud) > yo.texto->longitud)
+            longitud = yo.texto->longitud - inicio;
+
+        if(longitud == 0)
+        {
+            pdcrt_empujar_texto(ctx, "", 0);
+        }
+        else
+        {
+            char *buffer = malloc(longitud);
+            assert(buffer);
+            memcpy(buffer, yo.texto->contenido + inicio, longitud);
+            pdcrt_empujar_texto(ctx, buffer, longitud);
+            free(buffer);
+        }
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.parte_del_texto))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, "Texto: parteDelTexto necesita 2 argumentos");
+        pdcrt_extender_pila(ctx, 1);
+
+        bool ok = false;
+        pdcrt_entero inicio, final;
+        inicio = pdcrt_obtener_entero(ctx, argp, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: parteDelTexto necesita 2 enteros como argumentos");
+        final = pdcrt_obtener_entero(ctx, argp + 1, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Texto: parteDelTexto necesita 2 enteros como argumentos");
+
+        if(inicio < 0 || (size_t) inicio > yo.texto->longitud)
+            pdcrt_error(ctx, "Texto: valor fuera de rango para el primer argumento de #parteDelTexto");
+        if(final < 0)
+            pdcrt_error(ctx, "Texto: valor fuera de rango para el segundo argumento de #parteDelTexto");
+        if((size_t) final > yo.texto->longitud)
+            final = yo.texto->longitud;
+
+        if(final <= inicio)
+        {
+            pdcrt_empujar_texto(ctx, "", 0);
+        }
+        else
+        {
+            char *buffer = malloc(final - inic);
+            assert(buffer);
+            memcpy(buffer, yo.texto->contenido + inicio, final - inicio);
+            pdcrt_empujar_texto(ctx, buffer, final - inicio);
+            free(buffer);
+        }
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -1551,7 +1626,12 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
         .marco = m,
     };
     pdcrt_obj msj_o = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, msj, tam_msj));
-    for(ssize_t i = nproto - 1; i >= 0; i--)
+    /* for(ssize_t i = nproto - 1; i >= 0; i--) */
+    /* { */
+    /*     assert(proto[i] == 0); */
+    /*     ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1]; */
+    /* } */
+    for(size_t i = 0; i < nproto; i++)
     {
         assert(proto[i] == 0);
         ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
