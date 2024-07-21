@@ -1,0 +1,12 @@
+funcion Arr: ...X
+    devolver X
+finfuncion
+
+escribir (Arr: {A}, {B}, {C})#unir: {}
+nl
+escribir (Arr: {A}, {B}, {C})#unir: {, }
+nl
+escribir (Arr: {A}, {}, {C})#unir: {, }
+nl
+escribir Arr#unir: {, }
+nl

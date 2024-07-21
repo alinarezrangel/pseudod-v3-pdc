@@ -88,6 +88,8 @@ typedef enum pdcrt_tipo_obj_gc
 {
     PDCRT_TGC_MARCO,
     PDCRT_TGC_TEXTO,
+    PDCRT_TGC_ARREGLO,
+    PDCRT_TGC_CLOSURE,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -111,6 +113,12 @@ typedef struct pdcrt_texto
     char contenido[];
 } pdcrt_texto;
 
+struct pdcrt_arreglo;
+typedef struct pdcrt_arreglo pdcrt_arreglo;
+
+struct pdcrt_closure;
+typedef struct pdcrt_closure pdcrt_closure;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -121,8 +129,26 @@ typedef struct pdcrt_obj
         bool bval;
         pdcrt_marco *marco;
         pdcrt_texto *texto;
+        pdcrt_arreglo *arreglo;
+        pdcrt_closure *closure;
     };
 } pdcrt_obj;
+
+struct pdcrt_arreglo
+{
+    pdcrt_cabecera_gc gc;
+    size_t longitud;
+    size_t capacidad;
+    pdcrt_obj *valores;
+};
+
+struct pdcrt_closure
+{
+    pdcrt_cabecera_gc gc;
+    pdcrt_f f;
+    size_t num_capturas;
+    pdcrt_obj capturas[];
+};
 
 typedef enum pdcrt_tipo
 {
@@ -132,6 +158,8 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_MARCO,
     PDCRT_TOBJ_TEXTO,
     PDCRT_TOBJ_NULO,
+    PDCRT_TOBJ_ARREGLO,
+    PDCRT_TOBJ_CLOSURE,
 } pdcrt_tipo;
 
 
@@ -145,8 +173,6 @@ struct pdcrt_marco
     size_t num_capturas;
     pdcrt_obj locales_y_capturas[];
 };
-
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 
 #define PDCRT_TABLA_TEXTOS(X)                                           \
     X(operador_mas, "operador_+")                                       \
@@ -169,8 +195,8 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     X(mayor_que, "mayorQue")                                            \
     X(operador_menor_o_igual_a, "operador_=<")                          \
     X(menor_o_igual_a, "menorOIgualA")                                  \
-        X(operador_mayor_o_igual_a, "operador_>=")                      \
-        X(mayor_o_igual_a, "mayorOIgualA")                              \
+    X(operador_mayor_o_igual_a, "operador_>=")                          \
+    X(mayor_o_igual_a, "mayorOIgualA")                                  \
         X(negar, "negar")                                               \
         X(piso, "piso")                                                 \
         X(techo, "techo")                                               \
@@ -184,8 +210,11 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     X(buscar, "buscar")                                                 \
     X(buscar_en_reversa, "buscarEnReversa")                             \
     X(formatear, "formatear")                                           \
-    X(verdadero, "VERDADERO")                                           \
-    X(falso, "FALSO")
+    X(fijarEn, "fijarEn")                                               \
+        X(verdadero, "VERDADERO")                                       \
+        X(falso, "FALSO")                                               \
+    X(unir, "unir")                                                     \
+    X(llamar, "llamar")
 
 typedef struct pdcrt_textos
 {
@@ -236,6 +265,7 @@ void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
+void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 
 typedef ssize_t pdcrt_stp;
 
@@ -245,15 +275,24 @@ bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
 
+void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
+void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_stp arr);
+
 void pdcrt_negar(pdcrt_ctx *ctx);
 
 void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 
+void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_stp i);
+
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
 #ifdef PDCRT_INTERNO
+
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
+pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
+pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
 
 #define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
@@ -263,6 +302,14 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 #define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]
 #define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
 #define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
+
+pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
+                     pdcrt_marco *m,
+                     int params,
+                     bool variadic,
+                     pdcrt_kf kf);
+
+void pdcrt_variadic(pdcrt_ctx *ctx, int params);
 
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
@@ -276,7 +323,15 @@ pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
 void pdcrt_agregar_nombre(pdcrt_ctx *ctx, const char *nombre, size_t tam_nombre, bool autoejec);
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m);
 
+void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps);
+
+void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
+                                 pdcrt_arreglo *arr,
+                                 size_t espacio);
+
 bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
+
+void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
 
 int pdcrt_main(int argc, char **argv, pdcrt_f f);
 
