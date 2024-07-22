@@ -241,17 +241,46 @@ metodo EstadoDeEmisión#inicializarVariable: nodoIdentificador
     finsi
 
     si no EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
-        yo#emisor#emitir: Opcode#caja
-    finsi
-    si yo#capturas#contiene: reg#binding
-        yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
+        si yo#capturas#contiene: reg#binding
+            yo#emisor#emitir: Opcode#fijarCajaC, (yo#capturas#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#fijarCaja, (yo#locales#en: reg#binding)
+        finsi
     sino
-        yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
+        si yo#capturas#contiene: reg#binding
+            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
+        finsi
+    finsi
+finmetodo
+
+metodo EstadoDeEmisión#prepararDeclaración: nodoIdentificador
+    variable reg
+    fijar reg a yo#tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
+    si EsNulo: reg
+        fijar reg a yo#tablasRnAst#tablaUsos#buscarÚnico: {idNodo}, nodoIdentificador#id
+    finsi
+
+    si no EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
+        [ La variable es capturada, necesitamos inicializarla a una caja vacía ]
+        yo#emisor#emitir: Opcode#empujarNulo
+        yo#emisor#emitir: Opcode#caja
+        si yo#capturas#contiene: reg#binding
+            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
+        sino
+            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
+        finsi
     finsi
 finmetodo
 
 metodo EstadoDeEmisión#emitir: ast
     si EsInstancia: ast, AST#NodoBloque
+        ParaCadaElemento: ast#cuerpo, procedimiento: nodo
+            si EsInstancia: nodo, AST#NodoVariable
+                yo#prepararDeclaración: nodo#nombre
+            finsi
+        finprocedimiento
         ParaCadaElemento: ast#cuerpo, &(yo#emitir)
         devolver NULO
     finsi

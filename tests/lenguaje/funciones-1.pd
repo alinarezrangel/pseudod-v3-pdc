@@ -1,0 +1,10 @@
+procedimiento Hola
+    escribir {hola mundo}
+    nl
+finprocedimiento
+
+Hola
+Hola
+escribir {adios mundo}
+nl
+Hola

@@ -1,0 +1,17 @@
+procedimiento HolaMundo
+    escribir {hola}
+    Espacio
+    Mundo
+    nl
+finprocedimiento
+
+procedimiento Espacio
+    escribir { }
+finprocedimiento
+
+procedimiento Mundo
+    escribir {mundo}
+finprocedimiento
+
+HolaMundo
+HolaMundo

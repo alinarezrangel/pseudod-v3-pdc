@@ -44,6 +44,7 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
@@ -53,6 +54,7 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k);
 #define pdcrt_objeto_nulo() ((pdcrt_obj) { .recv = &pdcrt_recv_nulo })
 #define pdcrt_objeto_arreglo(arr) ((pdcrt_obj) { .recv = &pdcrt_recv_arreglo, .arreglo = (arr) })
 #define pdcrt_objeto_closure(cls) ((pdcrt_obj) { .recv = &pdcrt_recv_closure, .closure = (cls) })
+#define pdcrt_objeto_caja(cj) ((pdcrt_obj) { .recv = &pdcrt_recv_caja, .caja = (cj) })
 
 
 static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj);
@@ -136,6 +138,14 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
             pdcrt_gc_marcar(ctx, c->capturas[i]);
         break;
     }
+    case PDCRT_TGC_CAJA:
+    {
+        if(h->generacion == ctx->gc.generacion)
+            break;
+        h->generacion = ctx->gc.generacion;
+        pdcrt_caja *c = (pdcrt_caja *) h;
+        pdcrt_gc_marcar(ctx, c->valor);
+    }
     }
 }
 
@@ -160,6 +170,9 @@ static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
         break;
     case PDCRT_TOBJ_CLOSURE:
         h = PDCRT_CABECERA_GC(obj.closure);
+        break;
+    case PDCRT_TOBJ_CAJA:
+        h = PDCRT_CABECERA_GC(obj.caja);
         break;
     }
     pdcrt_gc_marcar_cabecera(ctx, h);
@@ -1729,6 +1742,7 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
 
     if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.llamar))
     {
+        pdcrt_extender_pila(ctx, yo.closure->num_capturas);
         for(size_t i = 0; i < yo.closure->num_capturas; i++)
         {
             pdcrt_empujar(ctx, yo.closure->capturas[i]);
@@ -1736,6 +1750,18 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_eliminar_elementos(ctx, inic, 2);
         return (*yo.closure->f)(ctx, args, k);
     }
+
+    assert(0 && "sin implementar");
+}
+
+static pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
 
     assert(0 && "sin implementar");
 }
@@ -1775,6 +1801,10 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     {
         return PDCRT_TOBJ_CLOSURE;
     }
+    else if(o.recv == &pdcrt_recv_caja)
+    {
+        return PDCRT_TOBJ_CAJA;
+    }
     else
     {
         assert(0 && "inalcanzable");
@@ -1795,6 +1825,10 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
     for(size_t i = 0; i < capturas; i++)
     {
         m->locales_y_capturas[locales + i] = ctx->pila[(top - capturas) + i];
+    }
+    for(size_t i = 0; i < locales; i++)
+    {
+        m->locales_y_capturas[i] = pdcrt_objeto_nulo();
     }
     ctx->tam_pila -= capturas;
 
@@ -1840,6 +1874,15 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas)
     {
         c->capturas[i] = pdcrt_objeto_nulo();
     }
+    return c;
+}
+
+pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor)
+{
+    pdcrt_caja *c = pdcrt_alojar_obj(ctx, PDCRT_TGC_CAJA, sizeof(pdcrt_caja));
+    if(!c)
+        pdcrt_enomem(ctx);
+    c->valor = valor;
     return c;
 }
 
@@ -1966,6 +2009,13 @@ void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad)
 {
     pdcrt_extender_pila(ctx, 1);
     pdcrt_obj obj = pdcrt_objeto_arreglo(pdcrt_crear_arreglo_vacio(ctx, capacidad));
+    pdcrt_empujar(ctx, obj);
+}
+
+void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_obj obj = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, pdcrt_objeto_nulo()));
     pdcrt_empujar(ctx, obj);
 }
 
@@ -2103,6 +2153,25 @@ bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_b
     {
         return false;
     }
+}
+
+void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja)
+{
+    size_t pos = pdcrt_stp_a_pos(ctx, caja);
+    pdcrt_fijar_caja(ctx, ctx->pila[pos], pdcrt_sacar(ctx));
+}
+
+void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja)
+{
+    size_t pos = pdcrt_stp_a_pos(ctx, caja);
+    pdcrt_obj o = pdcrt_obtener_caja(ctx, ctx->pila[pos]);
+    pdcrt_empujar(ctx, o);
+}
+
+void pdcrt_envolver_en_caja(pdcrt_ctx *ctx)
+{
+    pdcrt_obj c = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, ctx->pila[ctx->tam_pila - 1]));
+    ctx->pila[ctx->tam_pila - 1] = c;
 }
 
 void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i)
@@ -2464,6 +2533,9 @@ void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx)
             break;
         case PDCRT_TOBJ_CLOSURE:
             printf("función %p\n", o.closure);
+            break;
+        case PDCRT_TOBJ_CAJA:
+            printf("caja %p\n", o.caja);
             break;
         default:
             printf("unk %d\n", pdcrt_tipo_de_obj(o));

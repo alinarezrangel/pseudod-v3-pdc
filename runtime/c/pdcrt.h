@@ -90,6 +90,7 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_TEXTO,
     PDCRT_TGC_ARREGLO,
     PDCRT_TGC_CLOSURE,
+    PDCRT_TGC_CAJA,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -119,6 +120,9 @@ typedef struct pdcrt_arreglo pdcrt_arreglo;
 struct pdcrt_closure;
 typedef struct pdcrt_closure pdcrt_closure;
 
+struct pdcrt_caja;
+typedef struct pdcrt_caja pdcrt_caja;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -131,6 +135,7 @@ typedef struct pdcrt_obj
         pdcrt_texto *texto;
         pdcrt_arreglo *arreglo;
         pdcrt_closure *closure;
+        pdcrt_caja *caja;
     };
 } pdcrt_obj;
 
@@ -150,6 +155,12 @@ struct pdcrt_closure
     pdcrt_obj capturas[];
 };
 
+struct pdcrt_caja
+{
+    pdcrt_cabecera_gc gc;
+    pdcrt_obj valor;
+};
+
 typedef enum pdcrt_tipo
 {
     PDCRT_TOBJ_ENTERO,
@@ -160,6 +171,7 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_NULO,
     PDCRT_TOBJ_ARREGLO,
     PDCRT_TOBJ_CLOSURE,
+    PDCRT_TOBJ_CAJA,
 } pdcrt_tipo;
 
 
@@ -266,6 +278,7 @@ void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
 void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
+void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx);
 
 typedef ssize_t pdcrt_stp;
 
@@ -277,6 +290,10 @@ bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_b
 
 void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
 void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_stp arr);
+
+void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
+void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
+void pdcrt_envolver_en_caja(pdcrt_ctx *ctx);
 
 void pdcrt_negar(pdcrt_ctx *ctx);
 
@@ -293,6 +310,7 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
+pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
 
 #define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
@@ -302,6 +320,11 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
 #define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]
 #define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
 #define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
+
+pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx);
+
+#define pdcrt_fijar_caja(ctx, o, v) (o).caja->valor = (v)
+#define pdcrt_obtener_caja(ctx, o) (o).caja->valor
 
 pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
                      pdcrt_marco *m,
