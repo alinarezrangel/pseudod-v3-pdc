@@ -221,12 +221,12 @@ struct pdcrt_marco
     X(parte_del_texto, "parteDelTexto")                                 \
     X(buscar, "buscar")                                                 \
     X(buscar_en_reversa, "buscarEnReversa")                             \
-    X(formatear, "formatear")                                           \
     X(fijarEn, "fijarEn")                                               \
         X(verdadero, "VERDADERO")                                       \
         X(falso, "FALSO")                                               \
     X(unir, "unir")                                                     \
-    X(llamar, "llamar")
+    X(llamar, "llamar")                                                 \
+    X(formatear, "formatear")
 
 typedef struct pdcrt_textos
 {
@@ -276,6 +276,7 @@ void pdcrt_empujar_booleano(pdcrt_ctx *ctx, bool v);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
+void pdcrt_empujar_texto_cstr(pdcrt_ctx *ctx, const char *str);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
 void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx);
@@ -288,11 +289,6 @@ bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
 
-void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
-void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_stp arr);
-
-void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
-void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
 void pdcrt_envolver_en_caja(pdcrt_ctx *ctx);
 
 void pdcrt_negar(pdcrt_ctx *ctx);
@@ -301,6 +297,8 @@ void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 
 void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_stp i);
+void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i);
+void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
@@ -322,6 +320,12 @@ pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
 #define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
 
 pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx);
+
+void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
+void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_stp arr);
+
+void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
+void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
 
 #define pdcrt_fijar_caja(ctx, o, v) (o).caja->valor = (v)
 #define pdcrt_obtener_caja(ctx, o) (o).caja->valor

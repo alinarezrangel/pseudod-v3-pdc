@@ -1,0 +1,23 @@
+escribir {hola}#formatear [ hola ]
+nl
+escribir {hola~~mundo}#formatear [ hola~mundo ]
+nl
+escribir {hola~emundo}#formatear [ hola}mundo ]
+nl
+escribir {hola~Emundo}#formatear [ hola»mundo ]
+nl
+escribir {hola~qmundo}#formatear [ hola"mundo ]
+nl
+escribir {hola~|%
+mundo}#formatear [ holamundo ]
+nl
+escribir ({~T}#formatear: {hola}) [ hola ]
+nl
+escribir ({hola~T}#formatear: { mundo}) [ hola mundo ]
+nl
+escribir ({¡~T~T!}#formatear: {hola}, {mundo}) [ ¡holamundo! ]
+nl
+escribir ({~t}#formatear: 0) [ 0 ]
+nl
+escribir ({~t~t}#formatear: 1, (1 = 1)) [ 1VERDADERO ]
+nl

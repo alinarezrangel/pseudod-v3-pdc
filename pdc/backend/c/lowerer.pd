@@ -47,8 +47,37 @@ funcion NombreDeLaContinuación: identificadorDelMódulo, id
     devolver {pdc_m~t_k~t}#formatear: identificadorDelMódulo, id
 finfuncion
 
+variable NL
+fijar NL a {
+}
+
 funcion EscaparTexto: txt
-    devolver ({"}#concatenar: txt)#concatenar: {"}
+    variable res
+    fijar res a {}
+    ParaCadaNúmero: 0, txt#longitud, procedimiento: i
+        variable c
+        fijar c a txt#en: i
+        si c = {\}
+            fijar res a res#concatenar: {\\}
+            fijar c a {}
+        finsi
+        si c = {"}
+            fijar res a res#concatenar: {\"}
+            fijar c a {}
+        finsi
+        si c = {'}
+            fijar res a res#concatenar: {\'}
+            fijar c a {}
+        finsi
+        si c = NL
+            fijar res a res#concatenar: {\n}
+            fijar c a {}
+        finsi
+        si no c = {}
+            fijar res a res#concatenar: c
+        finsi
+    finprocedimiento
+    devolver ({"}#concatenar: res)#concatenar: {"}
 finfuncion
 
 procedimiento DeclararFunción: puerto, identificadorDelMódulo, func
