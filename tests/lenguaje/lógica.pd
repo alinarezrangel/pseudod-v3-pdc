@@ -1,0 +1,23 @@
+variables V, F
+fijar V a 1 = 1
+fijar F a 1 = 0
+
+
+procedimiento Escribir: X
+    escribir X#comoTexto
+    nl
+finprocedimiento
+
+
+Escribir: (F && F)
+Escribir: (F && V)
+Escribir: (V && F)
+Escribir: (V && V)
+
+escribir {----}
+nl
+
+Escribir: (F || F)
+Escribir: (F || V)
+Escribir: (V || F)
+Escribir: (V || V)

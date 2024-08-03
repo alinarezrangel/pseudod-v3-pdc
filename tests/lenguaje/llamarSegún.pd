@@ -1,0 +1,21 @@
+variables V, F
+fijar V a 1 = 1
+fijar F a 1 = 0
+
+funcion Hola
+    escribir {Hola}
+    nl
+    devolver {A}
+finfuncion
+
+funcion Adios
+    escribir {Adios}
+    nl
+    devolver {B}
+finfuncion
+
+
+escribir V#llamarSegún: &Hola, &Adios
+nl
+escribir F#llamarSegún: &Hola, &Adios
+nl

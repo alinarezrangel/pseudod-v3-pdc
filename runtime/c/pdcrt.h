@@ -226,7 +226,14 @@ struct pdcrt_marco
         X(falso, "FALSO")                                               \
     X(unir, "unir")                                                     \
     X(llamar, "llamar")                                                 \
-    X(formatear, "formatear")
+    X(formatear, "formatear")                                           \
+    X(escojer, "escojer")                                               \
+    X(llamarSegun, "llamarSegun")                                       \
+    X(llamarSegun2, "llamarSegún")                                      \
+    X(o, "o")                                                           \
+    X(operador_o, "operador_||")                                        \
+    X(y, "y")                                                           \
+    X(operador_y, "operador_&&")
 
 typedef struct pdcrt_textos
 {

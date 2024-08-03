@@ -1039,6 +1039,53 @@ static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.escojer))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, "Booleano: escojer necesita 2 argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj siVerdadero = ctx->pila[argp];
+        pdcrt_obj siFalso = ctx->pila[argp + 1];
+        pdcrt_empujar(ctx, yo.bval ? siVerdadero : siFalso);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.llamarSegun)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.llamarSegun2))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, u8"Booleano: llamarSegún necesita 2 argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj siVerdadero = ctx->pila[argp];
+        pdcrt_obj siFalso = ctx->pila[argp + 1];
+        pdcrt_empujar(ctx, yo.bval ? siVerdadero : siFalso);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_enviar_mensaje(ctx, k.marco, "llamar", 6, NULL, 0, k.kf);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.o)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_o))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Booleano: \"||\" necesita 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj v = ctx->pila[argp];
+        pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+        pdcrt_empujar_booleano(ctx, yo.bval || v.bval);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.y)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_y))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Booleano: \"&&\" necesita 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj v = ctx->pila[argp];
+        pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+        pdcrt_empujar_booleano(ctx, yo.bval && v.bval);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -2498,27 +2545,28 @@ pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
                      bool variadic,
                      pdcrt_kf kf)
 {
-    if(variadic)
+    for(size_t i = 0; i < m->num_locales; i++)
     {
-        for(size_t i = 0; i < m->num_locales; i++)
-        {
-            pdcrt_fijar_local(ctx, m, i, pdcrt_objeto_nulo());
-        }
+        pdcrt_fijar_local(ctx, m, i, pdcrt_objeto_nulo());
     }
+
     if(m->args < params)
         pdcrt_error(ctx, u8"función llamada de forma inválida");
-    int varargs = m->args - params;
-    pdcrt_extender_pila(ctx, 2);
-    pdcrt_empujar_arreglo_vacio(ctx, varargs);
-    for(int i = 0; i < varargs; i++)
+    if(variadic)
     {
-        pdcrt_empujar(ctx, ctx->pila[(ctx->tam_pila - varargs - 1) + i]);
-        pdcrt_arreglo_empujar_al_final(ctx, -2);
+        int varargs = m->args - params;
+        pdcrt_extender_pila(ctx, 2);
+        pdcrt_empujar_arreglo_vacio(ctx, varargs);
+        for(int i = 0; i < varargs; i++)
+        {
+            pdcrt_empujar(ctx, ctx->pila[(ctx->tam_pila - varargs - 1) + i]);
+            pdcrt_arreglo_empujar_al_final(ctx, -2);
+        }
+        pdcrt_obj var = pdcrt_sacar(ctx);
+        for(int i = 0; i < varargs; i++)
+            pdcrt_sacar(ctx);
+        pdcrt_empujar(ctx, var);
     }
-    pdcrt_obj var = pdcrt_sacar(ctx);
-    for(int i = 0; i < varargs; i++)
-        pdcrt_sacar(ctx);
-    pdcrt_empujar(ctx, var);
     return (pdcrt_k) {
             .kf = kf,
             .marco = m,
