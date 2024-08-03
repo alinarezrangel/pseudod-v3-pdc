@@ -1740,6 +1740,8 @@ static pdcrt_k pdcrt_arreglo_distinto_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 static pdcrt_k pdcrt_arreglo_como_texto_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_arreglo_como_texto_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_arreglo_como_texto_k3(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_arreglo_como_texto_k4(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_arreglo_como_texto_k5(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static pdcrt_k pdcrt_arreglo_como_texto_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
@@ -1757,9 +1759,7 @@ static pdcrt_k pdcrt_arreglo_como_texto_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     {
         pdcrt_extender_pila(ctx, 2);
         pdcrt_empujar(ctx, buffer);
-        pdcrt_empujar_texto_cstr(ctx, ")");
-        pdcrt_arreglo_empujar_al_final(ctx, -2);
-        pdcrt_obj sep = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, ", ", 0));
+        pdcrt_obj sep = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, ", ", 2));
         pdcrt_empujar(ctx, sep);
         static const int proto[] = {0};
         return pdcrt_enviar_mensaje(ctx, m, u8"unir", 4, proto, 1, &pdcrt_arreglo_como_texto_k3);
@@ -1783,12 +1783,35 @@ static pdcrt_k pdcrt_arreglo_como_texto_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_arreglo_empujar_al_final(ctx, -2);
     // [buffer]
     pdcrt_sacar(ctx);
+    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(i.ival + 1));
     return pdcrt_arreglo_como_texto_k1(ctx, m);
 }
 
 static pdcrt_k pdcrt_arreglo_como_texto_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_arreglo_como_texto_k3);
+    // [res]
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_empujar_texto_cstr(ctx, "(Arreglo#crearCon: ");
+    pdcrt_extraer(ctx, -2);
+    // [pref, res]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "concatenar", 10, proto, 1, &pdcrt_arreglo_como_texto_k4);
+}
+
+static pdcrt_k pdcrt_arreglo_como_texto_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_arreglo_como_texto_k4);
+    // [res]
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_empujar_texto_cstr(ctx, ")");
+    // [res, suf]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "concatenar", 10, proto, 1, &pdcrt_arreglo_como_texto_k5);
+}
+static pdcrt_k pdcrt_arreglo_como_texto_k5(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_arreglo_como_texto_k5);
     // [res]
     pdcrt_devolver(ctx, m, 1);
     return m->k.kf(ctx, m->k.marco);
@@ -1859,11 +1882,6 @@ static pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
                 pdcrt_crear_arreglo_vacio(ctx, yo.arreglo->longitud + 2))); // buffer
         pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(0)); // i
         PDCRT_SACAR_PRELUDIO();
-        pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, 1));
-        pdcrt_empujar_texto_cstr(ctx, "(Arreglo#crearCon: ");
-        // [arr, str]
-        pdcrt_arreglo_empujar_al_final(ctx, -2);
-        pdcrt_sacar(ctx);
         // []
         return pdcrt_arreglo_como_texto_k1(ctx, m);
     }

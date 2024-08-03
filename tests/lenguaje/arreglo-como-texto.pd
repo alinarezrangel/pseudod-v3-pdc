@@ -1,0 +1,8 @@
+funcion A: ...X
+    devolver X
+finfuncion
+
+escribir (A: 1, 2, 3)#comoTexto
+nl
+escribir A#comoTexto
+nl
