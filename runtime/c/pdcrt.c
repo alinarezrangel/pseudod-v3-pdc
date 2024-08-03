@@ -1170,9 +1170,17 @@ static pdcrt_k pdcrt_texto_formatear_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     }
     else
     {
+        size_t len = 0;
+        for(size_t j = i; j < yo.texto->longitud; j++)
+        {
+            if(yo.texto->contenido[j] == '~')
+                break;
+            len += 1;
+        }
+
         pdcrt_empujar(ctx, arr);
-        pdcrt_empujar_texto(ctx, yo.texto->contenido + i, 1);
-        i += 1;
+        pdcrt_empujar_texto(ctx, yo.texto->contenido + i, len);
+        i += len;
     }
 
     pdcrt_arreglo_empujar_al_final(ctx, -2);
