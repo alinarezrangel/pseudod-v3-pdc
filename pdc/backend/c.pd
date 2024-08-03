@@ -1,5 +1,6 @@
 utilizar bepd/builtins
 utilizar bepd/datos/caja (Caja)
+utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 utilizar bepd/utilidades/arreglo (Únicos)
 utilizar bepd/x/enum (Enum)
@@ -469,8 +470,10 @@ metodo EstadoDeEmisión#emitir: ast
 finmetodo
 
 
-variables T, A, cst, tablaCst, ast, tablaAst, tablaNombres, parches, tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin
+variables T, A, S, cst, tablaCst, ast, tablaAst, tablaNombres, parches,
+          tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin
 fijar A a __Argv#en: 0
+fijar S a __Argv#en: 1
 fijar T a LeerArchivo: A
 
 fijar parches a Arreglo#vacio
@@ -538,4 +541,7 @@ estado#emitir: ast
 fijar programa a estado#emisor#moverAPrograma
 
 [ EscribirPrograma: programa ]
-CompilarPrograma: SalidaEstándar, {mod}, programa
+variable salida
+fijar salida a PuertoDeArchivoDeEscritura#abrir: S
+CompilarPrograma: salida, {mod}, programa
+salida#cerrar
