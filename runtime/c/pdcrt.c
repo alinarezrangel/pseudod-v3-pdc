@@ -1168,6 +1168,10 @@ static pdcrt_k pdcrt_texto_formatear_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
         i += 5;
         goto final;
     }
+    else if(pdcrt_prefijo_de_texto(yo.texto, i, "~"))
+    {
+        pdcrt_error(ctx, u8"Formato inválido para Texto#formatear");
+    }
     else
     {
         size_t len = 0;
