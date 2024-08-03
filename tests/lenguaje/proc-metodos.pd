@@ -1,0 +1,17 @@
+funcion Hola
+    devolver 1
+finfuncion
+
+funcion Adios
+    devolver 2
+finfuncion
+
+
+escribir (&Hola = &Hola)#comoTexto
+nl
+escribir (&Hola = &Adios)#comoTexto
+nl
+escribir &Hola#comoTexto
+nl
+escribir &Adios#comoTexto
+nl

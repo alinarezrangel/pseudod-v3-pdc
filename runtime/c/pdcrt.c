@@ -2027,7 +2027,62 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
     pdcrt_obj msj = ctx->pila[inic + 1];
     pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
 
-    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.llamar))
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.igual)
+       || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_igual))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Procedimiento: operador_= / igualA necesitan 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj arg = ctx->pila[argp];
+        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CLOSURE)
+        {
+            pdcrt_empujar_booleano(ctx, false);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+        else
+        {
+            pdcrt_empujar_booleano(ctx, yo.closure == arg.closure);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.distinto)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Procedimiento: operador_no= / dístintoDe necesitan 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj arg = ctx->pila[argp];
+        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CLOSURE)
+        {
+            pdcrt_empujar_booleano(ctx, true);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+        else
+        {
+            pdcrt_empujar_booleano(ctx, yo.closure != arg.closure);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Procedimiento: comoTexto no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+#define PDCRT_MAX_LEN 32
+        char *buffer = malloc(PDCRT_MAX_LEN);
+        if(!buffer)
+            pdcrt_enomem(ctx);
+        snprintf(buffer, PDCRT_MAX_LEN, "Procedimiento: %p", yo.closure);
+        pdcrt_empujar_texto_cstr(ctx, buffer);
+#undef PDCRT_MAX_LEN
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.llamar))
     {
         pdcrt_extender_pila(ctx, yo.closure->num_capturas);
         for(size_t i = 0; i < yo.closure->num_capturas; i++)
