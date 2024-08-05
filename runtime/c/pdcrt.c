@@ -1688,7 +1688,6 @@ static pdcrt_k pdcrt_arreglo_igual_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     else if(yo.arreglo->longitud == otro.arreglo->longitud)
     {
         // Fin del arreglo, todos los elementos fueron iguales
-        pdcrt_eliminar_elementos(ctx, -3, 3);
         pdcrt_empujar_booleano(ctx, true);
         pdcrt_devolver(ctx, m, 1);
         return m->k.kf(ctx, m->k.marco);

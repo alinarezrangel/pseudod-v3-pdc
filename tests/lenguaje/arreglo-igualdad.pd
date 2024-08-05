@@ -1,0 +1,14 @@
+funcion A: ...X
+    devolver X
+finfuncion
+
+escribir ((A: 1, 2, 3) = (A: 1, 2, 3))#comoTexto
+nl
+escribir (A = A)#comoTexto
+nl
+escribir ((A: 1, 2) = (A: 1, 3))#comoTexto
+nl
+escribir ((A: 1, 2, 3) = (A: 1, 3))#comoTexto
+nl
+escribir ((A: 1, 2) = (A: 1, 2, 3))#comoTexto
+nl
