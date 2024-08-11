@@ -36,7 +36,8 @@ fijar Opcode a EnumConValores: {Opcode},
     {continuar},               FALSO,
     {empujarEspacioDeNombres}, FALSO,
     {agregarNombre},           FALSO,
-    {exportar},                FALSO
+    {exportar},                FALSO,
+    {obtenerRuntime},          FALSO
 
 metodo Opcode#requiereContinuación
     devolver yo#valor

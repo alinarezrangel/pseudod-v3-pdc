@@ -34,6 +34,7 @@ typedef int64_t pdcrt_entero;
 #define PDCRT_ENTERO_SCNx SCNx64
 
 typedef double pdcrt_float;
+typedef uint64_t pdcrt_efloat;
 
 #define PDCRT_FLOAT_C(n) n##L
 
@@ -74,8 +75,8 @@ typedef struct pdcrt_marco pdcrt_marco;
 struct pdcrt_k;
 typedef struct pdcrt_k pdcrt_k;
 
-typedef struct pdcrt_k (*pdcrt_f)(pdcrt_ctx *, int args, struct pdcrt_k);
-typedef struct pdcrt_k (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *);
+typedef pdcrt_k (*pdcrt_f)(pdcrt_ctx *, int args, struct pdcrt_k);
+typedef pdcrt_k (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *);
 
 struct pdcrt_k
 {
@@ -91,6 +92,7 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_ARREGLO,
     PDCRT_TGC_CLOSURE,
     PDCRT_TGC_CAJA,
+    PDCRT_TGC_TABLA,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -123,6 +125,9 @@ typedef struct pdcrt_closure pdcrt_closure;
 struct pdcrt_caja;
 typedef struct pdcrt_caja pdcrt_caja;
 
+struct pdcrt_tabla;
+typedef struct pdcrt_tabla pdcrt_tabla;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -136,6 +141,8 @@ typedef struct pdcrt_obj
         pdcrt_arreglo *arreglo;
         pdcrt_closure *closure;
         pdcrt_caja *caja;
+        pdcrt_tabla *tabla;
+        void *pval;
     };
 } pdcrt_obj;
 
@@ -161,6 +168,27 @@ struct pdcrt_caja
     pdcrt_obj valor;
 };
 
+struct pdcrt_bucket;
+typedef struct pdcrt_bucket pdcrt_bucket;
+
+struct pdcrt_tabla
+{
+    pdcrt_cabecera_gc gc;
+    pdcrt_obj funcion_hash;
+    pdcrt_obj funcion_igualdad;
+    size_t num_buckets;
+    size_t buckets_ocupados;
+    size_t limite_de_ocupacion;
+    pdcrt_bucket *buckets;
+};
+
+struct pdcrt_bucket
+{
+    bool activo;
+    pdcrt_bucket *siguiente_colision;
+    pdcrt_obj llave, valor;
+};
+
 typedef enum pdcrt_tipo
 {
     PDCRT_TOBJ_ENTERO,
@@ -172,6 +200,9 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_ARREGLO,
     PDCRT_TOBJ_CLOSURE,
     PDCRT_TOBJ_CAJA,
+    PDCRT_TOBJ_TABLA,
+    PDCRT_TOBJ_RUNTIME,
+    PDCRT_TOBJ_VOIDPTR,
 } pdcrt_tipo;
 
 
@@ -186,16 +217,17 @@ struct pdcrt_marco
     pdcrt_obj locales_y_capturas[];
 };
 
+
 #define PDCRT_TABLA_TEXTOS(X)                                           \
     X(operador_mas, "operador_+")                                       \
-        X(operador_menos, "operador_-")                                 \
-        X(operador_por, "operador_*")                                   \
-        X(operador_entre, "operador_/")                                 \
-        X(operador_igual, "operador_=")                                 \
-        X(operador_distinto, "operador_no=")                            \
-        X(sumar, "sumar")                                               \
-        X(restar, "restar")                                             \
-        X(multiplicar, "multiplicar")                                   \
+    X(operador_menos, "operador_-")                                     \
+    X(operador_por, "operador_*")                                       \
+    X(operador_entre, "operador_/")                                     \
+    X(operador_igual, "operador_=")                                     \
+    X(operador_distinto, "operador_no=")                                \
+    X(sumar, "sumar")                                                   \
+    X(restar, "restar")                                                 \
+    X(multiplicar, "multiplicar")                                       \
     X(dividir, "dividir")                                               \
     X(igual, "igualA")                                                  \
     X(distinto, "distíntoDe")                                           \
@@ -209,21 +241,21 @@ struct pdcrt_marco
     X(menor_o_igual_a, "menorOIgualA")                                  \
     X(operador_mayor_o_igual_a, "operador_>=")                          \
     X(mayor_o_igual_a, "mayorOIgualA")                                  \
-        X(negar, "negar")                                               \
-        X(piso, "piso")                                                 \
-        X(techo, "techo")                                               \
-        X(truncar, "truncar")                                           \
-        X(como_numero_entero, "comoNumeroEntero")                       \
-        X(como_numero_real, "comoNumeroReal")                           \
-        X(longitud, "longitud")                                         \
-        X(en, "en")                                                     \
-        X(subtexto, "subTexto")                                         \
+    X(negar, "negar")                                                   \
+    X(piso, "piso")                                                     \
+    X(techo, "techo")                                                   \
+    X(truncar, "truncar")                                               \
+    X(como_numero_entero, "comoNumeroEntero")                           \
+    X(como_numero_real, "comoNumeroReal")                               \
+    X(longitud, "longitud")                                             \
+    X(en, "en")                                                         \
+    X(subtexto, "subTexto")                                             \
     X(parte_del_texto, "parteDelTexto")                                 \
     X(buscar, "buscar")                                                 \
     X(buscar_en_reversa, "buscarEnReversa")                             \
     X(fijarEn, "fijarEn")                                               \
-        X(verdadero, "VERDADERO")                                       \
-        X(falso, "FALSO")                                               \
+    X(verdadero, "VERDADERO")                                           \
+    X(falso, "FALSO")                                                   \
     X(unir, "unir")                                                     \
     X(llamar, "llamar")                                                 \
     X(formatear, "formatear")                                           \
@@ -233,7 +265,9 @@ struct pdcrt_marco
     X(o, "o")                                                           \
     X(operador_o, "operador_||")                                        \
     X(y, "y")                                                           \
-    X(operador_y, "operador_&&")
+    X(operador_y, "operador_&&")                                        \
+    X(crearTabla, "crearTabla")                                         \
+    X(rehashear, "rehashear")
 
 typedef struct pdcrt_textos
 {
@@ -256,12 +290,17 @@ struct pdcrt_ctx
     pdcrt_marco *primer_marco_activo;
     pdcrt_marco *ultimo_marco_activo;
 
+    pdcrt_obj runtime;
+
     unsigned int cnt;
 
     pdcrt_texto **textos;
     size_t tam_textos;
     size_t cap_textos;
     pdcrt_textos textos_globales;
+
+    pdcrt_obj funcion_igualdad;
+    pdcrt_obj funcion_hash;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;
@@ -287,6 +326,8 @@ void pdcrt_empujar_texto_cstr(pdcrt_ctx *ctx, const char *str);
 void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
 void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx);
+void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, size_t capacidad);
+void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx);
 
 typedef ssize_t pdcrt_stp;
 
@@ -316,6 +357,7 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, 
 pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
 pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
+pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad);
 
 #define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]

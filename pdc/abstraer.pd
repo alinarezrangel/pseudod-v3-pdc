@@ -6,7 +6,7 @@ utilizar pdc/ast como AST
 utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin)
 
 
 [DOCUMENTA
@@ -300,25 +300,33 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
         si nodoCst#esLiteral
             devolver AST#NodoLiteralTextual#crear: nodoCst#áreaTextual, nodoCst#nombre
         finsi
-        variables binding, reg, id
+
+        variables binding, reg, id, builtin
         fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre
         fijar reg a tablasRnCst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoCst#id
         si no EsNulo: reg
+            fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
             finprocedimiento
         sino
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#id
+            fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
             registrarParche: procedimiento
                 tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: id#id, reg#binding)
             finprocedimiento
         finsi
-        si binding#esAutoejecutable && nodoCst#aplicaAutoejecución
-            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual, id, {llamar}, Arreglo#vacio
+
+        si no EsNulo: builtin
+            devolver AST#NodoBuiltin#crear: nodoCst#áreaTextual, builtin#builtin, Arreglo#vacio
         sino
-            devolver id
+            si binding#esAutoejecutable && nodoCst#aplicaAutoejecución
+                devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual, id, {llamar}, Arreglo#vacio
+            sino
+                devolver id
+            finsi
         finsi
     finsi
 
@@ -331,10 +339,20 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     finsi
 
     si EsInstancia: nodoCst, CST#NodoLlamarProcedimiento
-        devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
-            (abstraer: nodoCst#proc),
-            {llamar},
-            (abstraerArgumentos: nodoCst#argumentos)
+        variable proc
+        fijar proc a abstraer: nodoCst#proc
+
+        si EsInstancia: proc, AST#NodoBuiltin
+            [ FIXME: No debería estar fijando un campo, ya que los nodos
+              deberían ser inmutables. ]
+            fijar proc#argumentos a abstraerArgumentos: nodoCst#argumentos
+            devolver proc
+        sino
+            devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
+                proc,
+                {llamar},
+                (abstraerArgumentos: nodoCst#argumentos)
+        finsi
     finsi
 
     si EsInstancia: nodoCst, CST#NodoEnviarMensaje

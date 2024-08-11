@@ -1,0 +1,27 @@
+variable T
+
+fijar T a __RT#crearTabla: 0
+T#fijarEn: 0, {hola}
+T#fijarEn: 5937, {mundo}
+T#fijarEn: 2947294, { }
+escribir T#en: 0
+escribir T#en: 2947294
+escribir T#en: 5937
+nl
+escribir T#longitud
+nl
+escribir T#capacidad
+nl
+
+fijar T a __RT#crearTabla: 100
+T#fijarEn: 0, {hola}
+T#fijarEn: 5937, {mundo}
+T#fijarEn: 2947294, { }
+escribir T#en: 0
+escribir T#en: 2947294
+escribir T#en: 5937
+nl
+escribir T#longitud
+nl
+escribir T#capacidad
+nl

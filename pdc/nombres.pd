@@ -100,6 +100,23 @@ fijar Ámbitos a CrearTipoDeRegistro: {Ámbitos},
     {ámbito}, FALSO
 
 [DOCUMENTA
+@brief{Un binding que es un builtin.}
+
+Asocia cada binding predefinido con un builtin del compilador.
+
+@itemlist(
+@item{@code{binding}: El binding de la variable que es un builtin.}
+
+@item{@code{builtin}: Un @pd{Texto}, el nombre del builtin al que esta variable
+será compilada.}
+)
+DOCUMENTA]
+variable Builtin
+fijar Builtin a CrearTipoDeRegistro: {Builtin},
+    {binding}, VERDADERO,
+    {builtin}, VERDADERO
+
+[DOCUMENTA
 @brief{Un ámbito del programa.}
 
 Cada ámbito contiene las variables y bindings de un bloque.
@@ -261,6 +278,11 @@ clase TablasDeResoluciónDeNombres
     @brief{Tabla de @pd{Ámbitos}s.}
     DOCUMENTA]
     atributo tablaÁmbitos
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{Builtin}.}
+    DOCUMENTA]
+    atributo tablaBuiltins
 finclase
 
 [DOCUMENTA

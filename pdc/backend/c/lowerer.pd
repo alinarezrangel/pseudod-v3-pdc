@@ -259,4 +259,8 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     si opcode = Opcode#exportar
         EmitirLínea: puerto, {return pdcrt_exportar(ctx, m);}
     finsi
+
+    si opcode = Opcode#obtenerRuntime
+        EmitirLínea: puerto, {pdcrt_obtener_objeto_runtime(ctx);}
+    finsi
 finprocedimiento

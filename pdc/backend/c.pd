@@ -13,7 +13,7 @@ utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, Es
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
@@ -186,6 +186,7 @@ metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
     si EsNulo: reg
         fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
     finsi
+
     si EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
         si yo#locales#contiene: reg#binding
             yo#emisor#emitir: Opcode#obtenerLocal, (yo#locales#en: reg#binding)
@@ -461,6 +462,10 @@ metodo EstadoDeEmisión#emitir: ast
             yo#emisor#emitir: Opcode#exportar
             devolver NULO
         finsi
+        si ast#nombre = {obtenerRuntime}
+            yo#emisor#emitir: Opcode#obtenerRuntime
+            devolver NULO
+        finsi
         Escribir: {Builtin}, ast#nombre
         NoImplementado
     finsi
@@ -471,7 +476,8 @@ finmetodo
 
 
 variables T, A, S, cst, tablaCst, ast, tablaAst, tablaNombres, parches,
-          tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin
+          tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin,
+          ámbito, builtins
 fijar A a __Argv#en: 0
 fijar S a __Argv#en: 1
 fijar T a LeerArchivo: A
@@ -485,17 +491,25 @@ fijar tablasRnCst#tablaNombres a tablaNombres
 fijar tablasRnCst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
 fijar tablasRnCst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
 fijar tablasRnCst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+fijar tablasRnCst#tablaBuiltins a Tabla#vacíaConEsquema: Builtin
 
 fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
 fijar tablasRnAst#tablaNombres a tablaNombres
 fijar tablasRnAst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
 fijar tablasRnAst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
 fijar tablasRnAst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+fijar tablasRnCst#tablaBuiltins a tablasRnCst#tablaBuiltins
 
 fijar cst a CrearCST: T, A
 fijar tablaCst a EntablarÁrbol: cst
 fijar fin a Arreglo#vacio
-ResolverNombres: cst, tablasRnCst, (Ámbito#inicial: tablaNombres), fin
+fijar ámbito a Ámbito#inicial: tablaNombres
+
+variables btObjetoRuntime
+fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
+tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
+
+ResolverNombres: cst, tablasRnCst, ámbito, fin
 ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
 ValidaLlamadasAutoejecutables: cst, tablasRnCst
 
