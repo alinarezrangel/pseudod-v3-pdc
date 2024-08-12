@@ -2151,13 +2151,15 @@ static pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k)
 static pdcrt_k pdcrt_tabla_fijar_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_fijar_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_fijar_en_k3(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_fijar_en_k4(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static pdcrt_k pdcrt_tabla_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static pdcrt_k pdcrt_tabla_rehashear_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static void pdcrt_tabla_inicializar_buckets(pdcrt_ctx *ctx, pdcrt_bucket *buckets, size_t tam);
 static void pdcrt_tabla_expandir(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
@@ -2194,10 +2196,11 @@ static pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         if(args != 1)
             pdcrt_error(ctx, "Tabla: en necesita 1 argumento");
         pdcrt_obj llave = ctx->pila[argp];
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, 0, k);
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
         pdcrt_fijar_local(ctx, m, 0, yo);
         pdcrt_fijar_local(ctx, m, 1, llave);
         pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
+        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_booleano(false));
         PDCRT_SACAR_PRELUDIO();
         pdcrt_extender_pila(ctx, 2);
         pdcrt_empujar(ctx, yo.tabla->funcion_hash);
@@ -2278,6 +2281,40 @@ static pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_empujar_entero(ctx, yo.tabla->num_buckets);
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.contiene))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Tabla: contiene necesita 1 argumento");
+        pdcrt_obj llave = ctx->pila[argp];
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
+        pdcrt_fijar_local(ctx, m, 0, yo);
+        pdcrt_fijar_local(ctx, m, 1, llave);
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
+        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_booleano(true));
+        PDCRT_SACAR_PRELUDIO();
+        pdcrt_extender_pila(ctx, 2);
+        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
+        pdcrt_empujar(ctx, llave);
+        static const int proto[] = {0};
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_en_k1);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.eliminar))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Tabla: eliminar necesita 1 argumento");
+        pdcrt_obj llave = ctx->pila[argp];
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
+        pdcrt_fijar_local(ctx, m, 0, yo);
+        pdcrt_fijar_local(ctx, m, 1, llave);
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
+        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(NULL));
+        PDCRT_SACAR_PRELUDIO();
+        pdcrt_extender_pila(ctx, 2);
+        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
+        pdcrt_empujar(ctx, llave);
+        static const int proto[] = {0};
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_eliminar_k1);
     }
 
     assert(0 && "sin implementar");
@@ -2478,6 +2515,7 @@ static pdcrt_k pdcrt_tabla_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
     pdcrt_obj b = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj contiene = pdcrt_obtener_local(ctx, m, 3);
     // [hash]
     bool ok;
     pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
@@ -2489,7 +2527,16 @@ static pdcrt_k pdcrt_tabla_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_bucket *bucket = &yo.tabla->buckets[hash % yo.tabla->num_buckets];
     if(!bucket->activo)
     {
-        pdcrt_error(ctx, "Tabla#en: la llave no existe en la tabla");
+        if(contiene.bval)
+        {
+            pdcrt_empujar_booleano(ctx, false);
+            pdcrt_devolver(ctx, m, 1);
+            return m->k.kf(ctx, m->k.marco);
+        }
+        else
+        {
+            pdcrt_error(ctx, "Tabla#en: la llave no existe en la tabla");
+        }
     }
     else
     {
@@ -2508,6 +2555,7 @@ static pdcrt_k pdcrt_tabla_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
     pdcrt_obj b = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj contiene = pdcrt_obtener_local(ctx, m, 3);
     pdcrt_bucket *bucket = b.pval;
     // [eq]
     bool ok;
@@ -2518,15 +2566,35 @@ static pdcrt_k pdcrt_tabla_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     // []
     if(eq)
     {
-        pdcrt_empujar(ctx, bucket->valor);
-        pdcrt_devolver(ctx, m, 1);
-        return m->k.kf(ctx, m->k.marco);
+        if(contiene.bval)
+        {
+            pdcrt_empujar_booleano(ctx, true);
+            pdcrt_devolver(ctx, m, 1);
+            return m->k.kf(ctx, m->k.marco);
+        }
+        else
+        {
+            pdcrt_empujar(ctx, bucket->valor);
+            pdcrt_devolver(ctx, m, 1);
+            return m->k.kf(ctx, m->k.marco);
+        }
     }
     else
     {
         bucket = bucket->siguiente_colision;
         if(!bucket)
-            pdcrt_error(ctx, "Tabla#en: llave no encontrada");
+        {
+            if(contiene.bval)
+            {
+                pdcrt_empujar_booleano(ctx, false);
+                pdcrt_devolver(ctx, m, 1);
+                return m->k.kf(ctx, m->k.marco);
+            }
+            else
+            {
+                pdcrt_error(ctx, "Tabla#en: llave no encontrada");
+            }
+        }
 
         pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
         pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
@@ -2643,6 +2711,97 @@ static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_fijar_local(ctx, m, 1, pdcrt_objeto_voidptr(bucket));
     pdcrt_fijar_local(ctx, m, 5, pdcrt_objeto_entero(buckets_ocupados));
     return pdcrt_tabla_rehashear_k1(ctx, m);
+}
+
+static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj obucket_anterior = pdcrt_obtener_local(ctx, m, 3);
+    // [hash]
+    bool ok;
+    pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, "Tabla#eliminar: el hash de la llave debe ser un entero");
+    if(yo.tabla->num_buckets == 0)
+    {
+        pdcrt_empujar_nulo(ctx);
+        pdcrt_devolver(ctx, m, 1);
+        return m->k.kf(ctx, m->k.marco);
+    }
+    pdcrt_bucket *bucket = &yo.tabla->buckets[hash % yo.tabla->num_buckets];
+    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
+    if(!bucket->activo)
+    {
+        pdcrt_empujar_nulo(ctx);
+        pdcrt_devolver(ctx, m, 1);
+        return m->k.kf(ctx, m->k.marco);
+    }
+
+    pdcrt_extender_pila(ctx, 3);
+    pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
+    pdcrt_empujar(ctx, llave);
+    pdcrt_empujar(ctx, bucket->llave);
+    static const int proto[] = {0, 0};
+    return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_eliminar_k2);
+}
+
+static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj obucket_anterior = pdcrt_obtener_local(ctx, m, 3);
+    pdcrt_bucket *bucket = obucket.pval;
+    pdcrt_bucket *bucket_anterior = obucket_anterior.pval;
+    // [eq]
+    bool ok;
+    bool eq = pdcrt_obtener_booleano(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, u8"Tabla#eliminar: la función de igualdad debe devolver un booleano");
+
+    if(eq)
+    {
+        if(bucket_anterior)
+        {
+            bucket_anterior->siguiente_colision = bucket->siguiente_colision;
+            free(bucket);
+        }
+        else
+        {
+            bucket->activo = false;
+            bucket->llave = bucket->valor = pdcrt_objeto_nulo();
+            bucket->siguiente_colision = NULL;
+            yo.tabla->buckets_ocupados -= 1;
+        }
+
+        pdcrt_empujar_nulo(ctx);
+        pdcrt_devolver(ctx, m, 1);
+        return m->k.kf(ctx, m->k.marco);
+    }
+    else
+    {
+        bucket_anterior = bucket;
+        bucket = bucket->siguiente_colision;
+        if(!bucket)
+        {
+            pdcrt_empujar_nulo(ctx);
+            pdcrt_devolver(ctx, m, 1);
+            return m->k.kf(ctx, m->k.marco);
+        }
+
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
+        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(bucket_anterior));
+
+        pdcrt_extender_pila(ctx, 3);
+        pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
+        pdcrt_empujar(ctx, llave);
+        pdcrt_empujar(ctx, bucket->llave);
+        static const int proto[] = {0, 0};
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_eliminar_k2);
+
+    }
 }
 
 static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)

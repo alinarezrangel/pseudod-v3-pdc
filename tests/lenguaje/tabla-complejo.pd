@@ -1,0 +1,38 @@
+variable T
+
+fijar T a __RT#crearTabla: 3
+T#fijarEn: 0, {hola}
+T#fijarEn: 5937, {mundo}
+T#fijarEn: 2947294, { }
+escribir T#contiene: 0
+escribir { }
+escribir T#contiene: 2947294
+escribir { }
+escribir T#contiene: 5937
+escribir { }
+escribir T#contiene: 49284
+escribir { }
+escribir T#contiene: -4245
+nl
+escribir T#longitud
+nl
+escribir T#capacidad
+nl
+
+T#eliminar: 2947294
+T#eliminar: 5937
+
+escribir T#contiene: 0
+escribir { }
+escribir T#contiene: 2947294
+escribir { }
+escribir T#contiene: 5937
+escribir { }
+escribir T#contiene: 49284
+escribir { }
+escribir T#contiene: -4245
+nl
+escribir T#longitud
+nl
+escribir T#capacidad
+nl
