@@ -2270,6 +2270,15 @@ static pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_tabla_rehashear_k1(ctx, m);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.capacidad))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Tabla: capacidad no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_entero(ctx, yo.tabla->num_buckets);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -2897,7 +2906,7 @@ pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad)
         pdcrt_enomem(ctx);
     tbl->num_buckets = capacidad;
     tbl->buckets = NULL;
-    tbl->limite_de_ocupacion = 0;
+    tbl->limite_de_ocupacion = PDCRT_TABLA_LIMITE(capacidad);
     tbl->buckets_ocupados = 0;
     tbl->funcion_igualdad = ctx->funcion_igualdad;
     tbl->funcion_hash = ctx->funcion_hash;

@@ -267,7 +267,8 @@ struct pdcrt_marco
     X(y, "y")                                                           \
     X(operador_y, "operador_&&")                                        \
     X(crearTabla, "crearTabla")                                         \
-    X(rehashear, "rehashear")
+    X(rehashear, "rehashear")                                           \
+    X(capacidad, "capacidad")
 
 typedef struct pdcrt_textos
 {
