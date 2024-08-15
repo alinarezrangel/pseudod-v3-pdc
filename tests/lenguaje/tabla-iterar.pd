@@ -1,0 +1,13 @@
+variable T
+
+fijar T a __RT#crearTabla: 3
+T#fijarEn: {hola}, {mundo}
+T#fijarEn: {adios}, {mundo}
+T#fijarEn: {que}, {tal}
+
+T#paraCadaPar: procedimiento: llave, valor
+    escribir llave
+    escribir { }
+    escribir valor
+    nl
+finprocedimiento

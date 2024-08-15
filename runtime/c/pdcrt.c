@@ -2161,6 +2161,9 @@ static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
+static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_tabla_para_cada_par_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
+
 static void pdcrt_tabla_inicializar_buckets(pdcrt_ctx *ctx, pdcrt_bucket *buckets, size_t tam);
 static void pdcrt_tabla_expandir(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
 
@@ -2315,6 +2318,28 @@ static pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_empujar(ctx, llave);
         static const int proto[] = {0};
         return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_eliminar_k1);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.paraCadaPar))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Tabla: paraCadaPar necesita 1 argumento");
+        if(yo.tabla->num_buckets == 0)
+        {
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+        else
+        {
+            pdcrt_obj iterador = pdcrt_cima(ctx);
+            pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
+            pdcrt_fijar_local(ctx, m, 0, yo);
+            pdcrt_fijar_local(ctx, m, 1, iterador);
+            pdcrt_fijar_local(ctx, m, 2,
+                              pdcrt_objeto_voidptr(&yo.tabla->buckets[0]));
+            pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(0));
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_tabla_para_cada_par_k1(ctx, m);
+        }
     }
 
     assert(0 && "sin implementar");
@@ -2802,6 +2827,59 @@ static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
         return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_eliminar_k2);
 
     }
+}
+
+static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_tabla_para_cada_par_k1);
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj iterador = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 3);
+    pdcrt_bucket *bucket = obucket.pval;
+    pdcrt_entero i = oi.ival;
+
+    if(!bucket || !bucket->activo)
+    {
+        i += 1;
+        if(i >= yo.tabla->num_buckets)
+        {
+            pdcrt_empujar_nulo(ctx);
+            pdcrt_devolver(ctx, m, 1);
+            return m->k.kf(ctx, m->k.marco);
+        }
+        bucket = &yo.tabla->buckets[i];
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
+        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(i));
+        return pdcrt_tabla_para_cada_par_k1(ctx, m);
+    }
+    else
+    {
+        pdcrt_extender_pila(ctx, 3);
+        pdcrt_empujar(ctx, iterador);
+        pdcrt_empujar(ctx, bucket->llave);
+        pdcrt_empujar(ctx, bucket->valor);
+        static const int proto[] = {0, 0};
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2,
+                                    &pdcrt_tabla_para_cada_par_k2);
+    }
+}
+
+static pdcrt_k pdcrt_tabla_para_cada_par_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_tabla_para_cada_par_k2);
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj iterador = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 3);
+    pdcrt_bucket *bucket = obucket.pval;
+    pdcrt_entero i = oi.ival;
+
+    // [res]
+    pdcrt_sacar(ctx);
+    bucket = bucket->siguiente_colision;
+    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
+    return pdcrt_tabla_para_cada_par_k1(ctx, m);
 }
 
 static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)

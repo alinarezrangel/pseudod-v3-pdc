@@ -270,7 +270,8 @@ struct pdcrt_marco
     X(rehashear, "rehashear")                                           \
     X(capacidad, "capacidad")                                           \
     X(contiene, "contiene")                                             \
-    X(eliminar, "eliminar")
+    X(eliminar, "eliminar")                                             \
+    X(paraCadaPar, "paraCadaPar")
 
 typedef struct pdcrt_textos
 {
