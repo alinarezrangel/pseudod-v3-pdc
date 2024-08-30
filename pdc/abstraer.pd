@@ -308,14 +308,18 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
             fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
             registrarParche: procedimiento
-                tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
+                si no EsNulo: id#id
+                    tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
+                finsi
             finprocedimiento
         sino
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#id
             fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
             registrarParche: procedimiento
-                tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: id#id, reg#binding)
+                si no EsNulo: id#id
+                    tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: id#id, reg#binding)
+                finsi
             finprocedimiento
         finsi
 
