@@ -1,4 +1,5 @@
 utilizar bepd/builtins
+utilizar bepd/datos/resultado (Resultado)
 
 [DOCUMENTA
 @brief{Agrupa operadores infijos en base a precedencia.}
@@ -58,4 +59,132 @@ funcion ShuntingYard: secuencia, comb, precedenciaDe, esOperador
     CombinarHasta: -1
 
     devolver valores#últimoValorApilado
+finfuncion
+
+[DOCUMENTA
+@brief{Ordena un arreglo con una función de comparación.}
+
+@pd{menorQue} debe ser una función que, al ser llamada como @pd{%menorQue: A,
+B} determina si @code{A} es menor que @code{B}.
+
+El algoritmo de ordenamiento utilizado @bold{no es estable}: elementos con el
+mismo valor podrían ser reordenados los unos con respecto a los otros.
+
+@devuelve{No devuelve nada.}
+
+@bold{Nota}: Por ahora, el algoritmo utilizado es @italic{QuickSort}. Por eso
+presentará problemas al usarse sobre arreglos ordenados o casi
+ordenados. @bold{El algoritmo específico no esta garantizado} y puede cambiar
+entre versiones de la BEPD. De hecho, en un futuro ya no se utilizará
+QuickSort.
+DOCUMENTA]
+procedimiento OrdenarConComparación: arreglo, menorQue
+    [ Quicksort, sacado de <https://en.wikipedia.org/wiki/Quicksort> ]
+    procedimiento quicksort: inf, sup
+        si inf < sup
+            variable p
+            fijar p a particionar: inf, sup
+            quicksort: inf, (p - 1)
+            quicksort: (p + 1), sup
+        finsi
+    finprocedimiento
+
+    procedimiento particionar: inf, sup
+        variables i, pvi, pv
+        fijar pvi a ((sup - inf) / 2)#piso + inf
+        fijar pv a arreglo#en: pvi
+        fijar i a inf
+        ParaCadaNúmero: inf, (sup - 1), procedimiento: j
+            si no %menorQue: pv, (arreglo#en: j)
+                intercambiar: i, j
+                fijar i a i + 1
+            finsi
+        finprocedimiento
+        intercambiar: i, pvi
+        devolver i
+    finprocedimiento
+
+    procedimiento intercambiar: i, j
+        si no i = j
+            variable v
+            fijar v a arreglo#en: i
+            arreglo#fijarEn: i, (arreglo#en: j)
+            arreglo#fijarEn: j, v
+        finsi
+    finprocedimiento
+
+    quicksort: 0, arreglo#longitud
+finprocedimiento
+
+[DOCUMENTA
+@brief{Ordena un arreglo.}
+
+Idéntico a @pd{OrdenarConComparación}, pero utiliza el operador menor que
+(@code{<}) para comparar los elementos de @pd{arreglo}.
+DOCUMENTA]
+procedimiento Ordenar: arreglo
+    OrdenarConComparación: arreglo, funcion: A, B
+        devolver A < B
+    finfuncion
+finprocedimiento
+
+[DOCUMENTA
+@brief{Realiza una búsqueda binaria sobre un arreglo.}
+
+Busca en @pd{arreglo} (un arreglo ordenado) el valor @pd{valor} entre los
+elementos en los índices @pd{inf} (límite inferior, inclusivo) y @pd{sup)
+(límite superior, exclusivo).
+
+Utiliza la función @pd{menorQue} para comparar los elementos. Esta función, al
+ser llamada de la forma @pd{%menorQue: A, B} debe determinar si @code{A} es
+menor que @code{B}.
+
+@devuelve{Un @pd{Resultado}: es OK si se encontró el elemento, en cuyo
+caso el valor es el índice en el que se encontró. El resultado es un error si
+el valor no se encontró, en cuyo caso el error es el índice donde el elemento
+debería haber estado.}
+
+Si hay múltiples elementos con el mismo valor, devuelve el índice de cualquiera
+de estos.
+DOCUMENTA]
+funcion BúsquedaBinariaConComparación: arreglo, inf, sup, valor, menorQue
+    variables índice, encontrado
+    fijar índice a inf
+    fijar encontrado a FALSO
+    mientras inf < sup
+        variable i
+        fijar i a ((sup - inf) / 2)#piso + inf
+        si %menorQue: valor, (arreglo#en: i)
+            fijar sup a i - 1
+            fijar índice a sup
+        sino
+            si %menorQue: (arreglo#en: i), valor
+                fijar inf a i + 1
+                fijar índice a inf
+            sino
+                fijar encontrado a VERDADERO
+                fijar inf a i
+                fijar sup a i
+                fijar índice a i
+            finsi
+        finsi
+    finmientras
+
+    si encontrado
+        devolver Resultado#ok: índice
+    sino
+        devolver Resultado#error: índice
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Realiza una búsqueda binaria sobre un arreglo.}
+
+Idéntico a @pd{BúsquedaBinariaConComparación} pero utiliza el operador menor
+que (@code{<}) para comparar elementos.
+DOCUMENTA]
+funcion BúsquedaBinaria: arreglo, inf, sup, valor
+    devolver BúsquedaBinariaConComparación: arreglo, inf, sup, valor, funcion: A, B
+        devolver A < B
+    finfuncion
 finfuncion

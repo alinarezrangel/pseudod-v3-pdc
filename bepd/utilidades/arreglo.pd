@@ -61,3 +61,42 @@ DOCUMENTA]
 funcion Únicos: arr
     devolver (Conjunto#desdeArreglo: arr)#comoArreglo
 finfuncion
+
+[ TODO: Documentar ]
+funcion ClonarSuperficialmente: arreglo
+    variable arr
+    fijar arr a Arreglo#vacio
+    ParaCadaElemento: arreglo, procedimiento: el
+        arr#agregarAlFinal: el
+    finprocedimiento
+    devolver arr
+finfuncion
+
+[DOCUMENTA
+@brief{Inserta un elemento en el índice dado.}
+
+Inserta @pd{valor} en el índice @pd{índice} de forma que @pd{(arreglo#en:
+índice) = valor}.
+DOCUMENTA]
+procedimiento Insertar: arreglo, índice, valor
+    arreglo#agregarAlFinal: NULO
+    variable i
+    fijar i a arreglo#longitud - 1
+    mientras i > índice
+        arreglo#fijarEn: i, (arreglo#en: (i - 1))
+        fijar i a i - 1
+    finmientras
+    arreglo#fijarEn: índice, valor
+finprocedimiento
+
+[DOCUMENTA
+@brief{Elimina un elemento de un arreglo.}
+
+Elimina el elemento en el índice @pd{índice}.
+DOCUMENTA]
+procedimiento EliminarElemento: arreglo, índice
+    ParaCadaNúmero: índice, arreglo#longitud, procedimiento: i
+        arreglo#fijarEn: i, (arreglo#en: (i + 1))
+    finprocedimiento
+    arreglo#redimensionar: (arreglo#longitud - 1)
+finprocedimiento

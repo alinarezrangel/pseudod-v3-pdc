@@ -1,5 +1,25 @@
 utilizar bepd/builtins
-utilizar bepd/utilidades/texto (Unir)
+utilizar bepd/x/enum (Enum)
+utilizar bepd/utilidades/texto (Unir, Partir, TextoMenorQue)
+utilizar bepd/utilidades/arreglo (ClonarSuperficialmente, Insertar)
+utilizar bepd/algoritmos (OrdenarConComparación, BúsquedaBinariaConComparación)
+
+[DOCUMENTA
+@brief{Tipo de índice sobre una columna en la tabla.}
+
+Puede ser:
+
+@itemlist(
+@item{@code{ÚNICO}: Índice único. Solo puede haber una fila con cada valor.}
+
+@item{@code{ORDENADO}: Índice general. Pueden haber muchas filas con cada
+valor.}
+)
+DOCUMENTA]
+variable TipoDeÍndice
+fijar TipoDeÍndice a Enum: {TipoDeÍndice},
+    {ÚNICO},
+    {ORDENADO}
 
 [DOCUMENTA
 @brief{Tabla relacional de valores.}
@@ -44,8 +64,8 @@ clase Tabla
     @codeblock|{
     variables tabla, esquema
     fijar esquema a CrearTipoDeRegistro: {esquema},
-        {nombre}, VERDADERO,
-        {valor}, FALSO
+        {nombre}, {valor},
+        (Índice#ÚNICO: {nombre})
     fijar tabla a Tabla#vacíaConEsquema: esquema
     tabla#agregar: (esquema#crear: {nombre}, {hola}, {valor}, 1)
     tabla#agregar: (esquema#crear: {nombre}, {adios}, {valor}, 2)
@@ -66,6 +86,10 @@ clase Tabla
     DOCUMENTA]
     metodo buscarÚnico: campo, valor
 
+    metodo intentaBuscarOrdenado: campo, valor, ...camposYValores
+
+    metodo buscarOrdenado: campo, valor, ...camposYValores
+
     [DOCUMENTA
     @brief{Inspecciona todos los registros de la tabla.}
 
@@ -76,7 +100,53 @@ clase Tabla
     metodo escaneoLineal: f
 finclase
 
-atributos Tabla#índices, Tabla#valores, Tabla#esquema
+atributos Tabla#índicesÚnicos, Tabla#índicesOrdenados,
+          Tabla#valores, Tabla#esquema
+
+[ Los índices ordenados son arreglos de tuplas. Cada tupla tiene una llave, el
+  valor del índice, y un registro, la fila de la tabla con el valor asociado. ]
+clase Tupla
+    atributos llave, registro
+
+    metodo estatico crear: llave, registro
+
+    metodo comoTexto
+finclase
+
+metodo Tupla#inicializar: llave, registro
+    fijar yo#llave a llave
+    fijar yo#registro a registro
+finmetodo
+
+metodo Tupla#comoTexto
+    devolver {(Tupla ~t : ~t)}#formatear: yo#llave, yo#registro
+finmetodo
+
+[ Devuelve la llave (hasheable) de varias columnas. Es utilizada para mantener
+  el mapeo de índices ordenables (múltiples columnas) -> arreglo de tuplas. ]
+funcion LlaveDeColumnas: columnas
+    variable columnas'
+    fijar columnas' a ClonarSuperficialmente: columnas
+    OrdenarConComparación: columnas', &TextoMenorQue
+    devolver Unir: columnas', {|}
+finfuncion
+
+funcion ValoresDeColumnas: llaveDeColumnas, columnas, valores
+    variables mapeo, camposLlave, res
+    fijar mapeo a Diccionario#vacío
+    fijar camposLlave a Partir: llaveDeColumnas, {|}
+    fijar res a Arreglo#vacio
+    ParaCadaElementoConÍndice: camposLlave, procedimiento: llave, i
+        mapeo#fijarEn: llave, i
+        res#agregarAlFinal: NULO
+    finprocedimiento
+
+    ParaCadaElementoConÍndice: columnas, procedimiento: col, i
+        res#fijarEn: (mapeo#en: col), (valores#en: i)
+    finprocedimiento
+
+    devolver res
+finfuncion
 
 metodo estatico Tabla#vacíaConEsquema: esquema
     devolver yo#crear: esquema
@@ -85,22 +155,81 @@ finmetodo
 metodo Tabla#inicializar: esquema
     fijar yo#esquema a esquema
     fijar yo#valores a Arreglo#vacio
-    fijar yo#índices a Diccionario#vacío
-    yo#esquema#paraCadaCampoIndexado: procedimiento: campo
-        yo#índices#fijarEn: campo, Diccionario#vacío
+
+    fijar yo#índicesÚnicos a Diccionario#vacío
+    fijar yo#índicesOrdenados a Diccionario#vacío
+    yo#esquema#paraCadaÍndice: procedimiento: tipo, columnas
+        si tipo = TipoDeÍndice#ÚNICO
+            variable campo
+            fijar campo a columnas#en: 0
+            yo#índicesÚnicos#fijarEn: campo, Diccionario#vacío
+        sino
+            necesitas tipo = TipoDeÍndice#ORDENADO
+            yo#índicesOrdenados#fijarEn: (LlaveDeColumnas: columnas), Arreglo#vacio
+        finsi
     finprocedimiento
 finmetodo
 
+funcion TuplaMenorQue: A, B
+    necesitas A#llave#longitud = B#llave#longitud
+    devolver LlamarConEC: procedimiento: esc
+        ParaCadaElementoConÍndice: A#llave, procedimiento: subA, i
+            variable subB
+            fijar subB a B#llave#en: i
+
+            necesitas (TipoDe: subA) = (TipoDe: subB)
+            si EsInstancia: subA, Texto
+                si TextoMenorQue: subA, subB
+                    %esc: VERDADERO
+                finsi
+                si TextoMenorQue: subB, subA
+                    %esc: FALSO
+                finsi
+            sino
+                si subA < subB
+                    %esc: VERDADERO
+                finsi
+                si subB < subA
+                    %esc: FALSO
+                finsi
+            finsi
+        finprocedimiento
+
+        [ Son iguales ]
+        devolver FALSO
+    finprocedimiento
+finfuncion
+
 metodo Tabla#agregar: registro
     yo#valores#agregarAlFinal: registro
-    yo#esquema#paraCadaCampoIndexado: procedimiento: campo
-        (yo#índices#en: campo)#fijarEn: (EnviarMensaje: registro, campo), registro
+    yo#esquema#paraCadaÍndice: procedimiento: tipo, columnas
+        si tipo = TipoDeÍndice#ÚNICO
+            variable campo
+            fijar campo a columnas#en: 0
+            (yo#índicesÚnicos#en: campo)#fijarEn: (EnviarMensaje: registro, campo), registro
+        sino
+            necesitas tipo = TipoDeÍndice#ORDENADO
+            variables índice, valores, tupla, i, llave
+            fijar valores a Arreglo#vacio
+            ParaCadaElemento: columnas, procedimiento: campo
+                valores#agregarAlFinal: (EnviarMensaje: registro, campo)
+            finprocedimiento
+            fijar llave a LlaveDeColumnas: columnas
+            fijar índice a yo#índicesOrdenados#en: llave
+            fijar tupla a Tupla#crear: (ValoresDeColumnas: llave, columnas, valores), registro
+            fijar i a BúsquedaBinariaConComparación: índice, 0, índice#longitud, tupla, &TuplaMenorQue
+            si i#esOk
+                Insertar: índice, i#valor, tupla
+            sino
+                Insertar: índice, i#error, tupla
+            finsi
+        finsi
     finprocedimiento
 finmetodo
 
 metodo Tabla#intentaBuscarÚnico: campo, valor
     variable índice
-    fijar índice a yo#índices#en: campo
+    fijar índice a yo#índicesÚnicos#en: campo
     si índice#contiene: valor
         devolver índice#en: valor
     sino
@@ -110,7 +239,7 @@ finmetodo
 
 metodo Tabla#buscarÚnico: campo, valor
     variable índice
-    fijar índice a yo#índices#en: campo
+    fijar índice a yo#índicesÚnicos#en: campo
     si índice#contiene: valor
         devolver índice#en: valor
     sino
@@ -118,28 +247,114 @@ metodo Tabla#buscarÚnico: campo, valor
     finsi
 finmetodo
 
+metodo Tabla#intentaBuscarOrdenado: campo, valor, ...camposYValores
+    variables columnas, valores, llaveÍndice, índice, i, valoresAsociados, tupla
+    fijar columnas a Arreglo#crearCon: campo
+    fijar valores a Arreglo#crearCon: valor
+    ParaCadaNúmeroConPaso: 0, camposYValores#longitud, 2, procedimiento: i
+        columnas#agregarAlFinal: (camposYValores#en: i)
+        valores#agregarAlFinal: (camposYValores#en: (i + 1))
+    finprocedimiento
+
+    fijar llaveÍndice a LlaveDeColumnas: columnas
+    fijar valoresAsociados a ValoresDeColumnas: llaveÍndice, columnas, valores
+    fijar tupla a Tupla#crear: valoresAsociados, NULO
+    fijar índice a yo#índicesOrdenados#en: llaveÍndice
+    fijar i a BúsquedaBinariaConComparación: índice, 0, índice#longitud, tupla, &TuplaMenorQue
+    si i#esOk
+        [ Extrae todos los registros con los valores dados ]
+        variables j, k, v
+        fijar j a i#valor
+        fijar k a j
+        fijar v a índice#en: j
+
+        LlamarConEC: procedimiento: salir
+            mientras j >= 0
+                si no (índice#en: j)#llave = v#llave
+                    %salir: NULO
+                finsi
+                fijar j a j - 1
+            finmientras
+        finprocedimiento
+        fijar j a j + 1
+
+        LlamarConEC: procedimiento: salir
+            mientras k < índice#longitud
+                si no (índice#en: k)#llave = v#llave
+                    %salir: NULO
+                finsi
+                fijar k a k + 1
+            finmientras
+        finprocedimiento
+
+        devolver Mapear: (PedazoDeArreglo: índice, j, k), funcion: tupla
+            devolver tupla#registro
+        finfuncion
+    sino
+        devolver Arreglo#vacio
+    finsi
+finmetodo
+
+metodo Tabla#buscarOrdenado: campo, valor, ...camposYValores
+    variables columnas, valores, res
+    fijar columnas a Arreglo#crearCon: campo
+    fijar valores a Arreglo#crearCon: valor
+    ParaCadaNúmeroConPaso: 0, camposYValores#longitud, 2, procedimiento: i
+        columnas#agregarAlFinal: (camposYValores#en: i)
+        valores#agregarAlFinal: (camposYValores#en: (i + 1))
+    finprocedimiento
+
+    fijar res a yo#intentaBuscarOrdenado: campo, valor, ...camposYValores
+    si res#longitud = 0
+        __FallarConMensaje: ({No se pudo encontrar los campos ~t con los valores ~t en la tabla ~t}#formatear: columnas, valores, yo#esquema)
+    sino
+        devolver res
+    finsi
+finmetodo
+
 metodo Tabla#escaneoLineal: f
     ParaCadaElemento: yo#valores, f
+finmetodo
+
+clase Índice
+    metodo tipo
+    metodo columnas
+
+    metodo estatico ÚNICO: columna
+    metodo estatico ORDENADO: ...columnas
+finclase
+
+atributos Índice#tipo, Índice#columnas
+
+metodo estatico Índice#ÚNICO: columna
+    devolver yo#crear: TipoDeÍndice#ÚNICO, (Arreglo#crearCon: columna)
+finmetodo
+
+metodo estatico Índice#ORDENADO: ...columnas
+    devolver yo#crear: TipoDeÍndice#ORDENADO, columnas
+finmetodo
+
+metodo Índice#inicializar: tipo, columnas
+    fijar yo#tipo a tipo
+    fijar yo#columnas a columnas
 finmetodo
 
 [DOCUMENTA
 @brief{Crea un tipo de registro para usarse junto a una @pd{Tabla}.}
 
-Devuelve una nueva clase, de nombre @pd{nombre} (un @pd{Texto}). @pd{pares}
-deben ser pares de valores, donde el primero es un @pd{Texto} que es el nombre
-del campo del tipo, y el segundo un @pd{Boole} que indica si el campo es o no
-es indexado.
+Devuelve una nueva clase, de nombre @pd{nombre} (un @pd{Texto}).
+
+@pd{columnasEÍndices} deben ser una secuencia de @pd{Texto}s con los nombres de
+las columnas, seguido de cero o más índices de la tabla.
 
 Por ejemplo:
 
 @codeblock|{
 variable Usuario
 fijar Usuario a CrearTipoDeRegistro: {Usuario},
-    {nombre}, VERDADERO,
-    {contraseña}, FALSO,
-    {email}, VERDADERO,
-    {biografía}, FALSO,
-    {esPúblico}, FALSO
+    {nombre}, {contraseña}, {email}, {biografía}, {esPúblico},
+    (Índice#ÚNICO: {nombre}),
+    (Índice#ÚNICO: {email})
 }|
 
 La clase devuelta tendrá un constructor que acepta valores para su
@@ -163,47 +378,50 @@ metodo Usuario#referencia
 finmetodo
 }|
 DOCUMENTA]
-funcion CrearTipoDeRegistro: nombre, ...pares
-    variables campos, i
+funcion CrearTipoDeRegistro: nombre, ...columnasEÍndices
+    variables campos, índices, i
     fijar campos a Arreglo#vacio
-    fijar i a 0
-    mientras i < pares#longitud
-        campos#agregarAlFinal: (Arreglo#crearCon: (pares#en: i), (pares#en: (i + 1)))
-        fijar i a i + 2
-    finmientras
+    fijar índices a Arreglo#vacio
+    ParaCadaElemento: columnasEÍndices, procedimiento: columnaOÍndice
+        si EsInstancia: columnaOÍndice, Texto
+            campos#agregarAlFinal: columnaOÍndice
+        sino
+            índices#agregarAlFinal: columnaOÍndice
+        finsi
+    finprocedimiento
 
     clase TipoDeRegistro
+        metodo estatico paraCadaÍndice: f
+        metodo estatico paraCadaCampo: f
     finclase
 
     fijar TipoDeRegistro#nombre a nombre
 
     ParaCadaElemento: campos, procedimiento: campo
-        TipoDeRegistro#agregarAtributo: (campo#en: 0)
+        TipoDeRegistro#agregarAtributo: campo
     finprocedimiento
 
-    metodo estatico TipoDeRegistro#paraCadaCampoIndexado: f
-        ParaCadaElemento: campos, procedimiento: campo
-            si campo#en: 1
-                %f: (campo#en: 0)
-            finsi
+    metodo estatico TipoDeRegistro#paraCadaÍndice: f
+        ParaCadaElemento: índices, procedimiento: índice
+            %f: índice#tipo, índice#columnas
         finprocedimiento
     finmetodo
 
     metodo estatico TipoDeRegistro#paraCadaCampo: f
         ParaCadaElemento: campos, procedimiento: campo
-            %f: (campo#en: 0)
+            %f: campo
         finprocedimiento
     finmetodo
 
     metodo TipoDeRegistro#inicializar: ...valores
         ParaCadaElementoConÍndice: campos, procedimiento: campo, i
-            EnviarMensaje: yo, ({fijar_}#concatenar: (campo#en: 0)), (valores#en: i)
+            EnviarMensaje: yo, ({fijar_}#concatenar: campo), (valores#en: i)
         finprocedimiento
     finmetodo
 
     metodo TipoDeRegistro#comoTexto
         devolver {(~t ~t)}#formatear: nombre, (Unir: (Mapear: campos, funcion: campo
-            devolver (EnviarMensaje: yo, (campo#en: 0))#comoTexto
+            devolver (EnviarMensaje: yo, campo)#comoTexto
         finfuncion), {, })
     finmetodo
 
@@ -219,8 +437,8 @@ Tiene dos campos, @code{id} (indexado) que es un número entero y @code{nodo}
 DOCUMENTA]
 variable NodoDeÁrbol
 fijar NodoDeÁrbol a CrearTipoDeRegistro: {NodoDeÁrbol},
-    {id}, VERDADERO,
-    {nodo}, FALSO
+    {id}, {nodo},
+    (Índice#ÚNICO: {id})
 
 [DOCUMENTA
 @brief{Convierte un árbol en una tabla.}

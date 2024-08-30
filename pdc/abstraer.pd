@@ -3,7 +3,7 @@ utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
-utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin)

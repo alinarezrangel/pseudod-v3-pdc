@@ -4,7 +4,7 @@ utilizar bepd/utilidades/texto (Unir)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 
 utilizar pdc/cst como CST
-utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/catamorfismos (Buscando)
@@ -48,11 +48,9 @@ no.}
 DOCUMENTA]
 variable NombreResuelto
 fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
-    {binding}, VERDADERO,
-    {nombre}, FALSO,
-    {esAutoejecutable}, FALSO,
-    {importadoDesde}, FALSO,
-    {seLlamaba}, FALSO
+    {binding}, {nombre}, {esAutoejecutable}, {importadoDesde}, {seLlamaba},
+    (Índice#ÚNICO: {binding}),
+    (Índice#ORDENADO: {nombre})
 
 [DOCUMENTA
 @brief{El uso de una variable.}
@@ -65,8 +63,9 @@ fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
 DOCUMENTA]
 variable UsoDeNombre
 fijar UsoDeNombre a CrearTipoDeRegistro: {UsoDeNombre},
-    {idNodo}, VERDADERO,
-    {binding}, FALSO
+    {idNodo}, {binding},
+    (Índice#ÚNICO: {idNodo}),
+    (Índice#ORDENADO: {binding})
 
 [DOCUMENTA
 @brief{La definición de una variable.}
@@ -80,8 +79,9 @@ variable.}
 DOCUMENTA]
 variable DefiniciónDeNombre
 fijar DefiniciónDeNombre a CrearTipoDeRegistro: {DefiniciónDeNombre},
-    {idNodo}, VERDADERO,
-    {binding}, VERDADERO
+    {idNodo}, {binding},
+    (Índice#ÚNICO: {idNodo}),
+    (Índice#ÚNICO: {binding})
 
 [DOCUMENTA
 @brief{Un nodo con un ámbito}
@@ -96,8 +96,8 @@ Asocia cada nodo que introduce un ámbito con dicho ámbito.
 DOCUMENTA]
 variable Ámbitos
 fijar Ámbitos a CrearTipoDeRegistro: {Ámbitos},
-    {idNodo}, VERDADERO,
-    {ámbito}, FALSO
+    {idNodo}, {ámbito},
+    (Índice#ÚNICO: {idNodo})
 
 [DOCUMENTA
 @brief{Un binding que es un builtin.}
@@ -113,8 +113,9 @@ será compilada.}
 DOCUMENTA]
 variable Builtin
 fijar Builtin a CrearTipoDeRegistro: {Builtin},
-    {binding}, VERDADERO,
-    {builtin}, VERDADERO
+    {binding}, {builtin},
+    (Índice#ÚNICO: {binding}),
+    (Índice#ÚNICO: {builtin})
 
 [DOCUMENTA
 @brief{Un ámbito del programa.}

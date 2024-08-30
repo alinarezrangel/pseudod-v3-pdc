@@ -4,7 +4,7 @@ utilizar bepd/utilidades/arreglo (Únicos)
 
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
-utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
@@ -24,7 +24,8 @@ Un tipo de registro con los siguientes campos:
 DOCUMENTA]
 variable EsCapturada
 fijar EsCapturada a CrearTipoDeRegistro: {EsCapturada},
-    {binding}, VERDADERO
+    {binding},
+    (Índice#ÚNICO: {binding})
 
 [DOCUMENTA
 @brief{Contiene todas las capturas de una función.}
@@ -41,8 +42,8 @@ capturados por esta función.}
 DOCUMENTA]
 variable CapturasDeFunción
 fijar CapturasDeFunción a CrearTipoDeRegistro: {CapturasDeFunción},
-    {idNodo}, VERDADERO,
-    {bindingsCapturados}, FALSO
+    {idNodo}, {bindingsCapturados},
+    (Índice#ÚNICO: {idNodo})
 
 [DOCUMENTA
 @brief{Contiene todos los locales de una función.}
@@ -59,8 +60,9 @@ locales a esta función.}
 DOCUMENTA]
 variable LocalesDeFunción
 fijar LocalesDeFunción a CrearTipoDeRegistro: {LocalesDeFunción},
-    {idNodo}, VERDADERO,
-    {bindingsLocales}, FALSO
+    {idNodo}, {bindingsLocales},
+    (Índice#ÚNICO: {idNodo})
+
 
 [DOCUMENTA
 @brief{Todas las tablas útiles al marcar las capturas.}

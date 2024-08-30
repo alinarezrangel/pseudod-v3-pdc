@@ -1,0 +1,88 @@
+utilizar bepd/builtins
+utilizar bepd/utilidades/arreglo (EliminarElemento)
+utilizar pdc/tabla (Tabla, CrearTipoDeRegistro, Índice, EscribirTabla)
+
+
+procedimiento PruebaLosÍndicesÚnicosDebenFuncionar
+    variable Usuario
+    fijar Usuario a CrearTipoDeRegistro: {Usuario},
+        {nombre}, {contraseña}, {email}, {biografía}, {esPúblico},
+        (Índice#ÚNICO: {nombre}),
+        (Índice#ÚNICO: {email})
+
+    variable tblUsuarios
+    fijar tblUsuarios a Tabla#vacíaConEsquema: Usuario
+
+    variable miguel
+    fijar miguel a Usuario#crear:
+        {mg},
+        {abc123},
+        {miguel@example.com},
+        {¡Hola a todos!},
+        VERDADERO
+
+    tblUsuarios#agregar: miguel
+
+    variable pepe
+    fijar pepe a Usuario#crear:
+        {pp},
+        {a123b456},
+        {pepe@example.com},
+        {¡Hola!},
+        FALSO
+
+    tblUsuarios#agregar: pepe
+
+    necesitas son identicos (tblUsuarios#buscarÚnico: {nombre}, {mg}) y miguel
+    necesitas son identicos (tblUsuarios#buscarÚnico: {nombre}, {pp}) y pepe
+    necesitas EsNulo: (tblUsuarios#intentaBuscarÚnico: {nombre}, {alr})
+finprocedimiento
+
+funcion ResultadoDeBúsquedaIgualA: resultado, esperado
+    ParaCadaElemento: esperado, procedimiento: esp
+        variable i
+        fijar i a LlamarConEC: procedimiento: esc
+            ParaCadaElementoConÍndice: resultado, procedimiento: res, i
+                si res = esp
+                    %esc: i
+                finsi
+            finprocedimiento
+            __FallarConMensaje: ({La búsqueda no devolvió el valor ~t}#formatear: esp)
+        finprocedimiento
+        EliminarElemento: resultado, i
+    finprocedimiento
+    si resultado#longitud > 0
+        __FallarConMensaje: ({La búsqueda devolvió los valores adicionales ~t}#formatear: resultado)
+    finsi
+finfuncion
+
+procedimiento PruebaLosÍndicesOrdenadosSobreMúltiplesColumnas
+    variable MultiTabla
+    fijar MultiTabla a CrearTipoDeRegistro: {MultiTabla},
+        {X}, {Y}, {texto},
+        (Índice#ORDENADO: {X}),
+        (Índice#ORDENADO: {X}, {Y})
+
+    variable tblMulti
+    fijar tblMulti a Tabla#vacíaConEsquema: MultiTabla
+
+    variables X, Y, Z, W
+    fijar X a MultiTabla#crear: 1, 2, {hola}
+    fijar Y a MultiTabla#crear: 1, 2, {mundo}
+    fijar Z a MultiTabla#crear: 1, 3, {adios}
+    fijar W a MultiTabla#crear: 4, 5, {mundo}
+    tblMulti#agregar: X
+    tblMulti#agregar: Y
+    tblMulti#agregar: Z
+    tblMulti#agregar: W
+
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {X}, 1, {Y}, 2), (Arreglo#crearCon: Y, X)
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {Y}, 2, {X}, 1), (Arreglo#crearCon: Y, X)
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {Y}, 3, {X}, 1), (Arreglo#crearCon: Z)
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {X}, 1), (Arreglo#crearCon: Y, Z, X)
+    ResultadoDeBúsquedaIgualA: (tblMulti#intentaBuscarOrdenado: {X}, 2), Arreglo#vacio
+    ResultadoDeBúsquedaIgualA: (tblMulti#intentaBuscarOrdenado: {X}, 1, {Y}, 4), Arreglo#vacio
+finprocedimiento
+
+PruebaLosÍndicesÚnicosDebenFuncionar
+PruebaLosÍndicesOrdenadosSobreMúltiplesColumnas
