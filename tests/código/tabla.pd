@@ -80,8 +80,8 @@ procedimiento PruebaLosÍndicesOrdenadosSobreMúltiplesColumnas
     ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {Y}, 2, {X}, 1), (Arreglo#crearCon: Y, X)
     ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {Y}, 3, {X}, 1), (Arreglo#crearCon: Z)
     ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {X}, 1), (Arreglo#crearCon: Y, Z, X)
-    ResultadoDeBúsquedaIgualA: (tblMulti#intentaBuscarOrdenado: {X}, 2), Arreglo#vacio
-    ResultadoDeBúsquedaIgualA: (tblMulti#intentaBuscarOrdenado: {X}, 1, {Y}, 4), Arreglo#vacio
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {X}, 2), Arreglo#vacio
+    ResultadoDeBúsquedaIgualA: (tblMulti#buscarOrdenado: {X}, 1, {Y}, 4), Arreglo#vacio
 finprocedimiento
 
 PruebaLosÍndicesÚnicosDebenFuncionar

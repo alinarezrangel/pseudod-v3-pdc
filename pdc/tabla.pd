@@ -86,8 +86,19 @@ clase Tabla
     DOCUMENTA]
     metodo buscarÚnico: campo, valor
 
-    metodo intentaBuscarOrdenado: campo, valor, ...camposYValores
+    [DOCUMENTA
+    @brief{Busca varios registros usando un índice.}
 
+    Trata de obtener el registro cuyos campos (todos @pd{Texto}s) tienen los
+    valores dados. Los campos consisten de @pd{campo} y los valores de
+    @pd{valor}. @pd{camposYValores} deben ser campos y valores adicionales,
+    alternandose. Por ejemplo: para buscar un registro con los campos @code{A}
+    y @code{B} con los valores @code{1} y @code{2} utilizarías
+    @pd|{tabla#buscarOrdenado: {A}, 1, {B}, 2}|.
+
+    Devuelve un arreglo con los registros encontrados. El arreglo estará vacío
+    si no se encontró ningún registro.
+    DOCUMENTA]
     metodo buscarOrdenado: campo, valor, ...camposYValores
 
     [DOCUMENTA
@@ -247,7 +258,7 @@ metodo Tabla#buscarÚnico: campo, valor
     finsi
 finmetodo
 
-metodo Tabla#intentaBuscarOrdenado: campo, valor, ...camposYValores
+metodo Tabla#buscarOrdenado: campo, valor, ...camposYValores
     variables columnas, valores, llaveÍndice, índice, i, valoresAsociados, tupla
     fijar columnas a Arreglo#crearCon: campo
     fijar valores a Arreglo#crearCon: valor
@@ -292,23 +303,6 @@ metodo Tabla#intentaBuscarOrdenado: campo, valor, ...camposYValores
         finfuncion
     sino
         devolver Arreglo#vacio
-    finsi
-finmetodo
-
-metodo Tabla#buscarOrdenado: campo, valor, ...camposYValores
-    variables columnas, valores, res
-    fijar columnas a Arreglo#crearCon: campo
-    fijar valores a Arreglo#crearCon: valor
-    ParaCadaNúmeroConPaso: 0, camposYValores#longitud, 2, procedimiento: i
-        columnas#agregarAlFinal: (camposYValores#en: i)
-        valores#agregarAlFinal: (camposYValores#en: (i + 1))
-    finprocedimiento
-
-    fijar res a yo#intentaBuscarOrdenado: campo, valor, ...camposYValores
-    si res#longitud = 0
-        __FallarConMensaje: ({No se pudo encontrar los campos ~t con los valores ~t en la tabla ~t}#formatear: columnas, valores, yo#esquema)
-    sino
-        devolver res
     finsi
 finmetodo
 
