@@ -205,3 +205,23 @@ funcion TextoMenorQue: A, B
        return a < b
     end}, A, B
 finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{prefijo} es un prefijo de @pd{texto}.}
+DOCUMENTA]
+funcion EsPrefijo: texto, prefijo
+    si texto#longitud < prefijo#longitud
+        devolver FALSO
+    finsi
+    devolver (texto#subTexto: 0, prefijo#longitud) = prefijo
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{sufijo} es un sufijo de @pd{texto}.}
+DOCUMENTA]
+funcion EsSufijo: texto, sufijo
+    si texto#longitud < sufijo#longitud
+        devolver FALSO
+    finsi
+    devolver (texto#subTexto: (texto#longitud - sufijo#longitud), sufijo#longitud) = sufijo
+finfuncion

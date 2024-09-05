@@ -1,0 +1,131 @@
+utilizar bepd/builtins
+utilizar bepd/datos/resultado (Resultado)
+utilizar bepd/utilidades/texto/ascii (LF, CR, HT)
+
+utilizar bepd/x/json (DesdeJSON)
+
+
+procedimiento PruebaLiterales
+    necesitas (DesdeJSON: {false}) = (Resultado#ok: FALSO)
+    necesitas (DesdeJSON: {   true}) = (Resultado#ok: VERDADERO)
+    necesitas (DesdeJSON: {  null  }) = (Resultado#ok: NULO)
+    necesitas (DesdeJSON: {falso})#esError
+    necesitas (DesdeJSON: {truo})#esError
+    necesitas (DesdeJSON: {nulo})#esError
+    Escribir: {ok 1 - PruebaLiterales}
+finprocedimiento
+
+procedimiento PruebaNúmeros
+    necesitas (DesdeJSON: {0}) = (Resultado#ok: 0)
+    necesitas (DesdeJSON: {+1})#esError
+    necesitas (DesdeJSON: {01})#esError
+    necesitas (DesdeJSON: {-02})#esError
+    necesitas (DesdeJSON: {-e})#esError
+    necesitas (DesdeJSON: {12}) = (Resultado#ok: 12)
+    necesitas (DesdeJSON: {-34}) = (Resultado#ok: -34)
+    necesitas (DesdeJSON: {1}) = (Resultado#ok: 1)
+    necesitas (DesdeJSON: {-1}) = (Resultado#ok: -1)
+    necesitas (DesdeJSON: {0.12}) = (Resultado#ok: 0.12)
+    necesitas (DesdeJSON: {0.45}) = (Resultado#ok: 0.45)
+    necesitas (DesdeJSON: {0.01}) = (Resultado#ok: 0.01)
+    necesitas (DesdeJSON: {0.})#esError
+    necesitas (DesdeJSON: {123.})#esError
+    necesitas (DesdeJSON: {1e2}) = (Resultado#ok: 100)
+    necesitas (DesdeJSON: {1E+2}) = (Resultado#ok: 100)
+    necesitas (DesdeJSON: {25e-1}) = (Resultado#ok: 2.5)
+    necesitas (DesdeJSON: {1E+02}) = (Resultado#ok: 100)
+    necesitas (DesdeJSON: {25e-01}) = (Resultado#ok: 2.5)
+    necesitas (DesdeJSON: {1.e1})#esError
+    necesitas (DesdeJSON: {e1})#esError
+    necesitas (DesdeJSON: {1e.1})#esError
+    necesitas (DesdeJSON: {1e_1})#esError
+    necesitas (DesdeJSON: {1e})#esError
+    necesitas (DesdeJSON: {1.0e})#esError
+    necesitas (DesdeJSON: {1.0e0}) = (Resultado#ok: 1.0)
+    Escribir: {ok 2 - PruebaNúmeros}
+finprocedimiento
+
+procedimiento PruebaEspacios
+    necesitas (DesdeJSON: ({   ~t~t~t~t~t  null}#formatear: HT, CR, LF, LF, HT)) = (Resultado#ok: NULO)
+    necesitas (DesdeJSON: ({~tnull}#formatear: (__ByteATexto: 11)))#esError
+    Escribir: {ok 3 - PruebaEspacios}
+finprocedimiento
+
+procedimiento PruebaCadenas
+    necesitas (DesdeJSON: {""}) = (Resultado#ok: {})
+    necesitas (DesdeJSON: {"})#esError
+    necesitas (DesdeJSON: {"hola"}) = (Resultado#ok: {hola})
+    necesitas (DesdeJSON: {"hola})#esError
+    necesitas (DesdeJSON: {"hola mundo"}) = (Resultado#ok: {hola mundo})
+    necesitas (DesdeJSON: {"\"hola"}) = (Resultado#ok: {"hola})
+    necesitas (DesdeJSON: {"hola\""}) = (Resultado#ok: {hola"})
+    necesitas (DesdeJSON: {"hola\"mundo"}) = (Resultado#ok: {hola"mundo})
+    necesitas (DesdeJSON: {"\n"}) = (Resultado#ok: {~%}#formatear)
+    necesitas (DesdeJSON: {"\"})#esError
+    necesitas (DesdeJSON: {"\"\""}) = (Resultado#ok: {""})
+    necesitas (DesdeJSON: {"\"\"\""}) = (Resultado#ok: {"""})
+    necesitas (DesdeJSON: {"hola\"\"\"mundo"}) = (Resultado#ok: {hola"""mundo})
+    necesitas (DesdeJSON: {"\u00F1"}) = (Resultado#ok: {ñ})
+    necesitas (DesdeJSON: {"\u00F1\u00F1"}) = (Resultado#ok: {ññ})
+    necesitas (DesdeJSON: {"hola\u00F1\u00F1\u00F1mundo"}) = (Resultado#ok: {holañññmundo})
+    necesitas (DesdeJSON: {"\uD834\uDD1E"}) = (Resultado#ok: {𝄞})
+    necesitas (DesdeJSON: {"\u00F1\uD834\uDD1E\u00F1"}) = (Resultado#ok: {ñ𝄞ñ})
+    necesitas (DesdeJSON: {"a\u00F1\uD834\uDD1E\u00F1b"}) = (Resultado#ok: {añ𝄞ñb})
+    necesitas (DesdeJSON: {"\uD834"}) = (Resultado#ok: {�})
+    necesitas (DesdeJSON: {"\uDD1E"}) = (Resultado#ok: {�})
+    necesitas (DesdeJSON: {"\uD834\u00F1"}) = (Resultado#ok: {�ñ})
+    necesitas (DesdeJSON: {"\uDD1E\uD834"}) = (Resultado#ok: {��})
+    necesitas (DesdeJSON: {"\uD834a"}) = (Resultado#ok: {�a})
+    necesitas (DesdeJSON: {"\uD834\""}) = (Resultado#ok: {�"})
+    [ necesitas (DesdeJSON: {""}) = (Resultado#ok: {}) ]
+    Escribir: {ok 4 - PruebaCadenas}
+finprocedimiento
+
+procedimiento PruebaArreglos
+    necesitas (DesdeJSON: {[]}) = (Resultado#ok: Arreglo#vacio)
+    necesitas (DesdeJSON: {[  ]}) = (Resultado#ok: Arreglo#vacio)
+    necesitas (DesdeJSON: {[1]}) = (Resultado#ok: (Arreglo#crearCon: 1))
+    necesitas (DesdeJSON: {[  1  ]}) = (Resultado#ok: (Arreglo#crearCon: 1))
+    necesitas (DesdeJSON: {[  1  ,  2  ]}) = (Resultado#ok: (Arreglo#crearCon: 1, 2))
+    necesitas (DesdeJSON: {[1,2]}) = (Resultado#ok: (Arreglo#crearCon: 1, 2))
+    necesitas (DesdeJSON: {[1, 2]}) = (Resultado#ok: (Arreglo#crearCon: 1, 2))
+    necesitas (DesdeJSON: {[1 ,2]}) = (Resultado#ok: (Arreglo#crearCon: 1, 2))
+    necesitas (DesdeJSON: {[1, 2, 3, 4]}) = (Resultado#ok: (Arreglo#crearCon: 1, 2, 3, 4))
+    necesitas (DesdeJSON: {[,]})#esError
+    necesitas (DesdeJSON: {[1,]})#esError
+    necesitas (DesdeJSON: {[1, ]})#esError
+    necesitas (DesdeJSON: {[1, 2,]})#esError
+    necesitas (DesdeJSON: {[, 1]})#esError
+    necesitas (DesdeJSON: {[,,]})#esError
+    necesitas (DesdeJSON: {[1, 2})#esError
+    Escribir: {ok 5 - PruebaArreglos}
+finprocedimiento
+
+procedimiento PruebaObjetos
+    necesitas (DesdeJSON: «{}») = (Resultado#ok: Diccionario#vacío)
+    necesitas (DesdeJSON: «{  }») = (Resultado#ok: Diccionario#vacío)
+    necesitas (DesdeJSON: «{"a": 1}») = (Resultado#ok: (Diccionario#desdePares: {a}, 1))
+    necesitas (DesdeJSON: «{  "a"  :  1}») = (Resultado#ok: (Diccionario#desdePares: {a}, 1))
+    necesitas (DesdeJSON: «{"a":1}») = (Resultado#ok: (Diccionario#desdePares: {a}, 1))
+    necesitas (DesdeJSON: «{"a":1,"b":2,"c":3}») =
+        (Resultado#ok: (Diccionario#desdePares: {a}, 1, {b}, 2, {c}, 3))
+    necesitas (DesdeJSON: «{ "a" : 1  ,  "b"  :  2}») =
+        (Resultado#ok: (Diccionario#desdePares: {a}, 1, {b}, 2))
+    necesitas (DesdeJSON: «{,}»)#esError
+    necesitas (DesdeJSON: «{:}»)#esError
+    necesitas (DesdeJSON: «{"a"}»)#esError
+    necesitas (DesdeJSON: «{"a":}»)#esError
+    necesitas (DesdeJSON: «{"a", "b"}»)#esError
+    necesitas (DesdeJSON: «{"a": 1,}»)#esError
+    necesitas (DesdeJSON: «{,"a": 1}»)#esError
+    necesitas (DesdeJSON: «{"a": 1»)#esError
+    Escribir: {ok 6 - PruebaObjetos}
+finprocedimiento
+
+
+PruebaLiterales
+PruebaNúmeros
+PruebaEspacios
+PruebaCadenas
+PruebaArreglos
+PruebaObjetos

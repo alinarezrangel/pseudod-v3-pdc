@@ -2,6 +2,30 @@ utilizar bepd/builtinsImpl
 utilizar bepd/utilidades/texto
 
 [DOCUMENTA
+@brief{@pd{Texto} con el carácter de "Line Feed" o "nueva línea".}
+
+ASCII 10.
+DOCUMENTA]
+variable LF
+fijar LF a __ByteATexto: 10
+
+[DOCUMENTA
+@brief{@pd{Texto} con el carácter "Carriage Return" o "retorno de carro".}
+
+ASCII 13.
+DOCUMENTA]
+variable CR
+fijar CR a __ByteATexto: 13
+
+[DOCUMENTA
+@brief{@pd{Texto} con el carácter "Horizontal Tab" o "tabulador horizontal".}
+
+ASCII 9.
+DOCUMENTA]
+variable HT
+fijar HT a __ByteATexto: 9
+
+[DOCUMENTA
 @brief{Todo el alfabeto ASCII en mayúsculas.}
 DOCUMENTA]
 variable ALFABETO_ASCII_MAYÚSCULAS

@@ -1,0 +1,38 @@
+utilizar bepd/builtins
+
+
+[DOCUMENTA
+@brief{Bucle funcional.}
+
+Acepta varios argumentos seguidos de una función. La función se llamará con una
+función @code{recur} que iniciará un ciclo de recursión.
+
+Por ejemplo, para calcular el décimo número de fibonacci:
+
+@codeblock|{
+variable res
+fijar res a Bucle: 1, 1, 10, funcion: recur, A, B, n
+    si n > 0
+        devolver %recur: B, (A + B), (n - 1)
+    sino
+        devolver B
+    finsi
+finfuncion
+Escribir: res
+}|
+
+Como puedes ver, llamar a @code{recur} es como volver a llamar a la función
+pasada a @pd{Bucle}, y todos los argumentos pasados antes de dicha función
+serán pasados como argumentos iniciales.
+
+@devuelve{El valor devuelto por la función.}
+DOCUMENTA]
+funcion Bucle: ...argumentosYCuerpo
+    variable argumentos, cuerpo
+    fijar argumentos a PedazoDeArreglo: argumentosYCuerpo, 0, (argumentosYCuerpo#longitud - 1)
+    fijar cuerpo a ÚltimoElemento: argumentosYCuerpo
+    funcion recur: ...nuevosArgumentos
+        devolver %cuerpo: &recur, ...nuevosArgumentos
+    finfuncion
+    devolver recur: ...argumentos
+finfuncion

@@ -1,0 +1,25 @@
+utilizar bepd/builtins
+
+utilizar bepd/x/utf8 (CodepointACodeunit, SubrogadoACodepoint, CodepointASubrogado)
+
+
+procedimiento PruebaCodepointACodeunit
+    necesitas (CodepointACodeunit: 32) = { }
+    necesitas (CodepointACodeunit: 241) = {ñ}
+    necesitas (CodepointACodeunit: 16384) = {䀀}
+    necesitas (CodepointACodeunit: 67584) = {𐠀}
+    Escribir: {ok 1 - PruebaCodepointACodeunit}
+finprocedimiento
+
+procedimiento PruebaSubrogados
+    necesitas (SubrogadoACodepoint: 55348, 56606) = 119070
+    variable par
+    fijar par a CodepointASubrogado: 119070
+    necesitas par#alto = 55348
+    necesitas par#bajo = 56606
+    Escribir: {ok 2 - PruebaSubrogados}
+finprocedimiento
+
+
+PruebaCodepointACodeunit
+PruebaSubrogados

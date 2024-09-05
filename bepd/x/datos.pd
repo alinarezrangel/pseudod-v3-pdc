@@ -1,0 +1,53 @@
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/texto (Unir)
+
+
+[DOCUMENTA
+@brief{Crea un tipo de datos.}
+
+Crea y devuelve una clase con nombre @pd{nombre}, que tendrá los atributos
+@pd{campos} (varios @pd{Texto}s).
+
+La clase tendrá métodos automáticamente generados que inicializan los valores
+al momento de crear la clase y que convierten las instancias a textos.
+
+Por ejemplo:
+
+@codeblock|{
+variable Punto
+fijar Punto a TipoDeDatos: {Punto}, {X}, {Y}
+
+necesitas (Punto#crear: 1, 2)#X = 1
+necesitas (Punto#crear: 1, 2)#Y = 2
+Escribir: (Punto#crear: 5, 2)#comoTexto
+}|
+DOCUMENTA]
+funcion TipoDeDatos: nombre, ...campos
+    clase Tipo
+        metodo estatico crear: ...valores
+        metodo comoTexto
+    finclase
+
+    fijar Tipo#nombre a nombre
+    ParaCadaElemento: campos, procedimiento: campo
+        Tipo#agregarAtributo: campo
+    finprocedimiento
+
+    metodo Tipo#inicializar: ...valores
+        ParaCadaElementoConÍndice: campos, procedimiento: campo, i
+            EnviarMensaje: yo, ({fijar_}#concatenar: campo), (valores#en: i)
+        finprocedimiento
+    finmetodo
+
+    metodo Tipo#comoTexto
+        variable atrs
+        fijar atrs a Arreglo#vacio
+        ParaCadaElemento: campos, procedimiento: campo
+            atrs#agregarAlFinal: ({~t = ~t}#formatear: campo, (EnviarMensaje: yo, campo))
+        finprocedimiento
+        devolver {(~t ~t)}#formatear: (TipoDe: yo)#nombre, (Unir: atrs, {, })
+    finmetodo
+
+    devolver Tipo
+finfuncion

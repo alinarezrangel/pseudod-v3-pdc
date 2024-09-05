@@ -1,0 +1,99 @@
+utilizar bepd/builtins
+
+utilizar bepd/x/datos (TipoDeDatos)
+
+
+[DOCUMENTA
+@brief{Convierte un codepoint Unicode a una secuencia de codeunits UTF-8.}
+
+Por ejemplo, el codepoint 241 (correspondiente al carácter @code{ñ}) pasaría a
+ser los bytes 195 y 177.
+
+Esta función efectivamente convierte un codepoint a un @pd{Texto}.
+
+@devuelve{Un @pd{Texto} con el codepoint dado}.
+DOCUMENTA]
+funcion CodepointACodeunit: codepoint
+    necesitas codepoint >= 0
+    si codepoint < 127 [7F]
+        devolver __ByteATexto: codepoint
+    finsi
+    si codepoint < 2047 [7FF]
+        devolver (__ByteATexto: (192 <+> ((codepoint <*> 1984) >> 6)))#concatenar:
+                 (__ByteATexto: (128 <+> (codepoint <*> 63)))
+    finsi
+    si codepoint < 65535 [FFFF]
+        devolver (__ByteATexto: (224 <+> ((codepoint <*> 61440) >> 12)))#concatenar:
+                 ((__ByteATexto: (128 <+> ((codepoint <*> 4032) >> 6)))#concatenar:
+                  (__ByteATexto: (128 <+> (codepoint <*> 63))))
+    finsi
+    necesitas codepoint < 1114111 [10FFFF]
+    devolver (__ByteATexto: (240 <+> ((codepoint <*> 1835008) >> 18)))#concatenar:
+             ((__ByteATexto: (128 <+> ((codepoint <*> 258048) >> 12)))#concatenar:
+              ((__ByteATexto: (128 <+> ((codepoint <*> 4032) >> 6)))#concatenar:
+               (__ByteATexto: (128 <+> (codepoint <*> 63)))))
+finfuncion
+
+
+[DOCUMENTA
+@brief{Determina si @pd{codeunit} (un codeunit UTF-16) es la parte alta de un
+par subrogado.}
+DOCUMENTA]
+funcion EsSubrogadoAlto: codeunit
+    devolver (codeunit >= 55296) && (codeunit =< 56319)
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{codeunit} (un codeunit UTF-16) es la parte baja de un
+par subrogado.}
+DOCUMENTA]
+funcion EsSubrogadoBajo: codeunit
+    devolver (codeunit >= 56320) && (codeunit =< 57343)
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte un par subrogado a su codepoint.}
+
+@pd{alto} y @pd{bajo} son la parte alta y baja del par, respectivamente.
+
+@devuelve{Un @pd{Numero}, el codepoint.}
+DOCUMENTA]
+funcion SubrogadoACodepoint: alto, bajo
+    necesitas EsSubrogadoAlto: alto
+    necesitas EsSubrogadoBajo: bajo
+    devolver 65536 + (((alto <*> 1023) << 10) <+> (bajo <*> 1023))
+finfuncion
+
+[DOCUMENTA
+@brief{Clase que representa un par subrogado.}
+
+Tiene dos atributos, @code{alto} y @code{bajo}, ambos @pd{Numero}s con los
+codeunits (de UTF-16) del par subrogado.
+DOCUMENTA]
+variable ParSubrogado
+fijar ParSubrogado a TipoDeDatos: {ParSubrogado}, {alto}, {bajo}
+
+[DOCUMENTA
+@brief{Determina si el codepoint @pd{codepoint} necesita un par subrogado al
+codificarse en UTF-16.}
+DOCUMENTA]
+funcion NecesitaParSubrogado: codepoint
+    devolver (codepoint >= 65536) && (codepoint =< 1114111)
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte un codepoint a un par subrogado.}
+
+El codepoint debe necesitar un par subrogado (codepoints menores a 65536 no
+serán aceptados).
+
+@devuelve{Un @pd{ParSubrogado}.}
+DOCUMENTA]
+funcion CodepointASubrogado: codepoint
+    necesitas NecesitaParSubrogado: codepoint
+    fijar codepoint a codepoint - 65536
+    variables alto, bajo
+    fijar alto a ((codepoint >> 10) <*> 1023) <+> 55296
+    fijar bajo a (codepoint <*> 1023) <+> 56320
+    devolver ParSubrogado#crear: alto, bajo
+finfuncion
