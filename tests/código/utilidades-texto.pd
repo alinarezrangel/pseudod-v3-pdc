@@ -1,0 +1,74 @@
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/texto (Partir, PartirComoPerl, Unir, AjustarALaIzquierda, AjustarALaDerecha)
+
+
+procedimiento PruebaPartir
+    necesitas
+        (Partir: {hola:mundo:separado por:dos puntos}, {:})
+        =
+        (Arreglo#crearCon: {hola}, {mundo}, {separado por}, {dos puntos})
+
+    necesitas
+        (Partir: {::hola:mundo}, {:})
+        =
+        (Arreglo#crearCon: {}, {}, {hola}, {mundo})
+
+    necesitas
+        (Partir: {solo:dos::dos puntos::seguidos pueden:separar}, {::})
+        =
+        (Arreglo#crearCon: {solo:dos}, {dos puntos}, {seguidos pueden:separar})
+    Escribir: {ok 1 - PruebaPartir}
+finprocedimiento
+
+procedimiento PruebaPartirComoPerl
+    necesitas (PartirComoPerl: "::2:2::", ":") = (Arreglo#crearCon: "", "2", "2", "")
+    Escribir: {ok 2 - PruebaPartirComoPerl}
+finprocedimiento
+
+procedimiento PruebaUnir
+    necesitas
+        (Unir: (Arreglo#crearCon: {hola}, {mundo}, {separado por}, {dos puntos}), {:})
+        =
+        {hola:mundo:separado por:dos puntos}
+
+    necesitas
+        (Unir: (Arreglo#crearCon: {}, {}, {hola}, {mundo}), {:})
+        =
+        {::hola:mundo}
+
+    necesitas
+        (Unir: (Arreglo#crearCon: {solo:dos}, {dos puntos}, {seguidos pueden:separar}), {::})
+        =
+        {solo:dos::dos puntos::seguidos pueden:separar}
+    Escribir: {ok 3 - PruebaUnir}
+finprocedimiento
+
+procedimiento PruebaAjustarALaIzquierda
+    necesitas (AjustarALaIzquierda: {hola}, {0}, 5) = {0hola}
+    necesitas (AjustarALaIzquierda: {hola}, {0}, 6) = {00hola}
+    necesitas (AjustarALaIzquierda: {hola}, {0}, 4) = {hola}
+    necesitas (AjustarALaIzquierda: {hola}, {0}, 3) = {hola}
+    necesitas (AjustarALaIzquierda: {hola}, {00}, 5) = {00hola}
+    necesitas (AjustarALaIzquierda: {hola}, {00}, 6) = {00hola}
+    necesitas (AjustarALaIzquierda: {hola}, {00}, 7) = {0000hola}
+    Escribir: {ok 4 - PruebaAjustarALaIzquierda}
+finprocedimiento
+
+procedimiento PruebaAjustarALaDerecha
+    necesitas (AjustarALaDerecha: {hola}, {0}, 5) = {hola0}
+    necesitas (AjustarALaDerecha: {hola}, {0}, 6) = {hola00}
+    necesitas (AjustarALaDerecha: {hola}, {0}, 4) = {hola}
+    necesitas (AjustarALaDerecha: {hola}, {0}, 3) = {hola}
+    necesitas (AjustarALaDerecha: {hola}, {00}, 5) = {hola00}
+    necesitas (AjustarALaDerecha: {hola}, {00}, 6) = {hola00}
+    necesitas (AjustarALaDerecha: {hola}, {00}, 7) = {hola0000}
+    Escribir: {ok 5 - PruebaAjustarALaDerecha}
+finprocedimiento
+
+
+PruebaPartir
+PruebaPartirComoPerl
+PruebaUnir
+PruebaAjustarALaIzquierda
+PruebaAjustarALaDerecha

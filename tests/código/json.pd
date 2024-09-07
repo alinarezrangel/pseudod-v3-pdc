@@ -2,20 +2,20 @@ utilizar bepd/builtins
 utilizar bepd/datos/resultado (Resultado)
 utilizar bepd/utilidades/texto/ascii (LF, CR, HT)
 
-utilizar bepd/x/json (DesdeJSON)
+utilizar bepd/x/json (DesdeJSON, ComoTextoJSON)
 
 
-procedimiento PruebaLiterales
+procedimiento PruebaLeerLiterales
     necesitas (DesdeJSON: {false}) = (Resultado#ok: FALSO)
     necesitas (DesdeJSON: {   true}) = (Resultado#ok: VERDADERO)
     necesitas (DesdeJSON: {  null  }) = (Resultado#ok: NULO)
     necesitas (DesdeJSON: {falso})#esError
     necesitas (DesdeJSON: {truo})#esError
     necesitas (DesdeJSON: {nulo})#esError
-    Escribir: {ok 1 - PruebaLiterales}
+    Escribir: {ok 1 - PruebaLeerLiterales}
 finprocedimiento
 
-procedimiento PruebaNúmeros
+procedimiento PruebaLeerNúmeros
     necesitas (DesdeJSON: {0}) = (Resultado#ok: 0)
     necesitas (DesdeJSON: {+1})#esError
     necesitas (DesdeJSON: {01})#esError
@@ -42,16 +42,16 @@ procedimiento PruebaNúmeros
     necesitas (DesdeJSON: {1e})#esError
     necesitas (DesdeJSON: {1.0e})#esError
     necesitas (DesdeJSON: {1.0e0}) = (Resultado#ok: 1.0)
-    Escribir: {ok 2 - PruebaNúmeros}
+    Escribir: {ok 2 - PruebaLeerNúmeros}
 finprocedimiento
 
-procedimiento PruebaEspacios
+procedimiento PruebaLeerEspacios
     necesitas (DesdeJSON: ({   ~t~t~t~t~t  null}#formatear: HT, CR, LF, LF, HT)) = (Resultado#ok: NULO)
     necesitas (DesdeJSON: ({~tnull}#formatear: (__ByteATexto: 11)))#esError
-    Escribir: {ok 3 - PruebaEspacios}
+    Escribir: {ok 3 - PruebaLeerEspacios}
 finprocedimiento
 
-procedimiento PruebaCadenas
+procedimiento PruebaLeerCadenas
     necesitas (DesdeJSON: {""}) = (Resultado#ok: {})
     necesitas (DesdeJSON: {"})#esError
     necesitas (DesdeJSON: {"hola"}) = (Resultado#ok: {hola})
@@ -78,10 +78,10 @@ procedimiento PruebaCadenas
     necesitas (DesdeJSON: {"\uD834a"}) = (Resultado#ok: {�a})
     necesitas (DesdeJSON: {"\uD834\""}) = (Resultado#ok: {�"})
     [ necesitas (DesdeJSON: {""}) = (Resultado#ok: {}) ]
-    Escribir: {ok 4 - PruebaCadenas}
+    Escribir: {ok 4 - PruebaLeerCadenas}
 finprocedimiento
 
-procedimiento PruebaArreglos
+procedimiento PruebaLeerArreglos
     necesitas (DesdeJSON: {[]}) = (Resultado#ok: Arreglo#vacio)
     necesitas (DesdeJSON: {[  ]}) = (Resultado#ok: Arreglo#vacio)
     necesitas (DesdeJSON: {[1]}) = (Resultado#ok: (Arreglo#crearCon: 1))
@@ -98,10 +98,10 @@ procedimiento PruebaArreglos
     necesitas (DesdeJSON: {[, 1]})#esError
     necesitas (DesdeJSON: {[,,]})#esError
     necesitas (DesdeJSON: {[1, 2})#esError
-    Escribir: {ok 5 - PruebaArreglos}
+    Escribir: {ok 5 - PruebaLeerArreglos}
 finprocedimiento
 
-procedimiento PruebaObjetos
+procedimiento PruebaLeerObjetos
     necesitas (DesdeJSON: «{}») = (Resultado#ok: Diccionario#vacío)
     necesitas (DesdeJSON: «{  }») = (Resultado#ok: Diccionario#vacío)
     necesitas (DesdeJSON: «{"a": 1}») = (Resultado#ok: (Diccionario#desdePares: {a}, 1))
@@ -119,13 +119,68 @@ procedimiento PruebaObjetos
     necesitas (DesdeJSON: «{"a": 1,}»)#esError
     necesitas (DesdeJSON: «{,"a": 1}»)#esError
     necesitas (DesdeJSON: «{"a": 1»)#esError
-    Escribir: {ok 6 - PruebaObjetos}
+    Escribir: {ok 6 - PruebaLeerObjetos}
+finprocedimiento
+
+procedimiento PruebaEscribirLiterales
+    necesitas (ComoTextoJSON: FALSO) = (Resultado#ok: {false})
+    necesitas (ComoTextoJSON: VERDADERO) = (Resultado#ok: {true})
+    necesitas (ComoTextoJSON: NULO) = (Resultado#ok: {null})
+    Escribir: {ok 7 - PruebaEscribirLiterales}
+finprocedimiento
+
+procedimiento PruebaEscribirNúmeros
+    necesitas (ComoTextoJSON: 0) = (Resultado#ok: {0})
+    necesitas (ComoTextoJSON: 10) = (Resultado#ok: {10})
+    necesitas (ComoTextoJSON: -37) = (Resultado#ok: {-37})
+    necesitas (ComoTextoJSON: 12.5) = (Resultado#ok: {12.5})
+    necesitas (ComoTextoJSON: -0.111) = (Resultado#ok: {-0.111})
+    Escribir: {ok 8 - PruebaEscribirNúmeros}
+finprocedimiento
+
+procedimiento PruebaEscribirCadenas
+    necesitas (ComoTextoJSON: {}) = (Resultado#ok: {""})
+    necesitas (ComoTextoJSON: {hola mundo}) = (Resultado#ok: {"hola mundo"})
+    necesitas (ComoTextoJSON: ({hola~tmundo}#formatear: HT)) = (Resultado#ok: {"hola\tmundo"})
+    necesitas (ComoTextoJSON: ({hola~tmundo}#formatear: CR)) = (Resultado#ok: {"hola\rmundo"})
+    necesitas (ComoTextoJSON: ({hola~tmundo}#formatear: LF)) = (Resultado#ok: {"hola\nmundo"})
+    necesitas (ComoTextoJSON: {hola"mundo}) = (Resultado#ok: {"hola\"mundo"})
+    necesitas (ComoTextoJSON: {hola\mundo}) = (Resultado#ok: {"hola\\mundo"})
+    necesitas (ComoTextoJSON: {ñ}) = (Resultado#ok: {"ñ"})
+    necesitas (ComoTextoJSON: (__ByteATexto: 0)) = (Resultado#ok: {"\u0000"})
+    necesitas (ComoTextoJSON: (__ByteATexto: 19)) = (Resultado#ok: {"\u0013"})
+    necesitas (ComoTextoJSON: {𝄞}) = (Resultado#ok: {"\uD834\uDD1E"})
+    necesitas (ComoTextoJSON: {a�b}) = (Resultado#ok: {"a�b"})
+    Escribir: {ok 9 - PruebaEscribirCadenas}
+finprocedimiento
+
+procedimiento PruebaEscribirArreglos
+    necesitas (ComoTextoJSON: Arreglo#vacio) = (Resultado#ok: {[]})
+    necesitas (ComoTextoJSON: (Arreglo#crearCon: 0)) = (Resultado#ok: {[0]})
+    necesitas (ComoTextoJSON: (Arreglo#crearCon: 0, 1)) = (Resultado#ok: {[0, 1]})
+    Escribir: {ok 10 - PruebaEscribirArreglos}
+finprocedimiento
+
+procedimiento PruebaEscribirObjetos
+    necesitas (ComoTextoJSON: Diccionario#vacío) = (Resultado#ok: «{}»)
+    necesitas (ComoTextoJSON: (Diccionario#desdePares: {a}, 1)) =
+        (Resultado#ok: «{"a": 1}»)
+    necesitas (ComoTextoJSON: (Diccionario#desdePares: {a}, 1, {b}, 2)) =
+        (Resultado#ok: «{"a": 1, "b": 2}»)
+    necesitas (ComoTextoJSON: (Diccionario#desdePares: {a}, 1, {b}, 2, {c}, 3)) =
+        (Resultado#ok: «{"a": 1, "b": 2, "c": 3}»)
+    Escribir: {ok 11 - PruebaEscribirObjetos}
 finprocedimiento
 
 
-PruebaLiterales
-PruebaNúmeros
-PruebaEspacios
-PruebaCadenas
-PruebaArreglos
-PruebaObjetos
+PruebaLeerLiterales
+PruebaLeerNúmeros
+PruebaLeerEspacios
+PruebaLeerCadenas
+PruebaLeerArreglos
+PruebaLeerObjetos
+PruebaEscribirLiterales
+PruebaEscribirNúmeros
+PruebaEscribirCadenas
+PruebaEscribirArreglos
+PruebaEscribirObjetos

@@ -34,6 +34,49 @@ funcion CodepointACodeunit: codepoint
                (__ByteATexto: (128 <+> (codepoint <*> 63)))))
 finfuncion
 
+[DOCUMENTA
+@brief{El codepoint del carácter de reemplazo.}
+
+Codepoint FFFD.
+DOCUMENTA]
+variable REPLACEMENT_CHARACTER_CODEPOINT
+fijar REPLACEMENT_CHARACTER_CODEPOINT a 65533
+
+[DOCUMENTA
+@brief{El carácter de reemplazo, como un @pd{Texto}.}
+DOCUMENTA]
+variable REPLACEMENT_CHARACTER
+fijar REPLACEMENT_CHARACTER a CodepointACodeunit: REPLACEMENT_CHARACTER_CODEPOINT
+
+[DOCUMENTA
+@brief{Convierte varios codepoints a un texto.}
+
+Convierte todos los codepoints con @pd{CodepointACodeunit} y los concatena en
+un texto que es devuelto.
+DOCUMENTA]
+funcion CodepointsATexto: ...codepoints
+    variable res
+    fijar res a {}
+    ParaCadaElemento: codepoints, procedimiento: codepoint
+        fijar res a res#concatenar: (CodepointACodeunit: codepoint)
+    finprocedimiento
+    devolver res
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte una secuencia de bytes a un texto.}
+
+Convierte todos los bytes con @pd{__ByteATexto} y los concatena en un texto que
+es devuelto.
+DOCUMENTA]
+funcion BytesATexto: ...bytes
+    variable res
+    fijar res a {}
+    ParaCadaElemento: bytes, procedimiento: byte
+        fijar res a res#concatenar: (__ByteATexto: byte)
+    finprocedimiento
+    devolver res
+finfuncion
 
 [DOCUMENTA
 @brief{Determina si @pd{codeunit} (un codeunit UTF-16) es la parte alta de un
@@ -96,4 +139,177 @@ funcion CodepointASubrogado: codepoint
     fijar alto a ((codepoint >> 10) <*> 1023) <+> 55296
     fijar bajo a (codepoint <*> 1023) <+> 56320
     devolver ParSubrogado#crear: alto, bajo
+finfuncion
+
+[DOCUMENTA
+@brief{Itera sobre cada codepoint del texto.}
+
+Va por cada codepoint UTF-8 del @pd{texto}, llamando a @pd{proc} con 3
+argumentos: el subtexto leído, el codepoint del subtexto y la posición inicial
+de dicho subtexto.
+
+Por ejemplo:
+
+@codeblock|{
+ParaCadaCodepoint: {hñ𐠀h}, procedimiento: subtexto, codepoint, pos
+    Escribir: subtexto, codepoint, pos
+finprocedimiento
+}|
+
+Escribirá:
+
+@output|{
+h	104	0
+ñ	241	1
+𐠀	67584	3
+h	104	7
+}|
+
+La función es resistente a secuencias UTF-8 malformadas: estas serán
+reeplazadas con el @pd{REPLACEMENT_CHARACTER} (unicode @code{FFFD}).
+DOCUMENTA]
+procedimiento ParaCadaCodepoint: texto, proc
+    variable i
+    fijar i a 0
+    mientras i < texto#longitud
+        variable car
+        fijar car a texto#en: i
+        si EsInicioDeCodepoint: car
+            variables n, ok, m
+            fijar n a NúmeroDeContinuacionesDeCodepoint: car
+            fijar m a 1
+            fijar ok a VERDADERO
+            ParaCadaNúmero: (i + 1), (Min: (i + 1 + n), texto#longitud), procedimiento: j
+                si no EsContinuaciónDeCodepoint: (texto#en: j)
+                    fijar ok a FALSO
+                finsi
+                si ok
+                    fijar m a m + 1
+                finsi
+            finprocedimiento
+            si no n = (m - 1)
+                [ Codepoint largo "cortado" ]
+                fijar ok a FALSO
+            finsi
+
+            si ok
+                variable subtexto
+                fijar subtexto a texto#subTexto: i, (1 + n)
+                %proc: subtexto, (CodepointDeTexto: subtexto), i
+            sino
+                variable subtexto
+                fijar subtexto a texto#subTexto: i, m
+                %proc: subtexto, REPLACEMENT_CHARACTER_CODEPOINT, i
+            finsi
+
+            fijar i a i + m
+        sino
+            %proc: (texto#en: i), REPLACEMENT_CHARACTER_CODEPOINT, i
+            fijar i a i + 1
+        finsi
+    finmientras
+finprocedimiento
+
+[DOCUMENTA
+@brief{Determina si @pd{car} (un @pd{Texto}) es el inicio de un codepoint
+UTF-8.}
+
+No considera las codificaciones "extra largas" ("overlong").
+DOCUMENTA]
+funcion EsInicioDeCodepoint: car
+    variable b
+    fijar b a __TextoAByte: car
+    devolver (b < 127) || ((b <*> 224) = 192) || ((b <*> 240) = 224) || ((b <*> 248) = 240)
+finfuncion
+
+[DOCUMENTA
+@brief{Determina la cantidad de bytes que siguen a @pd{car} (un @pd{Texto}),
+que es el inicio de un codepoint UTF-8.}
+
+Devuelve @pd{NULO} si @pd{car} es un codeunit inválido.
+DOCUMENTA]
+funcion NúmeroDeContinuacionesDeCodepoint: car
+    variable b
+    fijar b a __TextoAByte: car
+    si b < 127
+        devolver 0
+    finsi
+    si (b <*> 224) = 192
+        devolver 1
+    finsi
+    si (b <*> 240) = 224
+        devolver 2
+    finsi
+    si (b <*> 248) = 240
+        devolver 3
+    finsi
+    devolver NULO
+finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{car} (un @pd{Texto}) es la continuación de un
+codepoint.}
+DOCUMENTA]
+funcion EsContinuaciónDeCodepoint: car
+    variable b
+    fijar b a __TextoAByte: car
+    devolver (b <*> 192) = 128
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve el codepoint de un texto.}
+
+@devuelve{Devuelve el codepoint del primer carácter de @pd{car} (un
+@pd{Texto}). Devuelve @pd{NULO} si el codeunit es inválido.}
+DOCUMENTA]
+funcion CodepointDeTexto: car
+    necesitas car#longitud > 0
+    variables b, k1, k2, k3
+    fijar b a __TextoAByte: (car#en: 0)
+    si b < 127
+        devolver b
+    finsi
+    si (b <*> 224) = 192
+        si car#longitud < 2
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 1)
+            devolver NULO
+        finsi
+        fijar k1 a __TextoAByte: (car#en: 1)
+        devolver ((b <*> 31) << 6) <+> (k1 <*> 63)
+    finsi
+    si (b <*> 240) = 224
+        si car#longitud < 3
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 1)
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 2)
+            devolver NULO
+        finsi
+        fijar k1 a __TextoAByte: (car#en: 1)
+        fijar k2 a __TextoAByte: (car#en: 2)
+        devolver ((b <*> 15) << 12) <+> ((k1 <*> 63) << 6) <+> (k2 <*> 63)
+    finsi
+    si (b <*> 248) = 240
+        si car#longitud < 4
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 1)
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 2)
+            devolver NULO
+        finsi
+        si no EsContinuaciónDeCodepoint: (car#en: 3)
+            devolver NULO
+        finsi
+        fijar k1 a __TextoAByte: (car#en: 1)
+        fijar k2 a __TextoAByte: (car#en: 2)
+        fijar k3 a __TextoAByte: (car#en: 3)
+        devolver ((b <*> 7) << 18) <+> ((k1 <*> 63) << 12) <+> ((k2 <*> 63) << 6) <+> (k3 <*> 63)
+    finsi
+    devolver NULO
 finfuncion

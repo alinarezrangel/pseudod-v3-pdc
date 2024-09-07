@@ -18,10 +18,10 @@ pero no ambos:
 
 @itemlist(
 @item{@code{p} activa el @italic{modo perl}. En el modo perl, partes íguales
-del resultado son colapsadas a una sola. Por ejemplo:
-@pd|{Partir': {hola,,mundo,1,1,1,1}, {,}, {p}}| produce
-@pd|{Arreglo#crearCon: {hola}, {}, {mundo}, {1}}|. Nota como los múltiples
-@code{1}s fueron colapsados.}
+vacías del resultado son colapsadas a una sola. Por ejemplo:
+@pd|{Partir': {hola,,mundo,,,,,}, {,}, {p}}| produce
+@pd|{Arreglo#crearCon: {hola}, {}, {mundo}, {}}|. Nota como los múltiples
+espacios vacíos fueron colapsados.}
 @item{@code{-} elimina cualquier parte vacía @code{""} que se pudiese producir.}
 @item{Si @pd{opciones} es un texto vacío, no colapsa ningún valor.}
 )
@@ -76,7 +76,7 @@ Por ejemplo:
 necesitas
     (Partir: {hola:mundo:separado por:dos puntos}, {:})
     =
-    (Arreglo#crearCon: {hola}, {mundo}, {separador por}, {dos puntos})
+    (Arreglo#crearCon: {hola}, {mundo}, {separado por}, {dos puntos})
 
 necesitas
     (Partir: {::hola:mundo}, {:})
@@ -96,8 +96,9 @@ finfuncion
 [DOCUMENTA
 @brief{Parte un texto sin dejar duplicados.}
 
-Similar a @pd{Partir} pero elimína elementos duplicados. Por ejemplo,
-@pd{PartirComoPerl: "1:1:2:2:3:3", ":"} es @pd{Arreglo#crearCon: "1", "2", "3"}.
+Similar a @pd{Partir} pero elimína elementos vacíos duplicados. Por ejemplo,
+@pd{PartirComoPerl: "::2:2::", ":"} es @pd{Arreglo#crearCon: "", "2", "2",
+""}.
 DOCUMENTA]
 funcion PartirComoPerl: texto, separador
     devolver Partir': texto, separador, {p}
@@ -119,7 +120,7 @@ El inverso de @pd{Partir}.
 
 @ejemplo|{
 necesitas
-    (Unir: (Arreglo#crearCon: {hola}, {mundo}, {separador por}, {dos puntos}), {:})
+    (Unir: (Arreglo#crearCon: {hola}, {mundo}, {separado por}, {dos puntos}), {:})
     =
     {hola:mundo:separado por:dos puntos}
 
@@ -224,4 +225,54 @@ funcion EsSufijo: texto, sufijo
         devolver FALSO
     finsi
     devolver (texto#subTexto: (texto#longitud - sufijo#longitud), sufijo#longitud) = sufijo
+finfuncion
+
+[DOCUMENTA
+@brief{Ajusta un texto agregando repeticiones de un prefijo al inicio.}
+
+Agrega repeticiones de @pd{relleno} al inicio de @pd{texto} hasta que su tamaño
+sea @bold{mayor o igual} a @pd{longitud}.
+
+Por ejemplo:
+
+@codeblock|{
+necesitas (AjustarALaIzquierda: {hola}, {0}, 5) = {0hola}
+necesitas (AjustarALaIzquierda: {hola}, {0}, 6) = {00hola}
+necesitas (AjustarALaIzquierda: {hola}, {0}, 4) = {hola}
+necesitas (AjustarALaIzquierda: {hola}, {0}, 3) = {hola}
+necesitas (AjustarALaIzquierda: {hola}, {00}, 5) = {00hola}
+necesitas (AjustarALaIzquierda: {hola}, {00}, 6) = {00hola}
+necesitas (AjustarALaIzquierda: {hola}, {00}, 7) = {0000hola}
+}|
+DOCUMENTA]
+funcion AjustarALaIzquierda: texto, relleno, longitud
+    mientras texto#longitud < longitud
+        fijar texto a relleno#concatenar: texto
+    finmientras
+    devolver texto
+finfuncion
+
+[DOCUMENTA
+@brief{Ajusta un texto agregando repeticiones de un sufijo al final.}
+
+Agrega repeticiones de @pd{relleno} al final de @pd{texto} hasta que su tamaño
+sea @bold{mayor o igual} a @pd{longitud}.
+
+Por ejemplo:
+
+@codeblock|{
+necesitas (AjustarALaDerecha: {hola}, {0}, 5) = {hola0}
+necesitas (AjustarALaDerecha: {hola}, {0}, 6) = {hola00}
+necesitas (AjustarALaDerecha: {hola}, {0}, 4) = {hola}
+necesitas (AjustarALaDerecha: {hola}, {0}, 3) = {hola}
+necesitas (AjustarALaDerecha: {hola}, {00}, 5) = {hola00}
+necesitas (AjustarALaDerecha: {hola}, {00}, 6) = {hola00}
+necesitas (AjustarALaDerecha: {hola}, {00}, 7) = {hola0000}
+}|
+DOCUMENTA]
+funcion AjustarALaDerecha: texto, relleno, longitud
+    mientras texto#longitud < longitud
+        fijar texto a texto#concatenar: relleno
+    finmientras
+    devolver texto
 finfuncion

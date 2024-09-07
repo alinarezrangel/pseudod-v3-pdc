@@ -1,10 +1,11 @@
 utilizar bepd/builtins
 utilizar bepd/datos/resultado (Resultado)
-utilizar bepd/utilidades/texto (TextoContiene)
+utilizar bepd/datos/diccionario (ParaCadaParConOrden)
+utilizar bepd/utilidades/texto (TextoContiene, AjustarALaIzquierda)
 utilizar bepd/utilidades/texto/ascii (EsDígitoDecimal, LF, CR, HT)
 
-utilizar bepd/x/puerto (TextoComoPuerto, EOF, PuertoDeLectura)
-utilizar bepd/x/utf8 (EsSubrogadoAlto, EsSubrogadoBajo, SubrogadoACodepoint, CodepointACodeunit)
+utilizar bepd/x/puerto (TextoComoPuerto, EOF, PuertoDeLectura, PuertoDeEscritura, PuertoParaTexto, TextoDePuertoDeEscritura)
+utilizar bepd/x/utf8 (EsSubrogadoAlto, EsSubrogadoBajo, SubrogadoACodepoint, CodepointACodeunit, REPLACEMENT_CHARACTER, ParaCadaCodepoint, NecesitaParSubrogado, CodepointASubrogado)
 utilizar bepd/x/control (Bucle)
 
 
@@ -15,7 +16,10 @@ utilizar bepd/x/control (Bucle)
 @brief{Procesa un @pd{Texto} con un valor JSON a un valor de PseudoD.}
 
 @pd{json} debe ser un @pd{Texto} o un @pd{PuertoDeLectura}. El JSON será leído
-desde este argumento.
+desde este argumento. Si es un @pd{PuertoDeLectura} lee el siguiente objeto
+JSON del puerto, dejando su posición justo después del final de este. Si es un
+texto, valida además que el no contenga ningún texto adicional después del
+objeto JSON.
 
 @devuelve{Un @pd{Resultado} con el resultado de procesar el JSON. Si es OK su
 valor será el objeto deserializado, si es un error entonces el error será un
@@ -27,18 +31,22 @@ sus respectivos tipos.
 DOCUMENTA]
 procedimiento DesdeJSON: json
     devolver LlamarConEC: procedimiento: error
-        variables puerto, res, c
+        variables puerto, res, c, esTexto
         si EsInstancia: json, Texto
             fijar puerto a TextoComoPuerto: json
+            fijar esTexto a VERDADERO
         sino
             fijar puerto a json
+            fijar esTexto a FALSO
         finsi
         fijar res a Resultado#ok: (LeerElemento: puerto, funcion: err
                 devolver %error: (Resultado#error: err)
             finfuncion)
-        fijar c a puerto#leerCarácter
-        si res#esOk && no son identicos c y EOF
-            devolver Resultado#error: ({Carácter inesperado ~t}#formatear: c)
+        si esTexto
+            fijar c a puerto#leerCarácter
+            si res#esOk && no son identicos c y EOF
+                devolver Resultado#error: ({Carácter inesperado ~t}#formatear: c)
+            finsi
         finsi
         devolver res
     finprocedimiento
@@ -271,19 +279,19 @@ procedimiento LeerCadena: puertoDeLectura, error
                                 si EsSubrogadoBajo: sigEscape
                                     fijar texto a texto#concatenar: (CodepointACodeunit: (SubrogadoACodepoint: escape, sigEscape))
                                 sino
-                                    fijar texto a texto#concatenar: (CodepointACodeunit: 65533 [0xFFFD])
+                                    fijar texto a texto#concatenar: REPLACEMENT_CHARACTER
                                     devolver %recur: sigEscape
                                 finsi
                             sino
-                                fijar texto a texto#concatenar: (CodepointACodeunit: 65533 [0xFFFD])
+                                fijar texto a texto#concatenar: REPLACEMENT_CHARACTER
                                 fijar texto a texto#concatenar: sigEscape
                             finsi
                         sino
-                            fijar texto a texto#concatenar: (CodepointACodeunit: 65533 [0xFFFD])
+                            fijar texto a texto#concatenar: REPLACEMENT_CHARACTER
                         finsi
                     sino
                         si EsSubrogadoBajo: escape
-                            fijar texto a texto#concatenar: (CodepointACodeunit: 65533 [0xFFFD])
+                            fijar texto a texto#concatenar: REPLACEMENT_CHARACTER
                         sino
                             fijar texto a texto#concatenar: (CodepointACodeunit: escape)
                         finsi
@@ -528,4 +536,174 @@ procedimiento LeerMiembro: obj, puertoDeLectura, error
     finsi
     fijar valor a LeerElemento: puertoDeLectura, error
     obj#fijarEn: llave, valor
+finprocedimiento
+
+
+[DOCUMENTA
+@brief{Serializa un valor de PseudoD a JSON.}
+
+Puede serializar los siguientes valores:
+
+@itemlist(
+@item{@pd{Boole}anos.}
+
+@item{@pd{Numero}s.}
+
+@item{@pd{Texto}s.}
+
+@item{@pd{NULO}.}
+
+@item{@pd{Arreglo}s de valores serializables.}
+
+@item{@pd{Diccionario}s donde las llaves son @pd{Texto}s y los valores son
+serializables.}
+)
+
+Escribe la serialización a @pd{salida}, que debe ser un @pd{PuertoDeEscritura}.
+DOCUMENTA]
+procedimiento ComoJSON: salida, valor
+    devolver LlamarConEC: procedimiento: error
+        EscribirElemento: salida, valor, funcion: err
+            devolver %error: (Resultado#error: err)
+        finfuncion
+        devolver Resultado#ok: NULO
+    finprocedimiento
+finprocedimiento
+
+[DOCUMENTA
+@brief{Como @pd{ComoJSON}, pero devueve un texto.}
+
+Serializa el valor y devuelve el serializado como un @pd{Texto}.
+DOCUMENTA]
+funcion ComoTextoJSON: valor
+    variables res, salida
+    fijar salida a PuertoParaTexto
+    fijar res a ComoJSON: salida, valor
+    si res#esOk
+        devolver Resultado#ok: (TextoDePuertoDeEscritura: salida)
+    sino
+        devolver res
+    finsi
+finfuncion
+
+procedimiento EscribirElemento: salida, valor, error
+    si valor = VERDADERO
+        salida#escribirTexto: {true}
+        devolver NULO
+    finsi
+    si valor = FALSO
+        salida#escribirTexto: {false}
+        devolver NULO
+    finsi
+    si valor = NULO
+        salida#escribirTexto: {null}
+        devolver NULO
+    finsi
+    si EsInstancia: valor, Numero
+        salida#escribirTexto: valor#comoTexto
+        devolver NULO
+    finsi
+    si EsInstancia: valor, Texto
+        devolver EscribirCadena: salida, valor, error
+    finsi
+    si EsInstancia: valor, Arreglo
+        devolver EscribirArreglo: salida, valor, error
+    finsi
+    si EsInstancia: valor, Diccionario
+        devolver EscribirObjeto: salida, valor, error
+    finsi
+
+    devolver %error: ({Valor de tipo inesperado: ~t}#formatear: (TipoDe: valor))
+finprocedimiento
+
+funcion EnteroEnHexadecimal: n
+    si n = 0
+        devolver {0}
+    finsi
+    variables r, s
+    fijar s a {}
+    fijar r a {}
+    si n < 0
+        fijar n a 0 - n
+        fijar s a {-}
+    finsi
+    mientras n > 0
+        variable d
+        fijar d a n <*> 15
+        fijar r a (DÍGITOS_HEX_MY#en: d)#concatenar: r
+        fijar n a n >> 4
+    finmientras
+    devolver s#concatenar: r
+finfuncion
+
+funcion EscaparUnicode: n
+    devolver AjustarALaIzquierda: (EnteroEnHexadecimal: n), {0}, 4
+finfuncion
+
+procedimiento EscribirCadena: salida, valor, error
+    salida#escribirTexto: {"}
+    ParaCadaCodepoint: valor, procedimiento: subtexto, codepoint, _pos
+        variable p
+        si codepoint < 20
+            fijar p a {\u}#concatenar: (EscaparUnicode: codepoint)
+        finsi
+        si NecesitaParSubrogado: codepoint
+            variable sub
+            fijar sub a CodepointASubrogado: codepoint
+            fijar p a {\u~t\u~t}#formatear: (EscaparUnicode: sub#alto), (EscaparUnicode: sub#bajo)
+        finsi
+        si subtexto = {"}
+            fijar p a {\"}
+        finsi
+        si subtexto = {\}
+            fijar p a {\\}
+        finsi
+        si subtexto = { }
+            fijar p a { }
+        finsi
+        si subtexto = LF
+            fijar p a {\n}
+        finsi
+        si subtexto = CR
+            fijar p a {\r}
+        finsi
+        si subtexto = HT
+            fijar p a {\t}
+        finsi
+        si EsNulo: p
+            fijar p a subtexto
+        finsi
+        salida#escribirTexto: p
+    finprocedimiento
+    salida#escribirTexto: {"}
+finprocedimiento
+
+procedimiento EscribirArreglo: salida, valor, error
+    salida#escribirTexto: {[}
+    ParaCadaElementoConÍndice: valor, procedimiento: el, i
+        si i > 0
+            salida#escribirTexto: {, }
+        finsi
+        EscribirElemento: salida, el, error
+    finprocedimiento
+    salida#escribirTexto: {]}
+finprocedimiento
+
+procedimiento EscribirObjeto: salida, valor, error
+    salida#escribirTexto: «{»
+    variable primero
+    fijar primero a VERDADERO
+    ParaCadaParConOrden: valor, procedimiento: llave, valor
+        si no primero
+            salida#escribirTexto: {, }
+        finsi
+        si no EsInstancia: llave, Texto
+            devolver %error: ({Llave de tipo ~t en diccionario}#formatear: (TipoDe: llave))
+        finsi
+        EscribirCadena: salida, llave, error
+        salida#escribirTexto: {: }
+        EscribirElemento: salida, valor, error
+        fijar primero a FALSO
+    finprocedimiento
+    salida#escribirTexto: «}»
 finprocedimiento

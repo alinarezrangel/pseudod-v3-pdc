@@ -1,6 +1,7 @@
 utilizar bepd/builtins
 
-utilizar bepd/x/utf8 (CodepointACodeunit, SubrogadoACodepoint, CodepointASubrogado)
+utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/utf8 (CodepointACodeunit, SubrogadoACodepoint, CodepointASubrogado, ParaCadaCodepoint, CodepointsATexto, BytesATexto)
 
 
 procedimiento PruebaCodepointACodeunit
@@ -20,6 +21,78 @@ procedimiento PruebaSubrogados
     Escribir: {ok 2 - PruebaSubrogados}
 finprocedimiento
 
+procedimiento PruebaIteración
+    variables iter, Iter
+    fijar Iter a TipoDeDatos: {Iter}, {subtexto}, {codepoint}, {pos}
+    fijar iter a Arreglo#vacio
+
+    ParaCadaCodepoint: {hñ𐠀h}, procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: {h}, 104, 0),
+        (Iter#crear: {ñ}, 241, 1),
+        (Iter#crear: (CodepointACodeunit: 67584), 67584, 3),
+        (Iter#crear: {h}, 104, 7))
+
+    fijar iter a Arreglo#vacio
+    ParaCadaCodepoint: (CodepointsATexto: 80100, 13, 128514, 10), procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: (CodepointACodeunit: 80100), 80100, 0),
+        (Iter#crear: (CodepointACodeunit: 13), 13, 4),
+        (Iter#crear: (CodepointACodeunit: 128514), 128514, 5),
+        (Iter#crear: (CodepointACodeunit: 10), 10, 9))
+
+    [ Caso inválido #1: Codepoint largo "cortado" ]
+    fijar iter a Arreglo#vacio
+    ParaCadaCodepoint: (BytesATexto: 240, 159, 152, 104), procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: (BytesATexto: 240, 159, 152), 65533, 0),
+        (Iter#crear: (CodepointACodeunit: 104), 104, 3))
+
+    [ Caso inválido #2: Codepoint corto "alargado" ]
+    fijar iter a Arreglo#vacio
+    ParaCadaCodepoint: (BytesATexto: 195, 177, 177, 177, 104), procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: (CodepointACodeunit: 241), 241, 0),
+        (Iter#crear: (BytesATexto: 177), 65533, 2),
+        (Iter#crear: (BytesATexto: 177), 65533, 3),
+        (Iter#crear: (CodepointACodeunit: 104), 104, 4))
+
+    [ Caso inválido #3: Byte de continuación sin precedente ]
+    fijar iter a Arreglo#vacio
+    ParaCadaCodepoint: (BytesATexto: 104, 177, 104), procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: (CodepointACodeunit: 104), 104, 0),
+        (Iter#crear: (BytesATexto: 177), 65533, 1),
+        (Iter#crear: (CodepointACodeunit: 104), 104, 2))
+
+    [ Caso inválido #4: Codepoint largo "cortado" al final ]
+    fijar iter a Arreglo#vacio
+    ParaCadaCodepoint: (BytesATexto: 240, 159, 152), procedimiento: subtexto, codepoint, pos
+        iter#agregarAlFinal: (Iter#crear: subtexto, codepoint, pos)
+    finprocedimiento
+
+    necesitas iter = (Arreglo#crearCon:
+        (Iter#crear: (BytesATexto: 240, 159, 152), 65533, 0))
+
+    Escribir: {ok 3 - PruebaIteración}
+finprocedimiento
+
 
 PruebaCodepointACodeunit
 PruebaSubrogados
+PruebaIteración
