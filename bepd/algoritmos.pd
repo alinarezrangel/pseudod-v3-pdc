@@ -156,11 +156,11 @@ funcion BúsquedaBinariaConComparación: arreglo, inf, sup, valor, menorQue
         fijar i a ((sup - inf) / 2)#piso + inf
         si %menorQue: valor, (arreglo#en: i)
             fijar sup a i - 1
-            fijar índice a sup
+            fijar índice a Max: inf, sup
         sino
             si %menorQue: (arreglo#en: i), valor
                 fijar inf a i + 1
-                fijar índice a inf
+                fijar índice a Min: inf, sup
             sino
                 fijar encontrado a VERDADERO
                 fijar inf a i
