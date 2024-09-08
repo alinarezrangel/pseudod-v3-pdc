@@ -81,15 +81,15 @@ funcion EscaparTexto: txt
 finfuncion
 
 procedimiento DeclararFunción: puerto, identificadorDelMódulo, func
-    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k);}
+    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k);}
 finprocedimiento
 
 procedimiento DeclararContinuación: puerto, identificadorDelMódulo, k
-    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m);}
+    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m);}
 finprocedimiento
 
 procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
-    EmitirLínea: puerto, {pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k)}
+    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k)}
     EmitirLínea: puerto, «{»
     EmitirLínea: puerto, {pdcrt_marco* m = pdcrt_crear_marco(ctx, }, func#númLocales, {, }, func#númCapturas, {, args, k);}
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
@@ -101,7 +101,7 @@ finprocedimiento
 procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
     variable nombre
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
-    EmitirLínea: puerto, {pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
+    EmitirLínea: puerto, {static pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
     EmitirLínea: puerto, «{»
     EmitirLínea: puerto, «if(pdcrt_stack_lleno(ctx)) return (pdcrt_k) { .kf = », nombre, «, .marco = m };»
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
@@ -262,5 +262,17 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
 
     si opcode = Opcode#obtenerRuntime
         EmitirLínea: puerto, {pdcrt_obtener_objeto_runtime(ctx);}
+    finsi
+
+    si opcode = Opcode#importar
+        EmitirLínea: puerto, {return pdcrt_importar(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)) {);}
+    finsi
+
+    si opcode = Opcode#extraer
+        EmitirLínea: puerto, {return pdcrt_extraer(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
+    finsi
+
+    si opcode = Opcode#sacar
+        EmitirLínea: puerto, {pdcrt_sacar(ctx);}
     finsi
 finprocedimiento

@@ -1,0 +1,70 @@
+utilizar bepd/builtins
+utilizar bepd/x/sistemaDeArchivos/rutas (ResolverRutaRelativa)
+utilizar bepd/x/datos (TipoDeDatos)
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/catamorfismos (Buscando)
+
+
+
+[DOCUMENTA
+@brief{Referencia a un módulo.}
+
+Contiene dos atributos: @code{paquete} y @code{módulo} (ambos @pd{Texto}s) con
+el paquete y módulo al que se está referenciando.
+DOCUMENTA]
+variable ReferenciaAMódulo
+fijar ReferenciaAMódulo a TipoDeDatos: {ReferenciaAMódulo}, {paquete}, {módulo}
+
+[DOCUMENTA
+@brief{Información de un módulo.}
+
+Es asociado a cada nodo utilizar de un programa, indicando que módulo el nodo
+importa. De esta forma cada pase del compilador no necesita volver a parsear el
+módulo importado para saber su paquete y módulo.
+
+@itemlist(
+@item{@code{idNodo}: ID del nodo utilizar.}
+
+@item{@code{paquete}: Nombre del paquete importado (un @pd{Texto}).}
+
+@item{@code{módulo}: Nombre del módulo importado (un @pd{Texto}).}
+)
+DOCUMENTA]
+variable InformaciónDeMódulo
+fijar InformaciónDeMódulo a CrearTipoDeRegistro: {InformaciónDeMódulo},
+    {idNodo}, {paquete}, {módulo},
+    (Índice#ÚNICO: {idNodo}),
+    (Índice#ORDENADO: {paquete}),
+    (Índice#ORDENADO: {paquete}, {módulo})
+
+
+[DOCUMENTA
+@brief{Obtiene y anota las dependencias del nodo.}
+
+Anota cada @pd{CST#NodoUtilizar} con un @pd{InformaciónDeMódulo} acerca de que
+módulo se está importando.
+
+Además, devuelve un arreglo de @pd{ReferenciaAMódulo}s con las dependencias del
+nodo.
+DOCUMENTA]
+procedimiento DependenciasDelNodo: nodoCst, tablaInf, paquete, nombreDelMódulo
+    variable dependencias
+    fijar dependencias a Arreglo#vacio
+    Buscando: nodoCst, funcion: nodo
+        devolver EsInstancia: nodo, CST#NodoUtilizar
+    finfuncion, procedimiento: nodo
+        variables porImportar, módulo
+        fijar porImportar a nodo#módulo
+        si EsInstancia: nodo#módulo, CST#NodoIdentificador
+            fijar módulo a nodo#módulo#nombre
+        sino
+            fijar módulo a ResolverRutaRelativa: nombreDelMódulo, nodo#módulo#valor
+        finsi
+        dependencias#agregarAlFinal: (ReferenciaAMódulo#crear: paquete, módulo)
+        tablaInf#agregar: (InformaciónDeMódulo#crear: nodo#id, paquete, módulo)
+    finprocedimiento
+    devolver dependencias
+finprocedimiento

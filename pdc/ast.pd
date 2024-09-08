@@ -358,9 +358,7 @@ clase NodoUtilizar hereda Nodo
     [DOCUMENTA
     @brief{Los nombres específicos a importar.}
 
-    Puede ser @pd{NULO}, en cuyo caso todos los nombres exportados por el
-    módulo deben ser importados. Si no es nulo es un arreglo de
-    @pd{NodoNombreEspecífico}s con los nombres a importar.
+    Es un arreglo de @pd{NodoNombreEspecífico}s con los nombres a importar.
     DOCUMENTA]
     atributo nombresEspecíficos
 finclase
@@ -392,39 +390,29 @@ finmetodo
 DOCUMENTA]
 clase NodoNombreEspecífico hereda Nodo
     [DOCUMENTA
-    @brief{Si este nombre debe renombrarse despues de importarse.}
-
-    Si es verdadero, @pd{renombre} tendrá el nuevo nombre de la variable.
-
-    Si es falso, @pd{renombre} será @pd{NULO}.
-    DOCUMENTA]
-    atributo debeRenombrarse
-
-    [DOCUMENTA
     @brief{Nombre de la variable a importar.}
+
+    Un @pd{NodoLiteralTextual}.
     DOCUMENTA]
     atributo nombre
 
     [DOCUMENTA
-    @brief{Nuevo nombre de la variable a importar.}
+    @brief{Variable que se importó.}
 
-    Puede ser @pd{NULO} si @pd{debeRenombrarse} es falso.
+    Un @pd{NodoIdentificador}.
     DOCUMENTA]
     atributo renombre
 finclase
 
 metodo NodoNombreEspecífico#inicializar: área, nombre, renombre
     fijar yo#áreaTextual a área
-    fijar yo#debeRenombrarse a no EsNulo: renombre
     fijar yo#nombre a nombre
     fijar yo#renombre a renombre
 finmetodo
 
 metodo NodoNombreEspecífico#recursivo: f
     %f: yo#nombre
-    si yo#debeRenombrarse
-        %f: yo#renombre
-    finsi
+    %f: yo#renombre
 finmetodo
 
 metodo NodoNombreEspecífico#comoTexto

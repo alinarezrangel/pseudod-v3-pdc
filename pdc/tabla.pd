@@ -109,6 +109,14 @@ clase Tabla
     de inserción}.
     DOCUMENTA]
     metodo escaneoLineal: f
+
+    [DOCUMENTA
+    @brief{Devuelve una representación textual de la tabla.}
+
+    No incluye el contenido de la tabla, para esto utiliza el procedimiento
+    @pd{EscribirTabla}.
+    DOCUMENTA]
+    metodo comoTexto
 finclase
 
 atributos Tabla#índicesÚnicos, Tabla#índicesOrdenados,
@@ -308,6 +316,10 @@ finmetodo
 
 metodo Tabla#escaneoLineal: f
     ParaCadaElemento: yo#valores, f
+finmetodo
+
+metodo Tabla#comoTexto
+    devolver {(Tabla de ~t)}#formatear: yo#esquema
 finmetodo
 
 clase Índice

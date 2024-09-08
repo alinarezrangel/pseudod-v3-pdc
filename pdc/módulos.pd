@@ -1,49 +1,171 @@
 utilizar bepd/builtins
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+utilizar bepd/x/datos (TipoDeDatos)
 
-utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, EscribirTabla)
-
-
-clase Módulo
-    atributos paquete, módulo, exportaciones, compilado, informaciónDeDepuración
-    metodo nombreCompleto
-finclase
-
-clase Módulos
-    metodo estatico desdeArchivo: archivo
-    metodo estatico enMemoria
-
-    metodo agregarMódulo: módulo
-    metodo buscarMódulo: nombreCompleto
-finclase
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, EscribirTabla)
 
 
+[DOCUMENTA
+@brief{Un valor exportado desde un módulo.}
+
+@itemlist(
+@item{@code{nombre}: Nombre de la exportación.}
+
+@item{@code{esAutoejecutable}: Si es autoejecutable o no.}
+)
+DOCUMENTA]
+variable Exportación
+fijar Exportación a TipoDeDatos: {Exportación}, {nombre}, {esAutoejecutable}
+
+[DOCUMENTA
+@brief{Módulo de PseudoD.}
+
+@itemlist(
+@item{@code{id}: ID del módulo. Solo es usado internamente por el compilador y
+no es guardado en los archivos de interfáz de módulo.}
+
+@item{@code{paquete}: Nombre del paquete.}
+
+@item{@code{módulo}: Nombre del módulo.}
+
+@item{@code{exportaciones}: Arreglo de @pd{Exportación} con las exportaciones
+del módulo.}
+
+@item{@code{prefijoDelMódulo}: Prefijo del módulo para el linker.}
+
+@item{@code{compilado}: Objeto con todos los datos resultantes de la
+compilación. Su tipo específico depende del backend que compiló el módulo.}
+
+@item{@code{archivoConElCompilado}: Archivo con la salida de la compilación.}
+)
+DOCUMENTA]
 variable Módulo
 fijar Módulo a CrearTipoDeRegistro: {Módulo},
-    {nombreCompleto}, VERDADERO,
-    {paquete}, FALSO,
-    {módulo}, FALSO,
-    {exportaciones}, FALSO,
-    {compilado}, FALSO
+    {id}, {paquete}, {módulo}, {exportaciones},
+    {prefijoDelMódulo}, {compilado}, {archivoConElCompilado},
+    (Índice#ÚNICO: {id}),
+    (Índice#ORDENADO: {paquete}),
+    (Índice#ORDENADO: {paquete}, {módulo})
 
-clase Exportación
-    atributos nombre, esAutoejecutable
+
+[DOCUMENTA
+@brief{Base de datos de módulos.}
+
+Contiene la tabla de @pd{Módulo}s. Almacena, busca y guarda la base de datos.
+DOCUMENTA]
+clase BaseDeDatosDeMódulos
+    [DOCUMENTA
+    @brief{Carga la base de datos desde un archivo.}
+    DOCUMENTA]
+    metodo estatico desdeArchivo: archivo
+
+    [DOCUMENTA
+    @brief{Crea una base de datos vacía.}
+    DOCUMENTA]
+    metodo estatico enMemoria
+
+    [DOCUMENTA
+    @brief{Obtiene la tabla de @pd{Módulo}s.}
+    DOCUMENTA]
+    metodo tablaMódulos
+
+    [DOCUMENTA
+    @brief{Carga un archivo, agregando sus módulos a la base de datos.}
+    DOCUMENTA]
+    metodo cargarDesdeArchivo: archivo
+
+    [DOCUMENTA
+    @brief{Guarda la base de datos en un archivo.}
+    DOCUMENTA]
+    metodo guardarEnArchivo: archivo
+
+    [DOCUMENTA
+    @brief{Agrega un nuevo módulo a la base de datos.}
+
+    Construye un @pd{Módulo} con los argumentos dados.
+    DOCUMENTA]
+    metodo agregarMódulo: paquete, módulo, exportaciones, compilado, archivoConElCompilado
+
+    [DOCUMENTA
+    @brief{Intenta buscar un módulo en base a su paquete y nombre.}
+
+    Si el módulo dado no existe, devuelve @pd{NULO}.
+    DOCUMENTA]
+    metodo intentaBuscarMódulo: paquete, nombre
+
+    [DOCUMENTA
+    @brief{Busca un módulo desde su paquete y nombre.}
+
+    Si el módulo no es encontrado, falla con un error.
+    DOCUMENTA]
+    metodo buscarMódulo: paquete, nombre
 finclase
 
-metodo Exportación#inicializar: nombre, esAutoejecutable
-    fijar yo#nombre a nombre
-    fijar yo#esAutoejecutable a esAutoejecutable
+atributo BaseDeDatosDeMódulos#tablaMódulos, BaseDeDatosDeMódulos#_contadorId
+
+metodo estatico BaseDeDatosDeMódulos#desdeArchivo: archivo
+    variable inst
+    fijar inst a yo#enMemoria
+    inst#cargarDesdeArchivo: archivo
+    devolver inst
 finmetodo
 
-procedimiento AgregarMódulo: tablaMódulos, paquete, módulo, exportaciones, compilado
-    variable mod
-    fijar mod a Módulo#crear:
-        ({~t/~t}#formatear: paquete, módulo),
-        paquete,
-        módulo,
-        exportaciones,
-        compilado
-    tablaMódulos#agregar: mod
-    devolver mod
-finprocedimiento
+metodo estatico BaseDeDatosDeMódulos#enMemoria
+    devolver yo#crear: (Tabla#vacíaConEsquema: Módulo)
+finmetodo
 
+metodo BaseDeDatosDeMódulos#inicializar: tabla
+    fijar yo#tablaMódulos a tabla
+    fijar yo#_contadorId a 0
+finmetodo
+
+metodo BaseDeDatosDeMódulos#cargarDesdeArchivo: archivo
+    NoImplementado
+finmetodo
+
+metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
+    NoImplementado
+finmetodo
+
+metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado
+    variable módulos
+    fijar módulos a yo#tablaMódulos#buscarOrdenado: {paquete}, paquete, {módulo}, módulo
+    si módulos#longitud > 0
+        __FallarConMensaje: ({No se puede registrar el módulo ~t::~t: ya existe}#formatear: paquete, módulo)
+    finsi
+    variable id
+    fijar id a yo#_generarId
+    yo#tablaMódulos#agregar:
+        (Módulo#crear: id,
+                       paquete,
+                       módulo,
+                       exportaciones,
+                       prefijoDelMódulo,
+                       compilado,
+                       archivoConElCompilado)
+    devolver id
+finmetodo
+
+metodo BaseDeDatosDeMódulos#_generarId
+    fijar yo#_contadorId a yo#_contadorId + 1
+    devolver yo#_contadorId
+finmetodo
+
+metodo BaseDeDatosDeMódulos#intentaBuscarMódulo: paquete, nombre
+    variable módulos
+    fijar módulos a yo#tablaMódulos#buscarOrdenado: {paquete}, paquete, {módulo}, nombre
+    si módulos#longitud = 1
+        devolver módulos#en: 0
+    sino
+        devolver NULO
+    finsi
+finmetodo
+
+metodo BaseDeDatosDeMódulos#buscarMódulo: paquete, nombre
+    variable mod
+    fijar mod a yo#intentaBuscarMódulo: paquete, nombre
+    si EsNulo: mod
+        __FallarConMensaje: ({No se encontró el módulo ~t::~t}#formatear: paquete, nombre)
+    finsi
+    devolver mod
+finmetodo

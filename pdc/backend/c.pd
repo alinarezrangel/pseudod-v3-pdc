@@ -1,8 +1,11 @@
 utilizar bepd/builtins
 utilizar bepd/datos/caja (Caja)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 utilizar bepd/utilidades/arreglo (Únicos)
+utilizar bepd/utilidades/texto (TextoContiene)
+utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal)
 utilizar bepd/x/enum (Enum)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (SalidaEstándar)
@@ -13,12 +16,14 @@ utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, Entablar�
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
 utilizar pdc/backend/c/lowerer (CompilarPrograma)
+utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
+utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 
 
 clase Emisor
@@ -143,19 +148,20 @@ finprocedimiento
 
 
 clase EstadoDeEmisión
-    atributos tablasRnAst, tablasMcAst, emisor, locales, capturas
+    atributos tablasRnAst, tablasMcAst, emisor, locales, capturas, bdMod
 finclase
 
-metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor
-    devolver yo#crear: tablasRnAst, tablasMcAst, emisor
+metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
+    devolver yo#crear: tablasRnAst, tablasMcAst, emisor, bdMod
 finmetodo
 
-metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor
+metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor, bdMod
     fijar yo#tablasRnAst a tablasRnAst
     fijar yo#tablasMcAst a tablasMcAst
     fijar yo#emisor a emisor
     fijar yo#locales a Diccionario#vacío
     fijar yo#capturas a Diccionario#vacío
+    fijar yo#bdMod a bdMod
 finmetodo
 
 metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
@@ -211,6 +217,7 @@ metodo EstadoDeEmisión#subestado: emisor, locales, capturas
     fijar sub#emisor a emisor
     fijar sub#locales a locales
     fijar sub#capturas a capturas
+    fijar sub#bdMod a yo#bdMod
     devolver sub
 finmetodo
 
@@ -366,7 +373,23 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoUtilizar
-        NoImplementado
+        variables informaciónDelMódulo, módulo
+        fijar informaciónDelMódulo a yo#tablasRnAst#tablaInformaciónDeMódulo#buscarÚnico: {idNodo}, ast#id
+        fijar módulo a yo#bdMod#buscarMódulo: informaciónDelMódulo#paquete, informaciónDelMódulo#módulo
+
+        yo#emisor#emitir: Opcode#importar, módulo#prefijoDelMódulo
+        ParaCadaElemento: ast#nombresEspecíficos, procedimiento: nombreEspecífico
+            yo#emisor#emitir: Opcode#extraer, nombreEspecífico#nombre#valor
+            yo#inicializarVariable: nombreEspecífico#renombre
+        finprocedimiento
+
+        si no EsNulo: ast#espacioDeNombres
+            yo#inicializarVariable: ast#espacioDeNombres
+        sino
+            yo#emisor#emitir: Opcode#sacar
+        finsi
+
+        devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoLiteralNumérica
@@ -474,88 +497,164 @@ metodo EstadoDeEmisión#emitir: ast
     Inalcanzable
 finmetodo
 
+clase BaseDeDatosDeCompilación
+    atributo tablaCst
+    atributo tablaAst
+    atributo tablasRnCst
+    atributo tablasRnAst
+    atributo tablasMcAst
+finclase
 
-variables T, A, S, cst, tablaCst, ast, tablaAst, tablaNombres, parches,
-          tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc, fin,
-          ámbito, builtins
+clase Compilado
+    metodo baseDeDatosDeCompilación
+    metodo paquete
+    metodo nombreDelMódulo
+    metodo idDelMódulo
+    metodo cst
+    metodo ast
+    metodo ir
+    metodo dependencias
+finclase
+
+atributos Compilado#baseDeDatosDeCompilación,
+          Compilado#paquete, Compilado#nombreDelMódulo, Compilado#idDelMódulo,
+          Compilado#cst, Compilado#ast, Compilado#ir, Compilado#dependencias
+
+metodo Compilado#inicializar: baseDeDatosDeCompilación, paquete, nombreDelMódulo, idDelMódulo, ast, cst, ir, dependencias
+    fijar yo#baseDeDatosDeCompilación a baseDeDatosDeCompilación
+    fijar yo#paquete a paquete
+    fijar yo#nombreDelMódulo a nombreDelMódulo
+    fijar yo#idDelMódulo a idDelMódulo
+    fijar yo#ast a ast
+    fijar yo#cst a cst
+    fijar yo#ir a ir
+    fijar yo#dependencias a dependencias
+finmetodo
+
+metodo Compilado#comoTexto
+    devolver {(Compilado de ~t::~t)}#formatear: yo#paquete, yo#nombreDelMódulo
+finmetodo
+
+funcion PrefijoDelMódulo: idDelMódulo
+    variables res, acc
+    fijar res a {}
+    fijar acc a {}
+    ParaCadaElemento: idDelMódulo, procedimiento: c
+        si (c = {\}) || (c = {/})
+            [ FIXME: Esto esta mal, en UNIX \ no es un carácter reservado en
+              los nombres. El condicional solo debería escapar \ como __ en Windows. ]
+            fijar res a {~t~t__}#formatear: res, acc
+            fijar acc a {}
+        sino
+            si (TextoContiene: ALFABETO_ASCII, c) || (EsDígitoDecimal: c)
+                fijar acc a acc#concatenar: c
+            sino
+                fijar res a {~t~t_N~t_}#formatear: res, acc, (__TextoAByte: c)
+                fijar acc a {}
+            finsi
+        finsi
+    finprocedimiento
+    fijar res a res#concatenar: acc
+    devolver res
+finfuncion
+
+procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, agregarBuiltins, salidaCompilado
+    variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
+              tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
+              parchesAbstraer, ámbito, builtins, exportaciones, dependencias,
+              prefijoDelMódulo
+
+    fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
+
+    fijar tablasRnCst a TablasDeResoluciónDeNombres#crear
+    fijar tablasRnCst#tablaNombres a tablaNombres
+    fijar tablasRnCst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+    fijar tablasRnCst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+    fijar tablasRnCst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+    fijar tablasRnCst#tablaBuiltins a Tabla#vacíaConEsquema: Builtin
+    fijar tablasRnCst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
+    fijar tablasRnCst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+
+    fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
+    fijar tablasRnAst#tablaNombres a tablaNombres
+    fijar tablasRnAst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+    fijar tablasRnAst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+    fijar tablasRnAst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+    fijar tablasRnAst#tablaBuiltins a tablasRnCst#tablaBuiltins
+    fijar tablasRnAst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
+    fijar tablasRnAst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+
+    fijar cst a CrearCST: T, A
+    fijar tablaCst a EntablarÁrbol: cst
+    fijar parchesNombres a Arreglo#vacio
+    fijar ámbito a Ámbito#inicial: tablaNombres
+
+    fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
+
+    si agregarBuiltins
+        variables btObjetoRuntime
+        fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
+        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
+    finsi
+
+    ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
+    ParaCadaElemento: parchesNombres, (MétodoComoFunción: {llamar})
+    ValidaLlamadasAutoejecutables: cst, tablasRnCst
+
+    fijar parchesAbstraer a Arreglo#vacio
+    fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
+    fijar tablaAst a EntablarÁrbol: ast
+    ParaCadaElemento: parchesAbstraer, (MétodoComoFunción: {llamar})
+    ValidaDevolverFueraDeFunción: ast
+
+    variables posiblesCapturas, definitivamenteNoCapturas, tablasMcAst
+    fijar posiblesCapturas a Diccionario#vacío
+    fijar definitivamenteNoCapturas a Arreglo#vacio
+    fijar tablaEsCap a Tabla#vacíaConEsquema: EsCapturada
+    fijar tablaCaps a Tabla#vacíaConEsquema: CapturasDeFunción
+    fijar tablaLoc a Tabla#vacíaConEsquema: LocalesDeFunción
+    fijar tablasMcAst a TablasDeCapturas#crear
+    fijar tablasMcAst#tablaLocales a tablaLoc
+    fijar tablasMcAst#tablaCapturas a tablaCaps
+    fijar tablasMcAst#tablaEsCapturada a tablaEsCap
+    MarcarCapturas: ast, tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
+
+    variables emisor, estado, programa
+    fijar emisor a Emisor#crear
+    fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
+    estado#emitir: ast
+    fijar programa a estado#emisor#moverAPrograma
+
+    fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
+    CompilarPrograma: salidaCompilado, prefijoDelMódulo, programa
+
+    fijar exportaciones a Arreglo#vacio
+    variable ámbitoPrincipal
+    necesitas EsInstancia: ast, AST#NodoPrograma
+    necesitas EsInstancia: ast#cuerpo, AST#NodoBloque
+    fijar ámbitoPrincipal a tablasRnAst#tablaÁmbitos#buscarÚnico: {idNodo}, ast#cuerpo#id
+    necesitas no EsNulo: ámbitoPrincipal
+    ámbitoPrincipal#ámbito#paraCadaNombreExportado: procedimiento: nombre, datos
+        exportaciones#agregarAlFinal: (Exportación#crear: nombre, datos#esAutoejecutable)
+    finprocedimiento
+
+    devolver ObjetoAdHoc:
+        {compilado}, (Compilado#crear: bdMod,
+                                       paquete, nombreDelMódulo, idDelMódulo,
+                                       cst, ast, programa, dependencias),
+        {exportaciones}, exportaciones,
+        {prefijoDelMódulo}, prefijoDelMódulo
+finprocedimiento
+
+
+variables T, A, S, salida, C, moddb
 fijar A a __Argv#en: 0
 fijar S a __Argv#en: 1
 fijar T a LeerArchivo: A
-
-fijar parches a Arreglo#vacio
-
-fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
-
-fijar tablasRnCst a TablasDeResoluciónDeNombres#crear
-fijar tablasRnCst#tablaNombres a tablaNombres
-fijar tablasRnCst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
-fijar tablasRnCst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
-fijar tablasRnCst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
-fijar tablasRnCst#tablaBuiltins a Tabla#vacíaConEsquema: Builtin
-
-fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
-fijar tablasRnAst#tablaNombres a tablaNombres
-fijar tablasRnAst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
-fijar tablasRnAst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
-fijar tablasRnAst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
-fijar tablasRnCst#tablaBuiltins a tablasRnCst#tablaBuiltins
-
-fijar cst a CrearCST: T, A
-fijar tablaCst a EntablarÁrbol: cst
-fijar fin a Arreglo#vacio
-fijar ámbito a Ámbito#inicial: tablaNombres
-
-variables btObjetoRuntime
-fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
-tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
-
-ResolverNombres: cst, tablasRnCst, ámbito, fin
-ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
-ValidaLlamadasAutoejecutables: cst, tablasRnCst
-
-fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parches, NULO
-fijar tablaAst a EntablarÁrbol: ast
-ParaCadaElemento: parches, (MétodoComoFunción: {llamar})
-ValidaDevolverFueraDeFunción: ast
-
-variables pos, def, tablasMcAst
-fijar pos a Diccionario#vacío
-fijar def a Arreglo#vacio
-fijar tablaEsCap a Tabla#vacíaConEsquema: EsCapturada
-fijar tablaCaps a Tabla#vacíaConEsquema: CapturasDeFunción
-fijar tablaLoc a Tabla#vacíaConEsquema: LocalesDeFunción
-fijar tablasMcAst a TablasDeCapturas#crear
-fijar tablasMcAst#tablaLocales a tablaLoc
-fijar tablasMcAst#tablaCapturas a tablaCaps
-fijar tablasMcAst#tablaEsCapturada a tablaEsCap
-MarcarCapturas: ast, tablasRnAst, tablasMcAst, pos, def
-
-Escribir: ast
-Escribir: { AST ================================================== }
-EscribirTabla: tablaAst
-Escribir: { NOMS ================================================== }
-EscribirTabla: tablaNombres
-Escribir: { USOS AST ================================================== }
-EscribirTabla: tablasRnAst#tablaUsos
-Escribir: { DEFS AST ================================================== }
-EscribirTabla: tablasRnAst#tablaDefiniciones
-Escribir: { AMB AST ================================================== }
-EscribirTabla: tablasRnAst#tablaÁmbitos
-Escribir: { ESCAP ================================================== }
-EscribirTabla: tablaEsCap
-Escribir: { CAPS ================================================== }
-EscribirTabla: tablaCaps
-Escribir: { LOCS ================================================== }
-EscribirTabla: tablaLoc
-
-variables emisor, estado, programa
-fijar emisor a Emisor#crear
-fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor
-estado#emitir: ast
-fijar programa a estado#emisor#moverAPrograma
-
-[ EscribirPrograma: programa ]
-variable salida
 fijar salida a PuertoDeArchivoDeEscritura#abrir: S
-CompilarPrograma: salida, {mod}, programa
+fijar moddb a BaseDeDatosDeMódulos#enMemoria
+moddb#agregarMódulo: {pdc}, {pdc/ejemplo}, (Arreglo#crearCon: (Exportación#crear: {hola}, FALSO), (Exportación#crear: {mundo}, VERDADERO)), {pdc_ejemplo}, NULO, {pdc/ejemplo.pd}
+fijar C a Compilar: {pdc}, {prueba}, {PDC}, moddb, T, VERDADERO, salida
+moddb#agregarMódulo: {pdc}, {prueba}, C#exportaciones, C#prefijoDelMódulo, C#compilado, S
+EscribirTabla: moddb#tablaMódulos
 salida#cerrar

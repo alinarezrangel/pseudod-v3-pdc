@@ -1,0 +1,33 @@
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/texto (EsPrefijo, Partir, Unir)
+
+
+[DOCUMENTA
+@brief{Resuelve una ruta relativa de UNIX.}
+
+Resuelve una ruta relativa de UNIX con respecto a una ruta base. Por ejemplo:
+si @pd{base} es @pd{"/a/b"} y @pd{ruta} es @pd{"c/d"} entonces devuelve
+@pd{"/a/b/c/d"}.
+
+Toma en cuenta los segmentos @code{../}.
+DOCUMENTA]
+funcion ResolverRutaRelativa: base, ruta
+    si EsPrefijo: ruta, {/}
+        devolver ruta#subTexto: 1, ruta#longitud
+    finsi
+    variable partes
+    fijar partes a Partir: base, {/}
+    mientras EsPrefijo: ruta, {../}
+        partes#redimensionar: (partes#longitud - 1)
+        fijar ruta a ruta#subTexto: 3, ruta#longitud
+        mientras EsPrefijo: ruta, {/}
+            fijar ruta a ruta#subTexto: 1, ruta#longitud
+        finmientras
+    finmientras
+
+    si no EsPrefijo: ruta, {/}
+        fijar ruta a {/}#concatenar: ruta
+    finsi
+    devolver (Unir: partes, {/})#concatenar: ruta
+finfuncion

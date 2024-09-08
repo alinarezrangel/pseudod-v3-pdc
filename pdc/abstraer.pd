@@ -6,8 +6,20 @@ utilizar pdc/ast como AST
 utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado)
+utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 
+
+funcion ObtenerBinding: nodoCstId, tablasRnCst
+    variable reg
+    fijar reg a tablasRnCst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoCstId#id
+    si EsNulo: reg
+        fijar reg a tablasRnCst#tablaUsos#buscarÚnico: {idNodo}, nodoCstId#id
+        devolver reg#binding
+    sino
+        devolver reg#binding
+    finsi
+finfuncion
 
 [DOCUMENTA
 @brief{Convierte un CST en un AST.}
@@ -276,24 +288,68 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     finsi
 
     si EsInstancia: nodoCst, CST#NodoUtilizar
-        variables ns, nombres
+        variables informaciónDelMódulo, ns, nombres, nombresImportados, regNombresImportados
         si no EsNulo: nodoCst#espacioDeNombres
             fijar ns a abstraer: nodoCst#espacioDeNombres
         finsi
+
+        fijar informaciónDelMódulo a tablasRnCst#tablaInformaciónDeMódulo#buscarÚnico: {idNodo}, nodoCst#id
+        fijar nombresImportados a tablasRnCst#tablaNombresImportados#buscarOrdenado: {idNodo}, nodoCst#id
+        fijar regNombresImportados a Arreglo#vacio
+
         si no EsNulo: nodoCst#nombresEspecíficos
             fijar nombres a Mapear: nodoCst#nombresEspecíficos, funcion: nombreORenombre
                 si EsInstancia: nombreORenombre, CST#NodoIdentificador
-                    devolver AST#NodoNombreEspecífico#crear: nombreORenombre#áreaTextual, (abstraer: nombreORenombre), NULO
+                    variable binding
+                    fijar binding a ObtenerBinding: nombreORenombre, tablasRnCst
+                    regNombresImportados#agregarAlFinal:
+                        (NombreImportado#crear: NULO, nombreORenombre#nombre, binding)
+                    devolver AST#NodoNombreEspecífico#crear: nombreORenombre#áreaTextual,
+                        (AST#NodoLiteralTextual#crear: nombreORenombre#áreaTextual, nombreORenombre#nombre),
+                        (abstraer: nombreORenombre)
                 sino
+                    variable binding
+                    fijar binding a ObtenerBinding: (nombreORenombre#en: 1), tablasRnCst
+                    regNombresImportados#agregarAlFinal:
+                        (NombreImportado#crear: NULO, (nombreORenombre#en: 0)#nombre, binding)
                     devolver AST#NodoNombreEspecífico#crear: (nombreORenombre#en: 1)#áreaTextual,
-                        (abstraer: (nombreORenombre#en: 0)), (abstraer: (nombreORenombre#en: 1))
+                        (abstraer: (nombreORenombre#en: 0)),
+                        (abstraer: (nombreORenombre#en: 1))
                 finsi
             finfuncion
+        sino
+            fijar nombres a Arreglo#vacio
+            ParaCadaElemento: nombresImportados, procedimiento: nombreImportado
+                variable id
+                fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreImportado#nombre, FALSO, VERDADERO
+                nombres#agregarAlFinal: (AST#NodoNombreEspecífico#crear: nodoCst#áreaTextual,
+                    (AST#NodoLiteralTextual#crear: nodoCst#áreaTextual, nombreImportado#nombre),
+                    id)
+                registrarParche: procedimiento
+                    tablasRnAst#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: id#id, nombreImportado#binding)
+                finprocedimiento
+            finprocedimiento
         finsi
-        devolver AST#NodoUtilizar#crear: nodoCst#áreaTextual,
+
+        variable astUtilz
+        fijar astUtilz a AST#NodoUtilizar#crear: nodoCst#áreaTextual,
             (abstraer: nodoCst#módulo),
             ns,
-            (Mapear: nodoCst#nombresEspecíficos)
+            nombres
+
+        registrarParche: procedimiento
+            ParaCadaElemento: regNombresImportados, procedimiento: nombreImportado
+                fijar nombreImportado#idNodo a astUtilz#id
+                tablasRnAst#tablaNombresImportados#agregar: nombreImportado
+            finprocedimiento
+
+            tablasRnAst#tablaInformaciónDeMódulo#agregar:
+                (InformaciónDeMódulo#crear: astUtilz#id,
+                    informaciónDelMódulo#paquete,
+                    informaciónDelMódulo#módulo)
+        finprocedimiento
+
+        devolver astUtilz
     finsi
 
     si EsInstancia: nodoCst, CST#NodoIdentificador

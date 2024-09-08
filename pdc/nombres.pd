@@ -8,6 +8,8 @@ utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, Entablar�
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/catamorfismos (Buscando)
+utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
+utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
 
 
 [ Cada identificador del programa que representa una variable se le es asignado
@@ -48,7 +50,7 @@ no.}
 DOCUMENTA]
 variable NombreResuelto
 fijar NombreResuelto a CrearTipoDeRegistro: {NombreResuelto},
-    {binding}, {nombre}, {esAutoejecutable}, {importadoDesde}, {seLlamaba},
+    {binding}, {nombre}, {esAutoejecutable},
     (Índice#ÚNICO: {binding}),
     (Índice#ORDENADO: {nombre})
 
@@ -116,6 +118,28 @@ fijar Builtin a CrearTipoDeRegistro: {Builtin},
     {binding}, {builtin},
     (Índice#ÚNICO: {binding}),
     (Índice#ÚNICO: {builtin})
+
+[DOCUMENTA
+@brief{Un nombre importado.}
+
+En las instrucciones @pd{utilizar}, cada nombre importado será registrado en
+esta tabla.
+
+@itemlist(
+@item{@code{idNodo}: ID del nodo utilizar.}
+
+@item{@code{nombre}: Nombre a importar.}
+
+@item{@code{binding}: Binding de la variable en la que se guardará el valor
+importado.}
+)
+DOCUMENTA]
+variable NombreImportado
+fijar NombreImportado a CrearTipoDeRegistro: {NombreImportado},
+    {idNodo}, {nombre}, {binding},
+    (Índice#ORDENADO: {idNodo}),
+    (Índice#ORDENADO: {nombre}),
+    (Índice#ÚNICO: {binding})
 
 [DOCUMENTA
 @brief{Un ámbito del programa.}
@@ -215,7 +239,7 @@ finmetodo
 
 metodo Ámbito#crear: nombre, esAutoejecutable
     variable reg
-    fijar reg a NombreResuelto#crear: yo#obtenerBinding, nombre, esAutoejecutable, NULO, NULO
+    fijar reg a NombreResuelto#crear: yo#obtenerBinding, nombre, esAutoejecutable
     yo#_porNombre#fijarEn: nombre, reg
     yo#tablaNombres#agregar: reg
     devolver reg
@@ -284,6 +308,16 @@ clase TablasDeResoluciónDeNombres
     @brief{Tabla de @pd{Builtin}.}
     DOCUMENTA]
     atributo tablaBuiltins
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{NombreImportado}.}
+    DOCUMENTA]
+    atributo tablaNombresImportados
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{InformaciónDeMódulo}.}
+    DOCUMENTA]
+    atributo tablaInformaciónDeMódulo
 finclase
 
 [DOCUMENTA
@@ -293,14 +327,14 @@ finclase
 @pd{TablasDeResoluciónDeNombres} con todas las tablas usadas. @pd{ámbito} es el
 ámbito actual y @pd{paraFinDelÁmbito} es un arreglo que se llenará con
 funciones (sin parámetros) que se deberán llamar cuando se termine el ámbito
-actual.
+actual. @pd{bdMod} es la base de datos de módulos (@pd{BaseDeDatosDeMódulos}).
 
 Este arreglo es usado, por ejemplo, para resolver los nombres de las funciones:
 cada función puede acceder a variables declaradas @bold{después} de la función,
 por lo cual es importante que el cuerpo de la función se resuelva al final del
 ámbito, cuando todos los demás nombres ya están resueltos.
 DOCUMENTA]
-funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
+funcion ResolverNombres: cst, tablas, bdMod, ámbito, paraElFinDelÁmbito
     Buscando: cst, funcion: nodo
         si EsInstancia: nodo, CST#NodoIdentificador
             devolver no nodo#esLiteral
@@ -309,6 +343,7 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
               || (EsInstancia: nodo, CST#NodoFunción)
               || (EsInstancia: nodo, CST#NodoMétodo)
               || (EsInstancia: nodo, CST#NodoFunciónAnónima)
+              || (EsInstancia: nodo, CST#NodoUtilizar)
     finfuncion, funcion: nodo
         si EsInstancia: nodo, CST#NodoIdentificador
             necesitas no nodo#esLiteral
@@ -332,13 +367,63 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
             devolver NULO
         finsi
 
+        si EsInstancia: nodo, CST#NodoUtilizar
+            variables inf, mod
+            fijar inf a tablas#tablaInformaciónDeMódulo#buscarÚnico: {idNodo}, nodo#id
+            fijar mod a bdMod#buscarMódulo: inf#paquete, inf#módulo
+
+            si no EsNulo: nodo#espacioDeNombres
+                variable reg
+                fijar reg a ámbito#crear: nodo#espacioDeNombres#nombre, FALSO
+                tablas#tablaDefiniciones#agregar:
+                    (DefiniciónDeNombre#crear: nodo#espacioDeNombres#id, reg#binding)
+            finsi
+
+            si (EsNulo: nodo#nombresEspecíficos) && (EsNulo: nodo#espacioDeNombres)
+                ParaCadaElemento: mod#exportaciones, procedimiento: exportación
+                    variable reg
+                    fijar reg a ámbito#crear: exportación#nombre, exportación#esAutoejecutable
+                    tablas#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: nodo#id, reg#binding)
+                    tablas#tablaNombresImportados#agregar:
+                        (NombreImportado#crear: nodo#id, exportación#nombre, reg#binding)
+                finprocedimiento
+            finsi
+
+            si no EsNulo: nodo#nombresEspecíficos
+                variable exportacionesPorNombre
+                fijar exportacionesPorNombre a Diccionario#vacío
+                ParaCadaElemento: mod#exportaciones, procedimiento: exportación
+                    exportacionesPorNombre#fijarEn: exportación#nombre, exportación
+                finprocedimiento
+
+                ParaCadaElemento: nodo#nombresEspecíficos, procedimiento: nombreORenombre
+                    variables nombreImportado, nombreFinal, exp, reg, nodoVar
+                    si EsInstancia: nombreORenombre, CST#NodoIdentificador
+                        fijar nombreImportado a nombreORenombre#nombre
+                        fijar nombreFinal a nombreORenombre#nombre
+                        fijar nodoVar a nombreORenombre
+                    sino
+                        fijar nombreImportado a (nombreORenombre#en: 0)#nombre
+                        fijar nombreFinal a (nombreORenombre#en: 1)#nombre
+                        fijar nodoVar a nombreORenombre#en: 1
+                    finsi
+                    fijar exp a exportacionesPorNombre#en: nombreImportado
+                    fijar reg a ámbito#crear: nombreFinal, exp#esAutoejecutable
+                    tablas#tablaDefiniciones#agregar: (DefiniciónDeNombre#crear: nodoVar#id, reg#binding)
+                    tablas#tablaNombresImportados#agregar:
+                        (NombreImportado#crear: nodo#id, nombreImportado, reg#binding)
+                finprocedimiento
+            finsi
+            devolver NULO
+        finsi
+
         si EsInstancia: nodo, CST#NodoBloque
             variable fin
             fijar fin a Arreglo#vacio
             fijar nodo#ámbito a Ámbito#desde: ámbito
             tablas#tablaÁmbitos#agregar: (Ámbitos#crear: nodo#id, nodo#ámbito)
             nodo#recursivo: procedimiento: subnodo
-                devolver ResolverNombres: subnodo, tablas, nodo#ámbito, fin
+                devolver ResolverNombres: subnodo, tablas, bdMod, nodo#ámbito, fin
             finprocedimiento
             ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
             devolver NULO
@@ -355,10 +440,10 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
             finsi
 
             si EsInstancia: nodo, CST#NodoMétodo
-                ResolverNombres: nodo#deClase, tablas, ámbito, paraElFinDelÁmbito
+                ResolverNombres: nodo#deClase, tablas, bdMod, ámbito, paraElFinDelÁmbito
             finsi
             si EsInstancia: nodo, CST#NodoFunción
-                ResolverNombres: nodo#nombre, tablas, ámbito, paraElFinDelÁmbito
+                ResolverNombres: nodo#nombre, tablas, bdMod, ámbito, paraElFinDelÁmbito
             finsi
 
             fijar nodo#ámbito a Ámbito#desde: ámbito
@@ -372,9 +457,9 @@ funcion ResolverNombres: cst, tablas, ámbito, paraElFinDelÁmbito
                 variable fin
                 fijar fin a Arreglo#vacio
                 ParaCadaElemento: nodo#parámetros, procedimiento: param
-                    devolver ResolverNombres: param, tablas, nodo#ámbito, fin
+                    devolver ResolverNombres: param, tablas, bdMod, nodo#ámbito, fin
                 finprocedimiento
-                ResolverNombres: nodo#cuerpo, tablas, nodo#ámbito, fin
+                ResolverNombres: nodo#cuerpo, tablas, bdMod, nodo#ámbito, fin
                 ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
             finprocedimiento
             devolver NULO
