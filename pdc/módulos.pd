@@ -1,6 +1,8 @@
 utilizar bepd/builtins
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeLectura, PuertoDeArchivoDeEscritura)
+utilizar bepd/x/json (DesdeJSON, ComoJSON)
 
 utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, EscribirTabla)
 
@@ -120,11 +122,59 @@ metodo BaseDeDatosDeMódulos#inicializar: tabla
 finmetodo
 
 metodo BaseDeDatosDeMódulos#cargarDesdeArchivo: archivo
-    NoImplementado
+    variables puerto, json, v
+    fijar puerto a PuertoDeArchivoDeLectura#desdeArchivo: archivo
+    fijar json a DesdeJSON: puerto
+    si json#esError
+        __FallarConMensaje: json#error
+    finsi
+    fijar json a json#valor
+    fijar v a json#en: {versión}
+    si v = 1
+        yo#_cargarDesdeArchivoV1: json
+    sino
+        __FallarConMensaje: ({No se pudo cargar la base de datos con la versión ~t}#formatear: v)
+    finsi
+finmetodo
+
+metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: json
+    variable módulos
+    fijar módulos a json#en: "módulos"
+    ParaCadaElemento: módulos, procedimiento: módulo
+        variable paquete, nombre, exportaciones, prefijo, archivo
+        fijar paquete a módulo#en: {paquete}
+        fijar nombre a módulo#en: {módulo}
+        fijar exportaciones a Mapear: (módulo#en: {exportaciones}), funcion: exp
+            devolver Exportación#crear: (exp#en: {nombre}), (exp#en: {esAutoejecutable})
+        finfuncion
+        fijar prefijo a módulo#en: {prefijoDelMódulo}
+        fijar archivo a módulo#en: {archivoConElCompilado}
+        yo#agregarMódulo: paquete, nombre, exportaciones, prefijo, NULO, archivo
+    finprocedimiento
 finmetodo
 
 metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
-    NoImplementado
+    variables puerto, mods, res
+    fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
+    fijar mods a Arreglo#vacio
+    yo#tablaMódulos#escaneoLineal: procedimiento: mod
+        mods#agregarAlFinal: (Diccionario#desdePares:
+            {paquete}, mod#paquete,
+            {módulo}, mod#módulo,
+            {exportaciones}, (Mapear: mod#exportaciones, funcion: exp
+                    devolver Diccionario#desdePares:
+                        {nombre}, exp#nombre,
+                        {esAutoejecutable}, exp#esAutoejecutable
+                finfuncion),
+            {prefijoDelMódulo}, mod#prefijoDelMódulo,
+            {archivoConElCompilado}, mod#archivoConElCompilado)
+    finprocedimiento
+    fijar res a ComoJSON: puerto, (Diccionario#desdePares:
+        {versión}, 1,
+        {módulos}, mods)
+    si res#esError
+        __FallarConMensaje: res#error
+    finsi
 finmetodo
 
 metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado

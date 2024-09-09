@@ -80,7 +80,7 @@ Inserta @pd{valor} en el índice @pd{índice} de forma que @pd{(arreglo#en:
 DOCUMENTA]
 procedimiento Insertar: arreglo, índice, valor
     necesitas índice >= 0
-    necesitas índice < arreglo#longitud
+    necesitas índice =< arreglo#longitud
     arreglo#agregarAlFinal: NULO
     variable i
     fijar i a arreglo#longitud - 1

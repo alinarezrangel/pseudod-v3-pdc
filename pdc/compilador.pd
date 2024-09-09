@@ -1,0 +1,445 @@
+utilizar bepd/builtins
+utilizar bepd/datos/caja (Caja)
+utilizar bepd/datos/resultado (Resultado)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+utilizar bepd/x/puerto (LeerTodo, EntradaEstándar, SalidaEstándar)
+utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
+utilizar bepd/utilidades/arreglo (Únicos)
+utilizar bepd/utilidades/texto (TextoContiene)
+utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal)
+utilizar bepd/x/enum (Enum)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+utilizar bepd/x/puerto (SalidaEstándar)
+utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/cli (Opción, CLI como ProcesarCLI)
+
+utilizar pdc/cst como CST
+utilizar pdc/ast como AST
+utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
+utilizar pdc/combinadores (Error)
+utilizar pdc/parser (ErrorComoTraceback, CrearCST)
+utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado)
+utilizar pdc/catamorfismos (Buscando)
+utilizar pdc/abstraer (Abstraer)
+utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/backend/c/lowerer (CompilarPrograma)
+utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
+utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
+utilizar pdc/backend/c (Emisor, EstadoDeEmisión)
+utilizar pdc/info como Info
+
+
+clase BaseDeDatosDeCompilación
+    atributo tablaCst
+    atributo tablaAst
+    atributo tablasRnCst
+    atributo tablasRnAst
+    atributo tablasMcAst
+finclase
+
+clase Compilado
+    metodo baseDeDatosDeCompilación
+    metodo paquete
+    metodo nombreDelMódulo
+    metodo idDelMódulo
+    metodo cst
+    metodo ast
+    metodo ir
+    metodo dependencias
+finclase
+
+atributos Compilado#baseDeDatosDeCompilación,
+          Compilado#paquete, Compilado#nombreDelMódulo, Compilado#idDelMódulo,
+          Compilado#cst, Compilado#ast, Compilado#ir, Compilado#dependencias
+
+metodo Compilado#inicializar: baseDeDatosDeCompilación, paquete, nombreDelMódulo, idDelMódulo, ast, cst, ir, dependencias
+    fijar yo#baseDeDatosDeCompilación a baseDeDatosDeCompilación
+    fijar yo#paquete a paquete
+    fijar yo#nombreDelMódulo a nombreDelMódulo
+    fijar yo#idDelMódulo a idDelMódulo
+    fijar yo#ast a ast
+    fijar yo#cst a cst
+    fijar yo#ir a ir
+    fijar yo#dependencias a dependencias
+finmetodo
+
+metodo Compilado#comoTexto
+    devolver {(Compilado de ~t::~t)}#formatear: yo#paquete, yo#nombreDelMódulo
+finmetodo
+
+funcion PrefijoDelMódulo: idDelMódulo
+    variables res, acc
+    fijar res a {}
+    fijar acc a {}
+    ParaCadaElemento: idDelMódulo, procedimiento: c
+        si (c = {\}) || (c = {/})
+            [ FIXME: Esto esta mal, en UNIX \ no es un carácter reservado en
+              los nombres. El condicional solo debería escapar \ como __ en Windows. ]
+            fijar res a {~t~t__}#formatear: res, acc
+            fijar acc a {}
+        sino
+            si (TextoContiene: ALFABETO_ASCII, c) || (EsDígitoDecimal: c)
+                fijar acc a acc#concatenar: c
+            sino
+                fijar res a {~t~t_N~t_}#formatear: res, acc, (__TextoAByte: c)
+                fijar acc a {}
+            finsi
+        finsi
+    finprocedimiento
+    fijar res a res#concatenar: acc
+    devolver res
+finfuncion
+
+procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, agregarBuiltins, salidaCompilado
+    variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
+              tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
+              parchesAbstraer, ámbito, builtins, exportaciones, dependencias,
+              prefijoDelMódulo, bdComp
+
+    fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
+
+    fijar tablasRnCst a TablasDeResoluciónDeNombres#crear
+    fijar tablasRnCst#tablaNombres a tablaNombres
+    fijar tablasRnCst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+    fijar tablasRnCst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+    fijar tablasRnCst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+    fijar tablasRnCst#tablaBuiltins a Tabla#vacíaConEsquema: Builtin
+    fijar tablasRnCst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
+    fijar tablasRnCst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+
+    fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
+    fijar tablasRnAst#tablaNombres a tablaNombres
+    fijar tablasRnAst#tablaUsos a Tabla#vacíaConEsquema: UsoDeNombre
+    fijar tablasRnAst#tablaDefiniciones a Tabla#vacíaConEsquema: DefiniciónDeNombre
+    fijar tablasRnAst#tablaÁmbitos a Tabla#vacíaConEsquema: Ámbitos
+    fijar tablasRnAst#tablaBuiltins a tablasRnCst#tablaBuiltins
+    fijar tablasRnAst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
+    fijar tablasRnAst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+
+    fijar cst a CrearCST: código, archivo
+    fijar tablaCst a EntablarÁrbol: cst
+    fijar parchesNombres a Arreglo#vacio
+    fijar ámbito a Ámbito#inicial: tablaNombres
+
+    fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
+
+    si agregarBuiltins
+        variables btObjetoRuntime
+        fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
+        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
+    finsi
+
+    ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
+    ParaCadaElemento: parchesNombres, (MétodoComoFunción: {llamar})
+    ValidaLlamadasAutoejecutables: cst, tablasRnCst
+
+    fijar parchesAbstraer a Arreglo#vacio
+    fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
+    fijar tablaAst a EntablarÁrbol: ast
+    ParaCadaElemento: parchesAbstraer, (MétodoComoFunción: {llamar})
+    ValidaDevolverFueraDeFunción: ast
+
+    variables posiblesCapturas, definitivamenteNoCapturas, tablasMcAst
+    fijar posiblesCapturas a Diccionario#vacío
+    fijar definitivamenteNoCapturas a Arreglo#vacio
+    fijar tablaEsCap a Tabla#vacíaConEsquema: EsCapturada
+    fijar tablaCaps a Tabla#vacíaConEsquema: CapturasDeFunción
+    fijar tablaLoc a Tabla#vacíaConEsquema: LocalesDeFunción
+    fijar tablasMcAst a TablasDeCapturas#crear
+    fijar tablasMcAst#tablaLocales a tablaLoc
+    fijar tablasMcAst#tablaCapturas a tablaCaps
+    fijar tablasMcAst#tablaEsCapturada a tablaEsCap
+    MarcarCapturas: ast, tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
+
+    variables emisor, estado, programa
+    fijar emisor a Emisor#crear
+    fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
+    estado#emitir: ast
+    fijar programa a estado#emisor#moverAPrograma
+
+    fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
+    CompilarPrograma: salidaCompilado, prefijoDelMódulo, programa
+
+    fijar exportaciones a Arreglo#vacio
+    variable ámbitoPrincipal
+    necesitas EsInstancia: ast, AST#NodoPrograma
+    necesitas EsInstancia: ast#cuerpo, AST#NodoBloque
+    fijar ámbitoPrincipal a tablasRnAst#tablaÁmbitos#buscarÚnico: {idNodo}, ast#cuerpo#id
+    necesitas no EsNulo: ámbitoPrincipal
+    ámbitoPrincipal#ámbito#paraCadaNombreExportado: procedimiento: nombre, datos
+        exportaciones#agregarAlFinal: (Exportación#crear: nombre, datos#esAutoejecutable)
+    finprocedimiento
+
+    fijar bdComp a BaseDeDatosDeCompilación#crear
+    fijar bdComp#tablaCst a tablaCst
+    fijar bdComp#tablaAst a tablaAst
+    fijar bdComp#tablasRnCst a tablasRnCst
+    fijar bdComp#tablasRnAst a tablasRnAst
+    fijar bdComp#tablasMcAst a tablasMcAst
+
+    devolver ObjetoAdHoc:
+        {compilado}, (Compilado#crear: bdComp,
+                                       paquete, nombreDelMódulo, idDelMódulo,
+                                       cst, ast, programa, dependencias),
+        {exportaciones}, exportaciones,
+        {prefijoDelMódulo}, prefijoDelMódulo
+finprocedimiento
+
+
+variable OpcionesDeCompilación
+fijar OpcionesDeCompilación a TipoDeDatos: {OpcionesDeCompilación},
+    {mostrarAyuda}, [ Boole ]
+    {mostrarVersión}, [ MostrarVersión ]
+    {verboso}, [ Verbosidad ]
+    {experimentos}, [ Arreglo de Textos ]
+    {salida}, [ SalidaAArchivo | SALIDA_A_SALIDA | IGNORAR_SALIDA ]
+    {entrada}, [ (EntradaDesdeArchivo | EntradaDesdeTexto | ENTRADA_DESDE_ENTRADA) o NULO si no se especificó ]
+    {guardarBaseDeDatos}, [ Texto o NULO ]
+    {cargarBasesDeDatos}, [ Arreglo de Textos ]
+    {nombreDelPaquete}, [ Texto ]
+    {nombreDelMódulo}, [ Texto ]
+    {identificadorDelMódulo} [ Texto ]
+
+metodo estatico OpcionesDeCompilación#predeterminado
+    devolver yo#crear:
+        FALSO,
+        MostrarVersión#NO,
+        Verbosidad#NINGUNA,
+        Arreglo#vacio,
+        IGNORAR_SALIDA,
+        NULO,
+        NULO,
+        Arreglo#vacio,
+        {demo},
+        {ejemplo},
+        {demo_ejemplo}
+finmetodo
+
+variable MostrarVersión
+fijar MostrarVersión a Enum: {MostrarVersión},
+    {VERSIÓN_Y_NOMBRE},
+    {SOLO_VERSIÓN},
+    {NO}
+
+variable Verbosidad
+fijar Verbosidad a Enum: {Verbosidad},
+    {NINGUNA},
+    {PEQUEÑA},
+    {MEDIANA},
+    {GRANDE}
+
+variables SalidaAArchivo, SalidaASalida, IgnorarSalida
+fijar SalidaAArchivo a TipoDeDatos: {SalidaAArchivo}, {nombreDelArchivo}
+fijar SalidaASalida a TipoDeDatos: {SalidaASalida}
+fijar IgnorarSalida a TipoDeDatos: {IgnorarSalida}
+variables SALIDA_A_SALIDA, IGNORAR_SALIDA
+fijar SALIDA_A_SALIDA a SalidaASalida#crear
+fijar IGNORAR_SALIDA a IgnorarSalida#crear
+
+variables EntradaDesdeArchivo, EntradaDesdeTexto, EntradaDesdeEntrada
+fijar EntradaDesdeArchivo a TipoDeDatos: {EntradaDesdeArchivo}, {nombreDelArchivo}
+fijar EntradaDesdeTexto a TipoDeDatos: {EntradaDesdeTexto}, {código}
+fijar EntradaDesdeEntrada a TipoDeDatos: {EntradaDesdeEntrada}
+variable ENTRADA_DESDE_ENTRADA
+fijar ENTRADA_DESDE_ENTRADA a EntradaDesdeEntrada#crear
+
+funcion ProcesarCLIDelCompilador: argumentosDelCLI
+    variable opciones
+    fijar opciones a OpcionesDeCompilación#predeterminado
+
+    procedimiento Almacenar: campo, valor
+        devolver procedimiento: opt, ...valores
+            EnviarMensaje: opciones, ({fijar_}#concatenar: campo), valor
+        finprocedimiento
+    finprocedimiento
+
+    procedimiento ManejarVerboso: opt, ...valores
+        si valores#longitud = 1
+            fijar opciones#verboso a Verbosidad#PEQUEÑA
+        finsi
+        si valores#longitud = 2
+            fijar opciones#verboso a Verbosidad#MEDIANA
+        finsi
+        si valores#longitud >= 3
+            fijar opciones#verboso a Verbosidad#GRANDE
+        finsi
+    finprocedimiento
+
+    procedimiento Fijar: campo
+        devolver procedimiento: opt, ...valores
+            si (opt#númArgumentos =< 1) && (no opt#acumular)
+                EnviarMensaje: opciones, ({fijar_}#concatenar: campo), (valores#en: 0)
+            sino
+                EnviarMensaje: opciones, ({fijar_}#concatenar: campo), valores
+            finsi
+        finprocedimiento
+    finprocedimiento
+
+    procedimiento ManejarSalida: opt, archivo
+        fijar opciones#salida a SalidaAArchivo#crear: archivo
+    finprocedimiento
+
+    procedimiento ManejarEntradaDesdeTexto: opt, código
+        fijar opciones#entrada a EntradaDesdeTexto#crear: código
+    finprocedimiento
+
+    procedimiento ManejarCargarBD: opt, ...valores
+        ParaCadaElemento: valores, procedimiento: valor
+            opciones#cargarBasesDeDatos#agregarAlFinal: valor
+        finprocedimiento
+    finprocedimiento
+
+    variable opts
+    fijar opts a Arreglo#crearCon:
+        [ ===== Ayuda e información ===== ]
+        (Opción#crear: {h},  {help},                 0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+        (Opción#crear: {a},  {ayuda},                0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+        (Opción#crear: {?},  NULO,                   0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+
+        (Opción#crear: {v},  {version},              0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#VERSIÓN_Y_NOMBRE)),
+        (Opción#crear: NULO, {solo-version},         0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#SOLO_VERSIÓN)),
+
+        (Opción#crear: {V},  {verboso},              0, VERDADERO, &ManejarVerboso),
+
+        [ ===== Experimentos ===== ]
+        (Opción#crear: {X},  {experimento},          1, VERDADERO, (Fijar: {experimentos})),
+
+        [ ===== Entrada, salida y archivos temporales ===== ]
+        (Opción#crear: {o},  {salida},               1, FALSO,     &ManejarSalida),
+        (Opción#crear: NULO, {escribir-salida},      0, FALSO,     (Almacenar: {salida}, SALIDA_A_SALIDA)),
+        (Opción#crear: NULO, {ignorar-salida},       0, FALSO,     (Almacenar: {salida}, IGNORAR_SALIDA)),
+        (Opción#crear: NULO, {leer-entrada},         0, FALSO,     (Almacenar: {entrada}, ENTRADA_DESDE_ENTRADA)),
+        (Opción#crear: {c},  {codigo},               1, FALSO,     &ManejarEntradaDesdeTexto),
+        (Opción#crear: NULO, {código},               1, FALSO,     &ManejarEntradaDesdeTexto),
+
+        [ ===== Base de datos de módulos ===== ]
+        (Opción#crear: NULO, {guardar-db},           1, FALSO,     (Fijar: {guardarBaseDeDatos})),
+        (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
+
+        [ ===== Compilación ===== ]
+        (Opción#crear: NULO, {id-modulo},           1, FALSO,     (Fijar: {identificadorDelMódulo})),
+        (Opción#crear: NULO, {paquete},             1, FALSO,     (Fijar: {nombreDelPaquete})),
+        (Opción#crear: NULO, {modulo},              1, FALSO,     (Fijar: {nombreDelMódulo}))
+
+    devolver LlamarConEC: procedimiento: salir
+        variables opcs, pos
+        fijar pos a ProcesarCLI: opts, NULO, argumentosDelCLI, procedimiento: error
+            devolver %salir: (Resultado#error: error)
+        finprocedimiento
+        si pos#longitud > 1
+            devolver Resultado#error: {Se especificaron múltiples archivos de entrada}
+        finsi
+        si pos#longitud = 1
+            si EsNulo: opciones#entrada
+                fijar opciones#entrada a EntradaDesdeArchivo#crear: (pos#en: 0)
+            sino
+                devolver Resultado#error: {Se especificaron múltiples archivos de entrada}
+            finsi
+        finsi
+
+        devolver Resultado#ok: opciones
+    finprocedimiento
+finfuncion
+
+clase SalidaDevNull
+    metodo escribirTexto: txt
+finclase
+
+metodo SalidaDevNull#escribirTexto: txt
+finmetodo
+
+procedimiento MostrarAyuda
+    Escribir: {TODO}
+finprocedimiento
+
+procedimiento MostrarSoloVersión
+    Escribir: ({pdc v~t}#formatear: Info#VERSIÓN)
+finprocedimiento
+
+procedimiento MostrarVersiónYNombre
+    MostrarSoloVersión
+    Escribir: ({Implementa PseudoD v~t}#formatear: Info#VERSIÓN_LENGUAGE)
+finprocedimiento
+
+procedimiento EjecutarCompilador: cli
+    variable rOpciones
+    fijar rOpciones a ProcesarCLIDelCompilador: cli
+    si rOpciones#esError
+        __FallarConMensaje: rOpciones#error
+    finsi
+    variable opciones
+    fijar opciones a rOpciones#valor
+
+    si opciones#mostrarAyuda
+        MostrarAyuda
+        devolver NULO
+    finsi
+    si opciones#mostrarVersión = MostrarVersión#SOLO_VERSIÓN
+        MostrarSoloVersión
+        devolver NULO
+    finsi
+    si opciones#mostrarVersión = MostrarVersión#VERSIÓN_Y_NOMBRE
+        MostrarVersiónYNombre
+        devolver NULO
+    finsi
+
+    si EsNulo: opciones#entrada
+        __FallarConMensaje: {Se debe especificar una entrada}
+    finsi
+
+    variables código, archivo, bdMod, salida, archivoSalida, res
+    si EsInstancia: opciones#entrada, EntradaDesdeArchivo
+        fijar archivo a opciones#entrada#nombreDelArchivo
+        fijar código a LeerArchivo: archivo
+    finsi
+    si EsInstancia: opciones#entrada, EntradaDesdeEntrada
+        fijar archivo a {/dev/stdin}
+        fijar código a LeerTodo: EntradaEstándar
+    finsi
+    si EsInstancia: opciones#entrada, EntradaDesdeTexto
+        fijar archivo a {-c}
+        fijar código a opciones#entrada#código
+    finsi
+
+    si EsInstancia: opciones#salida, SalidaAArchivo
+        fijar archivoSalida a opciones#salida#nombreDelArchivo
+        fijar salida a PuertoDeArchivoDeEscritura#abrir: archivoSalida
+    finsi
+    si EsInstancia: opciones#salida, SalidaASalida
+        fijar archivoSalida a {/dev/stdout}
+        fijar salida a SalidaEstándar
+    finsi
+    si EsInstancia: opciones#salida, IgnorarSalida
+        fijar archivoSalida a {/dev/null}
+        fijar salida a SalidaDevNull#crear
+    finsi
+
+    fijar bdMod a BaseDeDatosDeMódulos#enMemoria
+    ParaCadaElemento: opciones#cargarBasesDeDatos, procedimiento: archivo
+        bdMod#cargarDesdeArchivo: (__AbrirArchivo: archivo, 10)
+    finprocedimiento
+
+    fijar res a Compilar: opciones#nombreDelPaquete, opciones#nombreDelMódulo, opciones#identificadorDelMódulo, bdMod, código, archivo, VERDADERO, salida
+    bdMod#agregarMódulo: opciones#nombreDelPaquete, opciones#nombreDelMódulo, res#exportaciones, res#prefijoDelMódulo, res#compilado, archivoSalida
+
+    si no EsNulo: opciones#guardarBaseDeDatos
+        bdMod#guardarEnArchivo: (__AbrirArchivo: opciones#guardarBaseDeDatos, 11)
+    finsi
+finprocedimiento
+
+EjecutarCompilador: __Argv
+
+[ variables T, A, S, salida, C, moddb ]
+[ fijar A a __Argv#en: 0 ]
+[ fijar S a __Argv#en: 1 ]
+[ fijar T a LeerArchivo: A ]
+[ fijar salida a PuertoDeArchivoDeEscritura#abrir: S ]
+[ fijar moddb a BaseDeDatosDeMódulos#enMemoria ]
+[ moddb#agregarMódulo: {pdc}, {pdc/ejemplo}, (Arreglo#crearCon: (Exportación#crear: {hola}, FALSO), (Exportación#crear: {mundo}, VERDADERO)), {pdc_ejemplo}, NULO, {pdc/ejemplo.pd} ]
+[ fijar C a Compilar: {pdc}, {prueba}, {PDC}, moddb, T, A, VERDADERO, salida ]
+[ moddb#agregarMódulo: {pdc}, {prueba}, C#exportaciones, C#prefijoDelMódulo, C#compilado, S ]
+[ EscribirTabla: moddb#tablaMódulos ]
+[ salida#cerrar ]

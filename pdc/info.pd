@@ -1,0 +1,5 @@
+variable VERSIÓN
+fijar VERSIÓN a {3.0.0}
+
+variable VERSIÓN_LENGUAGE
+fijar VERSIÓN_LENGUAGE a {3.0.0}
