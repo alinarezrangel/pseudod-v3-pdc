@@ -93,6 +93,7 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_CLOSURE,
     PDCRT_TGC_CAJA,
     PDCRT_TGC_TABLA,
+    PDCRT_TGC_VALOP,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -128,6 +129,9 @@ typedef struct pdcrt_caja pdcrt_caja;
 struct pdcrt_tabla;
 typedef struct pdcrt_tabla pdcrt_tabla;
 
+struct pdcrt_valop;
+typedef struct pdcrt_valop pdcrt_valop;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -143,6 +147,7 @@ typedef struct pdcrt_obj
         pdcrt_caja *caja;
         pdcrt_tabla *tabla;
         void *pval;
+        pdcrt_valop *valop;
     };
 } pdcrt_obj;
 
@@ -189,6 +194,12 @@ struct pdcrt_bucket
     pdcrt_obj llave, valor;
 };
 
+struct pdcrt_valop
+{
+    pdcrt_cabecera_gc gc;
+    char datos[];
+};
+
 typedef enum pdcrt_tipo
 {
     PDCRT_TOBJ_ENTERO,
@@ -203,6 +214,8 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_TABLA,
     PDCRT_TOBJ_RUNTIME,
     PDCRT_TOBJ_VOIDPTR,
+    PDCRT_TOBJ_VALOP,
+    PDCRT_TOBJ_ESPACIO_DE_NOMBRES,
 } pdcrt_tipo;
 
 
@@ -306,6 +319,9 @@ struct pdcrt_ctx
     pdcrt_obj funcion_igualdad;
     pdcrt_obj funcion_hash;
 
+    pdcrt_obj registro_de_espacios_de_nombres;
+    pdcrt_obj registro_de_modulos;
+
     uintptr_t inicio_del_stack;
     size_t tam_stack;
 
@@ -332,6 +348,9 @@ void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx);
 void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, size_t capacidad);
 void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx);
+void* pdcrt_empujar_valop(pdcrt_ctx *ctx, size_t num_bytes);
+void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, void* ptr);
+
 
 typedef ssize_t pdcrt_stp;
 
@@ -340,6 +359,7 @@ pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
+void* pdcrt_obtener_valop(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 
 void pdcrt_envolver_en_caja(pdcrt_ctx *ctx);
 
@@ -362,6 +382,7 @@ pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
 pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
 pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
 pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad);
+pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes);
 
 #define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
@@ -400,8 +421,11 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
 pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
 void pdcrt_prnl(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
-void pdcrt_agregar_nombre(pdcrt_ctx *ctx, const char *nombre, size_t tam_nombre, bool autoejec);
-pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+pdcrt_k pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf);
+pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf);
+pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, bool autoejec, pdcrt_kf kf);
+pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo);
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps);
 
@@ -412,8 +436,14 @@ void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
 bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
 
 void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
+void pdcrt_inspeccionar_texto(pdcrt_texto *txt);
 
-int pdcrt_main(int argc, char **argv, pdcrt_f f);
+void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx);
+
+void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods);
+void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, size_t tam_nombre);
+
+int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f);
 
 #define PDCRT_DECLARAR_ENTRYPOINT(mod, fmain)                       \
     pdcrt_k pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k) \
@@ -421,10 +451,23 @@ int pdcrt_main(int argc, char **argv, pdcrt_f f);
         return fmain(ctx, args, k);                                 \
     }
 
+#define PDCRT_PRECARGAR(f, n, l) num_mods += 1;
+#define PDCRT_CARGAR(f, n, l) pdcrt_cargar_dependencia(ctx, &pdc_instalar_##f, n, l);
+#define PDCRT_PREDECLARAR(f, n, l) pdcrt_k pdc_instalar_##f(pdcrt_ctx *ctx, int args, pdcrt_k k);
+#define PDCRT_DECLARAR_DEPS(X)                             \
+    X(PDCRT_PREDECLARAR)                                   \
+    void pdcrt_cargar_dependencias(pdcrt_ctx *ctx)         \
+    {                                                      \
+        size_t num_mods = 0;                               \
+        X(PDCRT_PRECARGAR)                                 \
+        pdcrt_preparar_registro_de_modulos(ctx, num_mods); \
+        X(PDCRT_CARGAR)                                    \
+    }
+
 #define PDCRT_DECLARAR_MAIN(mod)                            \
     int main(int argc, char **argv)                         \
     {                                                       \
-        return pdcrt_main(argc, argv, &pdc_instalar_##mod); \
+        return pdcrt_main(argc, argv, &pdcrt_cargar_dependencias, &pdc_instalar_##mod); \
     }
 
 #endif  /* PDCRT_INTERNO */

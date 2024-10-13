@@ -1,0 +1,9 @@
+variable hola
+fijar hola a {Hola}
+
+funcion mundo: quien
+    escribir {¡}
+    escribir quien
+    escribir { mundo!}
+    nl
+finfuncion

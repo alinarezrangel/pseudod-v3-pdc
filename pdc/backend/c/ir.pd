@@ -35,12 +35,13 @@ fijar Opcode a EnumConValores: {Opcode},
     {mkclz},                   FALSO,
     {continuar},               FALSO,
     {empujarEspacioDeNombres}, FALSO,
-    {agregarNombre},           FALSO,
+    {agregarNombre},           VERDADERO,
     {exportar},                FALSO,
     {obtenerRuntime},          FALSO,
     {importar},                VERDADERO,
     {extraer},                 VERDADERO,
-    {sacar},                   FALSO
+    {sacar},                   FALSO,
+    {comoEspacioDeNombres},    FALSO
 
 metodo Opcode#requiereContinuación
     devolver yo#valor

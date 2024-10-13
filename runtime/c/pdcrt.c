@@ -48,6 +48,8 @@ static pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
@@ -61,6 +63,8 @@ static pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k);
 #define pdcrt_objeto_tabla(tbl) ((pdcrt_obj) { .recv = &pdcrt_recv_tabla, .tabla = (tbl) })
 #define pdcrt_objeto_runtime() ((pdcrt_obj) { .recv = &pdcrt_recv_runtime })
 #define pdcrt_objeto_voidptr(ptr) ((pdcrt_obj) { .recv = &pdcrt_recv_voidptr, .pval = (ptr) })
+#define pdcrt_objeto_valop(vo) ((pdcrt_obj) { .recv = &pdcrt_recv_valop, .valop = (vo) })
+#define pdcrt_objeto_espacio_de_nombres(tbl) ((pdcrt_obj) { .recv = &pdcrt_recv_espacio_de_nombres, .tabla = (tbl) })
 
 
 static void pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista);
@@ -154,6 +158,7 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
         h->generacion = ctx->gc.generacion;
         pdcrt_caja *c = (pdcrt_caja *) h;
         pdcrt_gc_marcar(ctx, c->valor);
+        break;
     }
     case PDCRT_TGC_TABLA:
     {
@@ -173,6 +178,14 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
                 b = b->siguiente_colision;
             }
         }
+        break;
+    }
+    case PDCRT_TGC_VALOP:
+    {
+        if(h->generacion == ctx->gc.generacion)
+            break;
+        h->generacion = ctx->gc.generacion;
+        break;
     }
     }
 }
@@ -205,7 +218,11 @@ static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
         h = PDCRT_CABECERA_GC(obj.caja);
         break;
     case PDCRT_TOBJ_TABLA:
+    case PDCRT_TOBJ_ESPACIO_DE_NOMBRES:
         h = PDCRT_CABECERA_GC(obj.tabla);
+        break;
+    case PDCRT_TOBJ_VALOP:
+        h = PDCRT_CABECERA_GC(obj.valop);
         break;
     }
     pdcrt_gc_marcar_cabecera(ctx, h);
@@ -221,6 +238,8 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx)
 
     pdcrt_gc_marcar(ctx, ctx->funcion_igualdad);
     pdcrt_gc_marcar(ctx, ctx->funcion_hash);
+    pdcrt_gc_marcar(ctx, ctx->registro_de_espacios_de_nombres);
+    pdcrt_gc_marcar(ctx, ctx->registro_de_modulos);
 
     if(ctx->continuacion_actual.marco)
     {
@@ -2935,7 +2954,7 @@ static pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k)
         char *buffer = malloc(PDCRT_MAX_LEN);
         if(!buffer)
             pdcrt_enomem(ctx);
-        snprintf(buffer, PDCRT_MAX_LEN, "Voidptr: %p", yo.closure);
+        snprintf(buffer, PDCRT_MAX_LEN, "Voidptr: %p", yo.pval);
         pdcrt_empujar_texto_cstr(ctx, buffer);
 #undef PDCRT_MAX_LEN
         PDCRT_SACAR_PRELUDIO();
@@ -2943,6 +2962,125 @@ static pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k)
     }
 
     assert(0 && "sin implementar");
+}
+
+static pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Valop: comoTexto no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+#define PDCRT_MAX_LEN 32
+        char *buffer = malloc(PDCRT_MAX_LEN);
+        if(!buffer)
+            pdcrt_enomem(ctx);
+        snprintf(buffer, PDCRT_MAX_LEN, "Valop: %p", yo.valop);
+        pdcrt_empujar_texto_cstr(ctx, buffer);
+#undef PDCRT_MAX_LEN
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+
+    assert(0 && "sin implementar");
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k3(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k4(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k5(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, args, k);
+    pdcrt_fijar_local(ctx, m, 0, pdcrt_objeto_tabla(yo.tabla)); // yo_tbl
+    pdcrt_fijar_local(ctx, m, 1, msj); // msj
+    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_booleano(false)); // esAutoejecutable
+
+    pdcrt_eliminar_elementos(ctx, inic, 2); // elimina yo y msj
+    return pdcrt_recv_espacio_de_nombres_k1(ctx, m);
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_recv_espacio_de_nombres_k1);
+    pdcrt_obj yo_tbl = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_empujar(ctx, yo_tbl);
+    pdcrt_empujar(ctx, msj);
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_recv_espacio_de_nombres_k2);
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_recv_espacio_de_nombres_k2);
+    // [tupla(valor,esAuto)]
+    pdcrt_duplicar(ctx, -1);
+    // [tupla, tupla]
+    pdcrt_empujar_entero(ctx, 1);
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_recv_espacio_de_nombres_k3);
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_recv_espacio_de_nombres_k3);
+    pdcrt_obj yo_tbl = pdcrt_obtener_local(ctx, m, 0);
+    pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
+    // [tupla, esAuto]
+    bool ok;
+    bool esAutoejecutable = pdcrt_obtener_booleano(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, "se esperaba un booleano como 'esAutoejecutable' del espacio de nombres");
+    pdcrt_sacar(ctx);
+    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_booleano(esAutoejecutable));
+    // [tupla]
+    pdcrt_empujar_entero(ctx, 0);
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_recv_espacio_de_nombres_k4);
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_recv_espacio_de_nombres_k4);
+    // [args..., valor]
+    pdcrt_obj esAutoejecutable = pdcrt_obtener_local(ctx, m, 2);
+    if(!esAutoejecutable.bval)
+    {
+        if(m->args != 0)
+            pdcrt_error(ctx, "tratando de llamar a valor exportado no autoejecutable");
+        pdcrt_devolver(ctx, m, 1);
+        return m->k.kf(ctx, m->k.marco);
+    }
+    else
+    {
+        pdcrt_insertar(ctx, -(1 + (pdcrt_stp) m->args));
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, NULL, m->args,
+                                    &pdcrt_recv_espacio_de_nombres_k5);
+    }
+}
+
+static pdcrt_k pdcrt_recv_espacio_de_nombres_k5(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_recv_espacio_de_nombres_k5);
+    pdcrt_devolver(ctx, m, 1);
+    return m->k.kf(ctx, m->k.marco);
 }
 
 
@@ -3055,6 +3193,14 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     {
         return PDCRT_TOBJ_VOIDPTR;
     }
+    else if(o.recv == &pdcrt_recv_valop)
+    {
+        return PDCRT_TOBJ_VALOP;
+    }
+    else if(o.recv == &pdcrt_recv_espacio_de_nombres)
+    {
+        return PDCRT_TOBJ_ESPACIO_DE_NOMBRES;
+    }
     else
     {
         assert(0 && "inalcanzable");
@@ -3157,6 +3303,15 @@ pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad)
     return tbl;
 }
 
+pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes)
+{
+    pdcrt_valop *valop = pdcrt_alojar_obj(ctx, PDCRT_TGC_VALOP, sizeof(pdcrt_valop) + num_bytes);
+    if(!valop)
+        pdcrt_enomem(ctx);
+    memset(valop->datos, 0, num_bytes);
+    return valop;
+}
+
 static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     if(m->anterior)
@@ -3189,6 +3344,9 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->funcion_hash = ctx->funcion_igualdad = pdcrt_objeto_nulo();
 
+    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_nulo();
+    ctx->registro_de_modulos = pdcrt_objeto_nulo();
+
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
 
@@ -3214,7 +3372,24 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
     ctx->funcion_hash = pdcrt_objeto_closure(
             pdcrt_crear_closure(ctx, &pdcrt_funcion_hash, 0));
 
+    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, 0));
+    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, 0));
+
     return ctx;
+}
+
+void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_obj o = pdcrt_sacar(ctx);
+    pdcrt_debe_tener_tipo(ctx, o, PDCRT_TOBJ_TABLA);
+    pdcrt_empujar(ctx, pdcrt_objeto_espacio_de_nombres(o.tabla));
+}
+
+static void pdcrt_preparar_registros(pdcrt_ctx *ctx, size_t num_mods)
+{
+    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, num_mods));
+    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, num_mods));
 }
 
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
@@ -3265,9 +3440,7 @@ void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f)
 
 void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx)
 {
-    // TODO
-    pdcrt_extender_pila(ctx, 1);
-    pdcrt_empujar(ctx, pdcrt_objeto_entero(1));
+    pdcrt_empujar_tabla_vacia(ctx, 24);
 }
 
 void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len)
@@ -3313,6 +3486,21 @@ void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx)
 {
     pdcrt_extender_pila(ctx, 1);
     pdcrt_obj obj = pdcrt_objeto_runtime();
+    pdcrt_empujar(ctx, obj);
+}
+
+void* pdcrt_empujar_valop(pdcrt_ctx *ctx, size_t num_bytes)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_obj obj = pdcrt_objeto_valop(pdcrt_crear_valop(ctx, num_bytes));
+    pdcrt_empujar(ctx, obj);
+    return obj.valop->datos;
+}
+
+void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, void* ptr)
+{
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_obj obj = pdcrt_objeto_voidptr(ptr);
     pdcrt_empujar(ctx, obj);
 }
 
@@ -3452,6 +3640,22 @@ bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_b
     }
 }
 
+void* pdcrt_obtener_valop(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
+{
+    size_t p = pdcrt_stp_a_pos(ctx, i);
+    pdcrt_obj o = ctx->pila[p];
+    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_VALOP)
+    {
+        *ok = true;
+        return o.valop->datos;
+    }
+    else
+    {
+        *ok = false;
+        return NULL;
+    }
+}
+
 void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja)
 {
     size_t pos = pdcrt_stp_a_pos(ctx, caja);
@@ -3536,7 +3740,7 @@ void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos)
 {
     size_t rpos = pdcrt_stp_a_pos(ctx, pos);
     pdcrt_obj o = pdcrt_cima(ctx);
-    for(size_t i = ctx->tam_pila - 1; i > rpos; i++)
+    for(size_t i = ctx->tam_pila - 1; i > rpos; i--)
     {
         ctx->pila[i] = ctx->pila[i - 1];
     }
@@ -3619,7 +3823,10 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
     /* } */
     for(size_t i = 0; i < nproto; i++)
     {
-        assert(proto[i] == 0);
+        if(proto)
+        {
+            assert(proto[i] == 0);
+        }
         ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
     }
     ctx->pila[(ctx->tam_pila++) - nproto] = msj_o;
@@ -3701,18 +3908,177 @@ pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
     return m->k;
 }
 
-void pdcrt_agregar_nombre(pdcrt_ctx *ctx, const char *nombre, size_t tam_nombre, bool autoejec)
+
+static pdcrt_k pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_importar_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_k pdcrt_importar_k3(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+pdcrt_k pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf)
 {
-    // TODO
-    (void) pdcrt_sacar(ctx);
+    pdcrt_extender_pila(ctx, 4);
+    pdcrt_kf *pkf = pdcrt_empujar_valop(ctx, sizeof(kf));
+    *pkf = kf;
+    // [valop]
+    pdcrt_empujar_texto(ctx, nombre, tam_nombre);
+    // [valop, nom]
+    pdcrt_empujar(ctx, ctx->registro_de_modulos);
+    // [valop, nom, mods]
+    pdcrt_empujar_texto(ctx, nombre, tam_nombre);
+    // [valop, nom, mods, nom]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_importar_k1);
 }
 
-pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m)
+static pdcrt_k pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
-    // TODO
-    (void) ctx;
+    PDCRT_K(pdcrt_importar_k1);
+    // [valop, nom, mfunc]
+    return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, NULL, 0, &pdcrt_importar_k2);
+}
+
+static pdcrt_k pdcrt_importar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_importar_k2);
+    // [valop, nom, NULO]
+    pdcrt_sacar(ctx);
+    // [valop, nom]
+    pdcrt_extender_pila(ctx, 2);
+    pdcrt_empujar(ctx, ctx->registro_de_espacios_de_nombres);
+    // [valop, nom, reg]
+    pdcrt_insertar(ctx, -2);
+    // [valop, reg, nom]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_importar_k3);
+}
+
+static pdcrt_k pdcrt_importar_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_importar_k3);
+    // [valop, res]
+    pdcrt_insertar(ctx, -2);
+    // [mod, valop]
+    bool ok;
+    pdcrt_kf *pkf = pdcrt_obtener_valop(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, "Error interno: valop esperado");
+    pdcrt_kf kf = *pkf;
+    pdcrt_sacar(ctx);
+    // [mod]
+    return (*kf)(ctx, m);
+}
+
+pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf)
+{
+    // [mod]
+    pdcrt_kf *valop = pdcrt_empujar_valop(ctx, sizeof(pdcrt_kf));
+    *valop = kf;
+    // [mod, valop]
+    pdcrt_duplicar(ctx, -2);
+    // [mod, valop, mod]
+    pdcrt_empujar_texto(ctx, nombre, tam_nombre);
+    // [mod, valop, mod, nom]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_extraerv_k1);
+}
+
+pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    // [mod, valop, arr]
+    pdcrt_empujar_entero(ctx, 0);
+    // [mod, valop, arr, 0]
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_extraerv_k2);
+}
+
+pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    // [mod, valop, val]
+    pdcrt_extraer(ctx, -2);
+    // [mod, val, valop]
+    bool ok;
+    pdcrt_kf *kf = pdcrt_obtener_valop(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, "error interno: valop esperado");
+    pdcrt_sacar(ctx);
+    return (*kf)(ctx, m);
+}
+
+static pdcrt_k pdcrt_agregar_nombre_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, bool autoejec, pdcrt_kf kf)
+{
+    pdcrt_extender_pila(ctx, 5);
+    // [mod, valor]
+    pdcrt_empujar(ctx, ctx->pila[ctx->tam_pila - 2]);
+    // [mod, valor, mod]
+    pdcrt_insertar(ctx, -2);
+    // [mod, mod, valor]
+    pdcrt_empujar_arreglo_vacio(ctx, 2);
+    // [mod, mod, valor, arr]
+    pdcrt_insertar(ctx, -2);
+    // [mod, mod, arr, valor]
+    pdcrt_arreglo_empujar_al_final(ctx, -2);
+    // [mod, mod, arr]
+    pdcrt_empujar_booleano(ctx, autoejec);
+    // [mod, mod, arr, auto]
+    pdcrt_arreglo_empujar_al_final(ctx, -2);
+    // [mod, mod, arr]
+    pdcrt_empujar_texto(ctx, nombre, tam_nombre);
+    // [mod, mod, arr, nom]
+    pdcrt_insertar(ctx, -2);
+    // [mod, mod, nom, arr]
+    pdcrt_kf *pkf = pdcrt_empujar_valop(ctx, sizeof(kf));
+    // [mod, mod, nom, arr, valop]
+    *pkf = kf;
+    pdcrt_insertar(ctx, -4);
+    // [mod, valop, mod, nom, arr]
+    static const int proto[] = {0, 0};
+    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_agregar_nombre_k1);
+}
+
+static pdcrt_k pdcrt_agregar_nombre_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_agregar_nombre_k1)
+    // [mod, valop, res]
+    pdcrt_sacar(ctx);
+    // [mod, valop]
+    bool ok;
+    pdcrt_kf *pkf = pdcrt_obtener_valop(ctx, -1, &ok);
+    if(!ok)
+        pdcrt_error(ctx, "Error interno: valop esperado");
+    pdcrt_kf kf = *pkf;
+    pdcrt_sacar(ctx);
+    // [mod]
+    return (*kf)(ctx, m);
+}
+
+static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo)
+{
+    pdcrt_extender_pila(ctx, 3);
+    // [mod]
+    pdcrt_empujar(ctx, ctx->registro_de_espacios_de_nombres);
+    // [mod, reg]
+    pdcrt_insertar(ctx, -2);
+    // [reg, mod]
+    pdcrt_empujar_texto(ctx, modulo, tam_modulo);
+    // [reg, mod, nom]
+    pdcrt_insertar(ctx, -2);
+    // [reg, nom, mod]
+    static const int proto[] = {0, 0};
+    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_exportar_k1);
+}
+
+static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    PDCRT_K(pdcrt_exportar_k1)
+    // []
     pdcrt_desactivar_marco(ctx, m);
-    return m->k;
+    return m->k.kf(ctx, m->k.marco);
 }
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps)
@@ -3822,11 +4188,43 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f)
     return pdcrt_ejecutar_opt(ctx, args, f, true);
 }
 
-int pdcrt_main(int argc, char **argv, pdcrt_f f)
+void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods)
+{
+    pdcrt_preparar_registros(ctx, num_mods);
+}
+
+static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
+    static const int proto[] = {0, 0};
+    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_cargar_dependencia_fijarEn_k1);
+}
+
+static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_empujar_nulo(ctx);
+    return pdcrt_devolver(ctx, m, 1);
+}
+
+void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, size_t tam_nombre)
+{
+    pdcrt_extender_pila(ctx, 3);
+    pdcrt_empujar(ctx, ctx->registro_de_modulos);
+    pdcrt_empujar_texto(ctx, nombre, tam_nombre);
+    pdcrt_empujar_closure(ctx, fmod, 0);
+    printf("cargando %s\n", nombre);
+    pdcrt_ejecutar(ctx, 0, pdcrt_cargar_dependencia_fijarEn);
+    pdcrt_sacar(ctx);
+}
+
+int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f)
 {
     (void) argc;
     (void) argv;
     pdcrt_ctx *ctx = pdcrt_crear_contexto();
+    cargar_deps(ctx);
     pdcrt_ejecutar(ctx, 0, f);
     pdcrt_cerrar_contexto(ctx);
     return 0;
@@ -3876,9 +4274,21 @@ void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx)
         case PDCRT_TOBJ_VOIDPTR:
             printf("void* %p\n", o.pval);
             break;
+        case PDCRT_TOBJ_VALOP:
+            printf("valop %p\n", o.valop);
+            break;
         default:
             printf("unk %d\n", pdcrt_tipo_de_obj(o));
             break;
         }
     }
+}
+
+void pdcrt_inspeccionar_texto(pdcrt_texto *txt)
+{
+    for(size_t i = 0; i < txt->longitud; i++)
+    {
+        putchar(txt->contenido[i]);
+    }
+    putchar('\n');
 }

@@ -253,11 +253,11 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#agregarNombre
-        EmitirLínea: puerto, {pdcrt_agregar_nombre(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {, }, ((tupla#en: 2)#escojer: {true}, {false}), {);}
+        EmitirLínea: puerto, {return pdcrt_agregar_nombre(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {, }, ((tupla#en: 2)#escojer: {true}, {false}), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {);}
     finsi
 
     si opcode = Opcode#exportar
-        EmitirLínea: puerto, {return pdcrt_exportar(ctx, m);}
+        EmitirLínea: puerto, {return pdcrt_exportar(ctx, m, }, (EscaparTexto: identificadorDelMódulo), {, }, identificadorDelMódulo#longitud, {);}
     finsi
 
     si opcode = Opcode#obtenerRuntime
@@ -265,11 +265,15 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#importar
-        EmitirLínea: puerto, {return pdcrt_importar(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)) {);}
+        EmitirLínea: puerto, {return pdcrt_importar(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
     finsi
 
     si opcode = Opcode#extraer
-        EmitirLínea: puerto, {return pdcrt_extraer(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
+        EmitirLínea: puerto, {return pdcrt_extraerv(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 2)), {);}
+    finsi
+
+    si opcode = Opcode#comoEspacioDeNombres
+        EmitirLínea: puerto, {pdcrt_convertir_a_espacio_de_nombres(ctx);}
     finsi
 
     si opcode = Opcode#sacar

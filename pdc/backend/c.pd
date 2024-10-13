@@ -365,6 +365,7 @@ metodo EstadoDeEmisión#emitir: ast
         finprocedimiento
 
         si no EsNulo: ast#espacioDeNombres
+            yo#emisor#emitir: Opcode#comoEspacioDeNombres
             yo#inicializarVariable: ast#espacioDeNombres
         sino
             yo#emisor#emitir: Opcode#sacar
