@@ -422,6 +422,10 @@ metodo EstadoDeEmisión#emitir: ast
         finprocedimiento
         sub#emisor#emitir: Opcode#params, paramsSinVariadic, tieneVariadic
 
+        ParaCadaElemento: ast#parámetros, procedimiento: param
+            sub#prepararDeclaración: param#identificador
+        finprocedimiento
+
         ParaCadaElementoEnReversaConÍndice: ast#parámetros, procedimiento: param, i
             si param#esVariadic
                 sub#emisor#emitir: Opcode#variadic, i

@@ -1,0 +1,8 @@
+funcion Principal: X
+    devolver funcion: Y
+        devolver X + Y
+    finfuncion
+finfuncion
+
+escribir (%(Principal: 3): 2)#comoTexto
+nl
