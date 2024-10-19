@@ -375,9 +375,7 @@ metodo NodoUtilizar#recursivo: f
     si no EsNulo: yo#espacioDeNombres
         %f: yo#espacioDeNombres
     finsi
-    si no EsNulo: yo#nombresEspecíficos
-        ParaCadaElemento: yo#nombresEspecíficos, f
-    finsi
+    ParaCadaElemento: yo#nombresEspecíficos, f
 finmetodo
 
 metodo NodoUtilizar#comoTexto

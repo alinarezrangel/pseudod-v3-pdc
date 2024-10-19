@@ -49,13 +49,15 @@ clase Compilado
     metodo ast
     metodo ir
     metodo dependencias
+    metodo prefijosTransitivos
 finclase
 
 atributos Compilado#baseDeDatosDeCompilación,
           Compilado#paquete, Compilado#nombreDelMódulo, Compilado#idDelMódulo,
-          Compilado#cst, Compilado#ast, Compilado#ir, Compilado#dependencias
+          Compilado#cst, Compilado#ast, Compilado#ir, Compilado#dependencias,
+          Compilado#prefijosTransitivos
 
-metodo Compilado#inicializar: baseDeDatosDeCompilación, paquete, nombreDelMódulo, idDelMódulo, ast, cst, ir, dependencias
+metodo Compilado#inicializar: baseDeDatosDeCompilación, paquete, nombreDelMódulo, idDelMódulo, ast, cst, ir, dependencias, prefijosTransitivos
     fijar yo#baseDeDatosDeCompilación a baseDeDatosDeCompilación
     fijar yo#paquete a paquete
     fijar yo#nombreDelMódulo a nombreDelMódulo
@@ -64,6 +66,7 @@ metodo Compilado#inicializar: baseDeDatosDeCompilación, paquete, nombreDelMódu
     fijar yo#cst a cst
     fijar yo#ir a ir
     fijar yo#dependencias a dependencias
+    fijar yo#prefijosTransitivos a prefijosTransitivos
 finmetodo
 
 metodo Compilado#comoTexto
@@ -97,7 +100,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
               tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
               parchesAbstraer, ámbito, builtins, exportaciones, dependencias,
-              prefijoDelMódulo, bdComp
+              prefijoDelMódulo, bdComp, prefijosTransitivos
 
     fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
 
@@ -161,7 +164,17 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar programa a estado#emisor#moverAPrograma
 
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
-    CompilarPrograma: salidaCompilado, prefijoDelMódulo, programa
+    fijar prefijosTransitivos a Arreglo#vacio
+    ParaCadaElemento: dependencias, funcion: dep
+        variable mod
+        fijar mod a bdMod#buscarMódulo: dep#paquete, dep#módulo
+        prefijosTransitivos#agregarAlFinal: mod#prefijoDelMódulo
+        ParaCadaElemento: mod#prefijosDeLosMódulosTransitivos, procedimiento: t
+            prefijosTransitivos#agregarAlFinal: t
+        finprocedimiento
+    finfuncion
+
+    CompilarPrograma: salidaCompilado, prefijoDelMódulo, prefijosTransitivos, programa
 
     fijar exportaciones a Arreglo#vacio
     variable ámbitoPrincipal
@@ -183,7 +196,8 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     devolver ObjetoAdHoc:
         {compilado}, (Compilado#crear: bdComp,
                                        paquete, nombreDelMódulo, idDelMódulo,
-                                       cst, ast, programa, dependencias),
+                                       cst, ast, programa, dependencias,
+                                       prefijosTransitivos),
         {exportaciones}, exportaciones,
         {prefijoDelMódulo}, prefijoDelMódulo
 finprocedimiento
@@ -390,7 +404,7 @@ procedimiento EjecutarCompilador: cli
         __FallarConMensaje: {Se debe especificar una entrada}
     finsi
 
-    variables código, archivo, bdMod, salida, archivoSalida, res
+    variables código, archivo, bdMod, salida, archivoSalida, res, prefijosTransitivos
     si EsInstancia: opciones#entrada, EntradaDesdeArchivo
         fijar archivo a opciones#entrada#nombreDelArchivo
         fijar código a LeerArchivo: archivo
@@ -422,8 +436,21 @@ procedimiento EjecutarCompilador: cli
         bdMod#cargarDesdeArchivo: (__AbrirArchivo: archivo, 10)
     finprocedimiento
 
-    fijar res a Compilar: opciones#nombreDelPaquete, opciones#nombreDelMódulo, opciones#identificadorDelMódulo, bdMod, código, archivo, VERDADERO, salida
-    bdMod#agregarMódulo: opciones#nombreDelPaquete, opciones#nombreDelMódulo, res#exportaciones, res#prefijoDelMódulo, res#compilado, archivoSalida
+    fijar res a Compilar: opciones#nombreDelPaquete,
+                          opciones#nombreDelMódulo,
+                          opciones#identificadorDelMódulo,
+                          bdMod,
+                          código,
+                          archivo,
+                          VERDADERO,
+                          salida
+    bdMod#agregarMódulo: opciones#nombreDelPaquete,
+                         opciones#nombreDelMódulo,
+                         res#exportaciones,
+                         res#prefijoDelMódulo,
+                         res#compilado,
+                         archivoSalida,
+                         res#compilado#prefijosTransitivos
 
     si no EsNulo: opciones#guardarBaseDeDatos
         bdMod#guardarEnArchivo: (__AbrirArchivo: opciones#guardarBaseDeDatos, 11)

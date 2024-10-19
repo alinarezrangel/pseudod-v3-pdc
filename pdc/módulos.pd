@@ -39,12 +39,17 @@ del módulo.}
 compilación. Su tipo específico depende del backend que compiló el módulo.}
 
 @item{@code{archivoConElCompilado}: Archivo con la salida de la compilación.}
+
+@item{@code{prefijosDeLosMódulosTransitivos}: Arreglo con los prefijos de todos
+los módulos que son dependencias de este. Es utilizado por el lowerer para
+precargar los módulos del programa.}
 )
 DOCUMENTA]
 variable Módulo
 fijar Módulo a CrearTipoDeRegistro: {Módulo},
     {id}, {paquete}, {módulo}, {exportaciones},
     {prefijoDelMódulo}, {compilado}, {archivoConElCompilado},
+    {prefijosDeLosMódulosTransitivos},
     (Índice#ÚNICO: {id}),
     (Índice#ORDENADO: {paquete}),
     (Índice#ORDENADO: {paquete}, {módulo})
@@ -141,7 +146,7 @@ metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: json
     variable módulos
     fijar módulos a json#en: "módulos"
     ParaCadaElemento: módulos, procedimiento: módulo
-        variable paquete, nombre, exportaciones, prefijo, archivo
+        variable paquete, nombre, exportaciones, prefijo, archivo, prefijos
         fijar paquete a módulo#en: {paquete}
         fijar nombre a módulo#en: {módulo}
         fijar exportaciones a Mapear: (módulo#en: {exportaciones}), funcion: exp
@@ -149,7 +154,8 @@ metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: json
         finfuncion
         fijar prefijo a módulo#en: {prefijoDelMódulo}
         fijar archivo a módulo#en: {archivoConElCompilado}
-        yo#agregarMódulo: paquete, nombre, exportaciones, prefijo, NULO, archivo
+        fijar prefijos a módulo#en: {prefijosDeLosMódulosTransitivos}
+        yo#agregarMódulo: paquete, nombre, exportaciones, prefijo, NULO, archivo, prefijos
     finprocedimiento
 finmetodo
 
@@ -167,7 +173,8 @@ metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
                         {esAutoejecutable}, exp#esAutoejecutable
                 finfuncion),
             {prefijoDelMódulo}, mod#prefijoDelMódulo,
-            {archivoConElCompilado}, mod#archivoConElCompilado)
+            {archivoConElCompilado}, mod#archivoConElCompilado,
+            {prefijosDeLosMódulosTransitivos}, mod#prefijosDeLosMódulosTransitivos)
     finprocedimiento
     fijar res a ComoJSON: puerto, (Diccionario#desdePares:
         {versión}, 1,
@@ -177,7 +184,7 @@ metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
     finsi
 finmetodo
 
-metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado
+metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado, prefijosDeLosMódulosTransitivos
     variable módulos
     fijar módulos a yo#tablaMódulos#buscarOrdenado: {paquete}, paquete, {módulo}, módulo
     si módulos#longitud > 0
@@ -192,7 +199,8 @@ metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, pr
                        exportaciones,
                        prefijoDelMódulo,
                        compilado,
-                       archivoConElCompilado)
+                       archivoConElCompilado,
+                       prefijosDeLosMódulosTransitivos)
     devolver id
 finmetodo
 

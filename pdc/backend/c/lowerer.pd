@@ -3,7 +3,7 @@ utilizar bepd/builtins
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
 
 
-procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, programa
+procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, identificadoresDeDependencias, programa
     EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
     EmitirLínea: puertoDeEscritura, {#include "pdcrt.h"}
 
@@ -24,6 +24,14 @@ procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, prog
     EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_ENTRYPOINT(}, identificadorDelMódulo, {, }, (NombreDeLaFunción: identificadorDelMódulo, programa#idDeLaFunciónPrincipal), {)}
 
     EmitirLínea: puertoDeEscritura, {#ifdef PDCRT_MAIN}
+    EmitirLínea: puertoDeEscritura, {#define PDCRT_DEPS(X) \}
+    EmitirLínea: puertoDeEscritura, {    X(}, identificadorDelMódulo, {, }, (EscaparTexto: identificadorDelMódulo), {, }, identificadorDelMódulo#longitud, {)},
+        ((identificadoresDeDependencias#longitud = 0)#escojer: {}, { \})
+    ParaCadaElementoConÍndice: identificadoresDeDependencias, procedimiento: id, i
+        EmitirLínea: puertoDeEscritura, {    X(}, id, {, }, (EscaparTexto: id), {, }, id#longitud, {)},
+                     ((i < (identificadoresDeDependencias#longitud - 1))#escojer: { \}, {})
+    finprocedimiento
+    EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_DEPS(PDCRT_DEPS)}
     EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_MAIN(}, identificadorDelMódulo, {)}
     EmitirLínea: puertoDeEscritura, {#endif}
 finprocedimiento

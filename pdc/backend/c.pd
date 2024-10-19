@@ -270,6 +270,14 @@ metodo EstadoDeEmisión#emitir: ast
             si EsInstancia: nodo, AST#NodoVariable
                 yo#prepararDeclaración: nodo#nombre
             finsi
+            si EsInstancia: nodo, AST#NodoUtilizar
+                si no EsNulo: nodo#espacioDeNombres
+                    yo#prepararDeclaración: nodo#espacioDeNombres
+                finsi
+                ParaCadaElemento: nodo#nombresEspecíficos, procedimiento: nombreEspecífico
+                    yo#prepararDeclaración: nombreEspecífico#renombre
+                finprocedimiento
+            finsi
         finprocedimiento
         ParaCadaElemento: ast#cuerpo, &(yo#emitir)
         devolver NULO

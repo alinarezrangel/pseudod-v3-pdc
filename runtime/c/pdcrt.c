@@ -1883,8 +1883,8 @@ static pdcrt_k pdcrt_arreglo_como_texto_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_empujar(ctx, buffer);
     // [eltxt, buffer]
     pdcrt_obj cima = pdcrt_cima(ctx);
-    ctx->pila[ctx->tam_pila - 1] = ctx->pila[ctx->tam_pila - 2];
-    ctx->pila[ctx->tam_pila - 2] = cima;
+    pdcrt_fijar_pila(ctx, ctx->tam_pila - 1, ctx->pila[ctx->tam_pila - 2]);
+    pdcrt_fijar_pila(ctx, ctx->tam_pila - 2, cima);
     // [buffer, eltxt]
     pdcrt_arreglo_empujar_al_final(ctx, -2);
     // [buffer]
@@ -2547,7 +2547,8 @@ static pdcrt_k pdcrt_tabla_fijar_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 static pdcrt_k pdcrt_tabla_fijar_en_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_tabla_fijar_en_k3);
-    pdcrt_extender_pila(ctx, 1);
+    // [_]
+    pdcrt_sacar(ctx);
     pdcrt_empujar_nulo(ctx);
     pdcrt_devolver(ctx, m, 1);
     return m->k.kf(ctx, m->k.marco);
@@ -3312,6 +3313,16 @@ pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes)
     return valop;
 }
 
+void pdcrt_empujar_interceptar(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    pdcrt_empujar_ll(ctx, o);
+}
+
+void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v)
+{
+    pdcrt_fijar_pila_ll(ctx, i, v);
+}
+
 static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     if(m->anterior)
@@ -3672,7 +3683,7 @@ void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja)
 void pdcrt_envolver_en_caja(pdcrt_ctx *ctx)
 {
     pdcrt_obj c = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, pdcrt_cima(ctx)));
-    ctx->pila[ctx->tam_pila - 1] = c;
+    pdcrt_fijar_pila(ctx, ctx->tam_pila - 1, c);
 }
 
 void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i)
@@ -3725,7 +3736,7 @@ void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_stp i)
 {
     pdcrt_extender_pila(ctx, 1);
     size_t pos = pdcrt_stp_a_pos(ctx, i);
-    ctx->pila[ctx->tam_pila++] = ctx->pila[pos];
+    pdcrt_fijar_pila(ctx, ctx->tam_pila++, ctx->pila[pos]);
 }
 
 void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i)
@@ -3733,7 +3744,7 @@ void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i)
     size_t pos = pdcrt_stp_a_pos(ctx, i);
     pdcrt_obj o = ctx->pila[pos];
     pdcrt_eliminar_elemento(ctx, i);
-    ctx->pila[ctx->tam_pila++] = o;
+    pdcrt_fijar_pila(ctx, ctx->tam_pila++, o);
 }
 
 void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos)
@@ -3742,9 +3753,9 @@ void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos)
     pdcrt_obj o = pdcrt_cima(ctx);
     for(size_t i = ctx->tam_pila - 1; i > rpos; i--)
     {
-        ctx->pila[i] = ctx->pila[i - 1];
+        pdcrt_fijar_pila(ctx, i, ctx->pila[i - 1]);
     }
-    ctx->pila[rpos] = o;
+    pdcrt_fijar_pila(ctx, rpos, o);
 }
 
 
@@ -3816,20 +3827,15 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
         .marco = m,
     };
     pdcrt_obj msj_o = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, msj, tam_msj));
-    /* for(ssize_t i = nproto - 1; i >= 0; i--) */
-    /* { */
-    /*     assert(proto[i] == 0); */
-    /*     ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1]; */
-    /* } */
     for(size_t i = 0; i < nproto; i++)
     {
         if(proto)
         {
             assert(proto[i] == 0);
         }
-        ctx->pila[ctx->tam_pila - i] = ctx->pila[(ctx->tam_pila - i) - 1];
+        pdcrt_fijar_pila(ctx, ctx->tam_pila - i, ctx->pila[(ctx->tam_pila - i) - 1]);
     }
-    ctx->pila[(ctx->tam_pila++) - nproto] = msj_o;
+    pdcrt_fijar_pila(ctx, (ctx->tam_pila++) - nproto, msj_o);
     pdcrt_obj t = ctx->pila[(ctx->tam_pila - nproto) - 2];
     return (*t.recv)(ctx, nproto, k);
 }
@@ -4076,7 +4082,7 @@ pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_
 static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_exportar_k1)
-    // []
+    // [NULO]
     pdcrt_desactivar_marco(ctx, m);
     return m->k.kf(ctx, m->k.marco);
 }
@@ -4214,7 +4220,6 @@ void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, 
     pdcrt_empujar(ctx, ctx->registro_de_modulos);
     pdcrt_empujar_texto(ctx, nombre, tam_nombre);
     pdcrt_empujar_closure(ctx, fmod, 0);
-    printf("cargando %s\n", nombre);
     pdcrt_ejecutar(ctx, 0, pdcrt_cargar_dependencia_fijarEn);
     pdcrt_sacar(ctx);
 }

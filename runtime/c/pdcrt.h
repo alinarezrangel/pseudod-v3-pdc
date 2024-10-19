@@ -384,7 +384,21 @@ pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
 pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad);
 pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes);
 
-#define pdcrt_empujar(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
+//#define PDCRT_EMP_INTR
+
+void pdcrt_empujar_interceptar(pdcrt_ctx *ctx, pdcrt_obj o);
+void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
+
+#define pdcrt_empujar_ll(ctx, v) (ctx)->pila[(ctx)->tam_pila++] = (v)
+#define pdcrt_fijar_pila_ll(ctx, i, v) (ctx)->pila[(i)] = (v)
+
+#ifdef PDCRT_EMP_INTR
+#define pdcrt_empujar(ctx, v) pdcrt_empujar_interceptar(ctx, v)
+#define pdcrt_fijar_pila(ctx, i, v) pdcrt_fijar_pila_interceptar(ctx, i, v)
+#else
+#define pdcrt_empujar(ctx, v) pdcrt_empujar_ll(ctx, v)
+#define pdcrt_fijar_pila(ctx, i, v) pdcrt_fijar_pila_ll(ctx, i, v)
+#endif
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
 #define pdcrt_cima(ctx) (ctx)->pila[(ctx)->tam_pila - 1]
 
