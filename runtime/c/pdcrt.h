@@ -94,6 +94,7 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_CAJA,
     PDCRT_TGC_TABLA,
     PDCRT_TGC_VALOP,
+    PDCRT_TGC_CORO,
 } pdcrt_tipo_obj_gc;
 
 typedef struct pdcrt_cabecera_gc
@@ -132,6 +133,9 @@ typedef struct pdcrt_tabla pdcrt_tabla;
 struct pdcrt_valop;
 typedef struct pdcrt_valop pdcrt_valop;
 
+struct pdcrt_corrutina;
+typedef struct pdcrt_corrutina pdcrt_corrutina;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -148,6 +152,8 @@ typedef struct pdcrt_obj
         pdcrt_tabla *tabla;
         void *pval;
         pdcrt_valop *valop;
+        pdcrt_corrutina *coro;
+        pdcrt_cabecera_gc *gc;
     };
 } pdcrt_obj;
 
@@ -200,6 +206,26 @@ struct pdcrt_valop
     char datos[];
 };
 
+typedef enum pdcrt_corrutina_estado
+{
+    PDCRT_CORO_INICIAL,
+    PDCRT_CORO_SUSPENDIDA,
+    PDCRT_CORO_EJECUTANDOSE,
+    PDCRT_CORO_FINALIZADA,
+} pdcrt_corrutina_estado;
+
+struct pdcrt_corrutina
+{
+    pdcrt_cabecera_gc gc;
+    pdcrt_corrutina_estado estado;
+    union
+    {
+        pdcrt_obj punto_de_inicio;
+        pdcrt_k punto_de_suspencion;
+        pdcrt_k punto_de_continuacion;
+    };
+};
+
 typedef enum pdcrt_tipo
 {
     PDCRT_TOBJ_ENTERO,
@@ -216,6 +242,7 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_VOIDPTR,
     PDCRT_TOBJ_VALOP,
     PDCRT_TOBJ_ESPACIO_DE_NOMBRES,
+    PDCRT_TOBJ_CORRUTINA,
 } pdcrt_tipo;
 
 
@@ -284,7 +311,10 @@ struct pdcrt_marco
     X(capacidad, "capacidad")                                           \
     X(contiene, "contiene")                                             \
     X(eliminar, "eliminar")                                             \
-    X(paraCadaPar, "paraCadaPar")
+    X(paraCadaPar, "paraCadaPar")                                       \
+    X(crearCorrutina, "crearCorrutina")                                 \
+    X(avanzar, "avanzar")                                               \
+    X(finalizada, "finalizada")
 
 typedef struct pdcrt_textos
 {
@@ -337,6 +367,8 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
 void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
 
+typedef ssize_t pdcrt_stp;
+
 void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
 void pdcrt_empujar_booleano(pdcrt_ctx *ctx, bool v);
 void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
@@ -350,9 +382,8 @@ void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, size_t capacidad);
 void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx);
 void* pdcrt_empujar_valop(pdcrt_ctx *ctx, size_t num_bytes);
 void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, void* ptr);
+void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_stp f);
 
-
-typedef ssize_t pdcrt_stp;
 
 pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
@@ -383,6 +414,7 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
 pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
 pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad);
 pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes);
+pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_stp f_idx);
 
 //#define PDCRT_EMP_INTR
 
@@ -442,6 +474,8 @@ pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre,
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo);
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps);
+
+void pdcrt_assert(pdcrt_ctx *ctx);
 
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  pdcrt_arreglo *arr,

@@ -1,0 +1,51 @@
+funcion EsEntero: n
+    devolver n = n#piso
+finfuncion
+
+funcion EsDividible: q, m
+    devolver EsEntero: (q / m)
+finfuncion
+
+variables coro1, coro2
+fijar coro1 a __RT#crearCorrutina: procedimiento: generarX, _
+    fijar coro2 a __RT#crearCorrutina: procedimiento: generarY, _
+        variable i
+        fijar i a 0
+        escribir {A}
+        nl
+        mientras i < 100
+            escribir {B }
+            escribir i#comoTexto
+            nl
+            si EsDividible: i, 3
+                %generarX: i
+            finsi
+            si EsDividible: i, 5
+                %generarY: i
+            finsi
+            fijar i a i + 1
+        finmientras
+    finprocedimiento
+
+    mientras no coro2#finalizada
+        variable w
+        fijar w a coro2#avanzar
+        escribir {sub }
+        escribir w#comoTexto
+        nl
+        %generarX: (0 - w)
+    finmientras
+finprocedimiento
+
+variable j
+fijar j a 0
+mientras j < 25
+    escribir {gen!}
+    nl
+    variable v
+    fijar v a coro1#avanzar
+    escribir {gen. }
+    escribir v#comoTexto
+    nl
+    fijar j a j + 1
+finmientras

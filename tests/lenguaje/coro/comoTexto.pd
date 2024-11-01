@@ -1,0 +1,6 @@
+variable coro
+fijar coro a __RT#crearCorrutina: procedimiento: generar, _
+finprocedimiento
+
+escribir coro#comoTexto
+nl

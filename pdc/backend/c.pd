@@ -338,6 +338,7 @@ metodo EstadoDeEmisión#emitir: ast
         fijar etqFinsi a Etiqueta#vacía
 
         yo#emitir: ast#condición
+        yo#emisor#emitir: Opcode#negar
         yo#emisor#emitir: Opcode#csaltar, etqSino
         yo#emitir: ast#cuerpoSiVerdadero
         yo#emisor#emitir: Opcode#saltar, etqFinsi
@@ -354,6 +355,7 @@ metodo EstadoDeEmisión#emitir: ast
 
         yo#emisor#ajustarEtiqueta: etqInicio
         yo#emitir: ast#condición
+        yo#emisor#emitir: Opcode#negar
         yo#emisor#emitir: Opcode#csaltar, etqFinmientras
         yo#emitir: ast#cuerpo
         yo#emisor#emitir: Opcode#saltar, etqInicio

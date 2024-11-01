@@ -1,0 +1,10 @@
+variables coro1, coro2
+fijar coro1 a __RT#crearCorrutina: procedimiento: generar, _
+finprocedimiento
+fijar coro2 a __RT#crearCorrutina: procedimiento: generar, _
+finprocedimiento
+
+necesitas no coro1 = coro2
+necesitas no coro1 = 0
+necesitas coro1 = coro1
+necesitas coro2 = coro2

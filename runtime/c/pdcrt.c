@@ -50,6 +50,7 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
@@ -65,6 +66,7 @@ static pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k
 #define pdcrt_objeto_voidptr(ptr) ((pdcrt_obj) { .recv = &pdcrt_recv_voidptr, .pval = (ptr) })
 #define pdcrt_objeto_valop(vo) ((pdcrt_obj) { .recv = &pdcrt_recv_valop, .valop = (vo) })
 #define pdcrt_objeto_espacio_de_nombres(tbl) ((pdcrt_obj) { .recv = &pdcrt_recv_espacio_de_nombres, .tabla = (tbl) })
+#define pdcrt_objeto_corrutina(corrutina) ((pdcrt_obj) { .recv = &pdcrt_recv_corrutina, .coro = (corrutina) })
 
 
 static void pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista);
@@ -181,10 +183,30 @@ static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
         break;
     }
     case PDCRT_TGC_VALOP:
+        if(h->generacion == ctx->gc.generacion)
+            break;
+        h->generacion = ctx->gc.generacion;
+        break;
+    case PDCRT_TGC_CORO:
     {
         if(h->generacion == ctx->gc.generacion)
             break;
         h->generacion = ctx->gc.generacion;
+        pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
+        if(coro->estado == PDCRT_CORO_INICIAL)
+        {
+            pdcrt_gc_marcar(ctx, coro->punto_de_inicio);
+        }
+        else if(coro->estado == PDCRT_CORO_SUSPENDIDA)
+        {
+            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(
+                    coro->punto_de_suspencion.marco));
+        }
+        else if(coro->estado == PDCRT_CORO_EJECUTANDOSE)
+        {
+            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(
+                    coro->punto_de_continuacion.marco));
+        }
         break;
     }
     }
@@ -203,26 +225,15 @@ static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
     case PDCRT_TOBJ_VOIDPTR:
         return;
     case PDCRT_TOBJ_MARCO:
-        h = PDCRT_CABECERA_GC(obj.marco);
-        break;
     case PDCRT_TOBJ_TEXTO:
-        h = PDCRT_CABECERA_GC(obj.texto);
-        break;
     case PDCRT_TOBJ_ARREGLO:
-        h = PDCRT_CABECERA_GC(obj.arreglo);
-        break;
     case PDCRT_TOBJ_CLOSURE:
-        h = PDCRT_CABECERA_GC(obj.closure);
-        break;
     case PDCRT_TOBJ_CAJA:
-        h = PDCRT_CABECERA_GC(obj.caja);
-        break;
     case PDCRT_TOBJ_TABLA:
     case PDCRT_TOBJ_ESPACIO_DE_NOMBRES:
-        h = PDCRT_CABECERA_GC(obj.tabla);
-        break;
     case PDCRT_TOBJ_VALOP:
-        h = PDCRT_CABECERA_GC(obj.valop);
+    case PDCRT_TOBJ_CORRUTINA:
+        h = obj.gc;
         break;
     }
     pdcrt_gc_marcar_cabecera(ctx, h);
@@ -302,6 +313,14 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
             {
                 pdcrt_tabla *tbl = (pdcrt_tabla *) h;
                 pdcrt_liberar_tabla(ctx, tbl->buckets, tbl->num_buckets);
+            }
+            else if(h->tipo == PDCRT_TGC_CORO)
+            {
+                pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
+                if(coro->estado == PDCRT_CORO_SUSPENDIDA)
+                {
+                    pdcrt_desactivar_marco(ctx, coro->punto_de_suspencion.marco);
+                }
             }
 
             free(h);
@@ -769,7 +788,7 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Numero (entero): operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Numero (entero): operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
@@ -963,7 +982,7 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Numero (float): operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Numero (float): operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
@@ -1085,7 +1104,7 @@ static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Booleano: operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Booleano: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_BOOLEANO)
@@ -1375,7 +1394,7 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Texto: operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Texto: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_TEXTO)
@@ -1707,7 +1726,7 @@ static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Nulo: operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Nulo: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         pdcrt_empujar_booleano(ctx, pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_NULO);
@@ -1754,7 +1773,7 @@ static pdcrt_k pdcrt_arreglo_igual_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     }
     else
     {
-        // Fin del arreglo, tenían tamaños distíntos
+        // Fin del arreglo, tenían tamaños distintos
         pdcrt_extender_pila(ctx, 1);
         pdcrt_empujar_booleano(ctx, false);
         pdcrt_devolver(ctx, m, 1);
@@ -1801,7 +1820,7 @@ static pdcrt_k pdcrt_arreglo_distinto_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
         pdcrt_empujar(ctx, yo.arreglo->valores[i.ival]);
         pdcrt_empujar(ctx, otro.arreglo->valores[i.ival]);
         static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, u8"distíntoDe", 11, proto, 1, &pdcrt_arreglo_distinto_k2);
+        return pdcrt_enviar_mensaje(ctx, m, u8"distintoDe", 11, proto, 1, &pdcrt_arreglo_distinto_k2);
     }
     else if(yo.arreglo->longitud == otro.arreglo->longitud)
     {
@@ -1812,7 +1831,7 @@ static pdcrt_k pdcrt_arreglo_distinto_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     }
     else
     {
-        // Fin del arreglo, tenían tamaños distíntos
+        // Fin del arreglo, tenían tamaños distintos
         pdcrt_extender_pila(ctx, 1);
         pdcrt_empujar_booleano(ctx, true);
         return m->k.kf(ctx, m->k.marco);
@@ -1826,7 +1845,7 @@ static pdcrt_k pdcrt_arreglo_distinto_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     bool ok = false;
     bool eq = pdcrt_obtener_booleano(ctx, -1, &ok);
     if(!ok)
-        pdcrt_error(ctx, "Arreglo: distíntoDe / operador_no=: el metodo distíntoDe de un elemento no devolvio un booleano");
+        pdcrt_error(ctx, "Arreglo: distintoDe / operador_no=: el metodo distintoDe de un elemento no devolvio un booleano");
     if(!eq)
     {
         pdcrt_sacar(ctx);
@@ -1959,7 +1978,7 @@ static pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Arreglo: operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Arreglo: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_ARREGLO)
@@ -2110,7 +2129,7 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
             || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
-            pdcrt_error(ctx, "Procedimiento: operador_no= / dístintoDe necesitan 1 argumento");
+            pdcrt_error(ctx, "Procedimiento: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_obj arg = ctx->pila[argp];
         if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CLOSURE)
@@ -2933,6 +2952,16 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.crearCorrutina))
+    {
+
+        if(args != 1)
+            pdcrt_error(ctx, "Runtime: crearCorrutina necesita 1 argumento");
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_corrutina(ctx, -1);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -3084,6 +3113,160 @@ static pdcrt_k pdcrt_recv_espacio_de_nombres_k5(pdcrt_ctx *ctx, pdcrt_marco *m)
     return m->k.kf(ctx, m->k.marco);
 }
 
+static pdcrt_k pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k);
+static pdcrt_k pdcrt_recv_corrutina_avanzar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    // [yo, msj, ...#args]
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+
+    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Corrutina: comoTexto no necesita argumentos");
+        pdcrt_extender_pila(ctx, 1);
+#define PDCRT_MAX_LEN 32
+        char *buffer = malloc(PDCRT_MAX_LEN);
+        if(!buffer)
+            pdcrt_enomem(ctx);
+        snprintf(buffer, PDCRT_MAX_LEN, "Corrutina: %p", yo.coro);
+        pdcrt_empujar_texto_cstr(ctx, buffer);
+#undef PDCRT_MAX_LEN
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.igual)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_igual))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Corrutina: igualA / operador_= necesita 1 argumento");
+
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj arg = ctx->pila[argp];
+        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CORRUTINA)
+        {
+            pdcrt_empujar_booleano(ctx, false);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+        else
+        {
+            pdcrt_empujar_booleano(ctx, yo.coro == arg.coro);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.distinto)
+            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Corrutina: distintoDe / operador_no= necesita 1 argumento");
+
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_obj arg = ctx->pila[argp];
+        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CORRUTINA)
+        {
+            pdcrt_empujar_booleano(ctx, true);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+        else
+        {
+            pdcrt_empujar_booleano(ctx, yo.coro != arg.coro);
+            PDCRT_SACAR_PRELUDIO();
+            return k.kf(ctx, k.marco);
+        }
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.finalizada))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Corrutina: finalizada no necesita argumentos");
+        pdcrt_empujar_booleano(ctx, yo.coro->estado == PDCRT_CORO_FINALIZADA);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.avanzar))
+    {
+        if(args != 0 && args != 1)
+            pdcrt_error(ctx, "Corrutina: avanzar necesita 0 o 1 argumentos");
+
+        pdcrt_obj kval;
+        if(args == 1)
+            kval = ctx->pila[argp];
+        else
+            kval = pdcrt_objeto_nulo();
+
+        if(yo.coro->estado == PDCRT_CORO_INICIAL)
+        {
+            pdcrt_extender_pila(ctx, 4);
+            pdcrt_empujar(ctx, yo.coro->punto_de_inicio);
+            pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, 0, k);
+            pdcrt_fijar_local(ctx, m, 0, yo);
+            yo.coro->estado = PDCRT_CORO_EJECUTANDOSE;
+            yo.coro->punto_de_continuacion = k;
+            pdcrt_empujar(ctx, yo);
+            pdcrt_empujar_closure(ctx, &pdcrt_corrutina_generar, 1);
+            pdcrt_empujar(ctx, kval);
+            PDCRT_SACAR_PRELUDIO();
+            static const int proto[] = {0, 0};
+            return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_recv_corrutina_avanzar_k1);
+        }
+        else if(yo.coro->estado == PDCRT_CORO_SUSPENDIDA)
+        {
+            pdcrt_k sus = yo.coro->punto_de_suspencion;
+            yo.coro->estado = PDCRT_CORO_EJECUTANDOSE;
+            yo.coro->punto_de_continuacion = k;
+            pdcrt_extender_pila(ctx, 1);
+            pdcrt_empujar(ctx, kval);
+            PDCRT_SACAR_PRELUDIO();
+            return sus.kf(ctx, sus.marco);
+        }
+        else
+        {
+            pdcrt_error(ctx, "No se puede avanzar una corrutina que se esta ejecutando o esta finalizada");
+        }
+    }
+
+    assert(0 && "sin implementar");
+}
+
+static pdcrt_k pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    if(args != 1)
+        pdcrt_error(ctx, "Corrutina: generador debe llamarse con un argumento");
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 1, args, k);
+    pdcrt_obj obj_coro = pdcrt_obtener_captura(ctx, m, 0);
+    pdcrt_corrutina *coro = obj_coro.coro;
+    // [res]
+    if(coro->estado != PDCRT_CORO_EJECUTANDOSE)
+    {
+        pdcrt_error(ctx, "Corrutina: no se puede generar un valor para una corrutina que no se esta ejecutando");
+    }
+    pdcrt_k coro_k = coro->punto_de_continuacion;
+    coro->estado = PDCRT_CORO_SUSPENDIDA;
+    coro->punto_de_suspencion = k;
+    pdcrt_desactivar_marco(ctx, m);
+    return coro_k.kf(ctx, coro_k.marco);
+}
+
+static pdcrt_k pdcrt_recv_corrutina_avanzar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
+    if(yo.coro->estado != PDCRT_CORO_EJECUTANDOSE)
+    {
+        pdcrt_error(ctx, "No se puede devolver de una corrutina que no se esta ejecutando");
+    }
+    pdcrt_k k = yo.coro->punto_de_continuacion;
+    yo.coro->estado = PDCRT_CORO_FINALIZADA;
+    pdcrt_devolver(ctx, m, 1);
+    return k.kf(ctx, k.marco);
+}
+
 
 static pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
 {
@@ -3202,12 +3385,24 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     {
         return PDCRT_TOBJ_ESPACIO_DE_NOMBRES;
     }
+    else if(o.recv == &pdcrt_recv_corrutina)
+    {
+        return PDCRT_TOBJ_CORRUTINA;
+    }
     else
     {
         assert(0 && "inalcanzable");
     }
 }
 
+
+static inline size_t pdcrt_stp_a_pos(pdcrt_ctx *ctx, pdcrt_stp i)
+{
+    if(i < 0)
+        return ctx->tam_pila + i;
+    else
+        return i;
+}
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k)
 {
@@ -3311,6 +3506,17 @@ pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes)
         pdcrt_enomem(ctx);
     memset(valop->datos, 0, num_bytes);
     return valop;
+}
+
+pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_stp f_idx)
+{
+    pdcrt_corrutina *coro = pdcrt_alojar_obj(ctx, PDCRT_TGC_CORO, sizeof(pdcrt_corrutina));
+    if(!coro)
+        pdcrt_enomem(ctx);
+    pdcrt_obj cuerpo = ctx->pila[pdcrt_stp_a_pos(ctx, f_idx)];
+    coro->estado = PDCRT_CORO_INICIAL;
+    coro->punto_de_inicio = cuerpo;
+    return coro;
 }
 
 void pdcrt_empujar_interceptar(pdcrt_ctx *ctx, pdcrt_obj o)
@@ -3515,12 +3721,11 @@ void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, void* ptr)
     pdcrt_empujar(ctx, obj);
 }
 
-static inline size_t pdcrt_stp_a_pos(pdcrt_ctx *ctx, pdcrt_stp i)
+void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_stp f)
 {
-    if(i < 0)
-        return ctx->tam_pila + i;
-    else
-        return i;
+    pdcrt_extender_pila(ctx, 1);
+    pdcrt_obj obj = pdcrt_objeto_corrutina(pdcrt_crear_corrutina(ctx, f));
+    pdcrt_empujar(ctx, obj);
 }
 
 pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
@@ -3787,10 +3992,7 @@ pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
             pdcrt_sacar(ctx);
         pdcrt_empujar(ctx, var);
     }
-    return (pdcrt_k) {
-            .kf = kf,
-            .marco = m,
-    };
+    return (*kf)(ctx, m);
 }
 
 void pdcrt_variadic(pdcrt_ctx *ctx, int params)
@@ -3810,10 +4012,7 @@ bool pdcrt_saltar_condicional(pdcrt_ctx *ctx)
 
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
 {
-    return (pdcrt_k) {
-        .kf = kf,
-        .marco = m,
-    };
+    return (*kf)(ctx, m);
 }
 
 pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
@@ -3894,10 +4093,7 @@ pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
 {
     pdcrt_obj o = pdcrt_sacar(ctx);
     pdcrt_prn_helper(ctx, o);
-    return (pdcrt_k) {
-        .kf = kf,
-        .marco = m,
-    };
+    return (*kf)(ctx, m);
 }
 
 void pdcrt_prnl(pdcrt_ctx *ctx)
@@ -4098,6 +4294,16 @@ void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps)
     pdcrt_empujar(ctx, pdcrt_objeto_closure(c));
 }
 
+void pdcrt_assert(pdcrt_ctx *ctx)
+{
+    pdcrt_obj b = pdcrt_sacar(ctx);
+    pdcrt_debe_tener_tipo(ctx, b, PDCRT_TOBJ_BOOLEANO);
+    if(!b.bval)
+    {
+        pdcrt_error(ctx, "necesitas fallido");
+    }
+}
+
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  pdcrt_arreglo *arr,
                                  size_t espacio)
@@ -4281,6 +4487,9 @@ void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx)
             break;
         case PDCRT_TOBJ_VALOP:
             printf("valop %p\n", o.valop);
+            break;
+        case PDCRT_TOBJ_CORRUTINA:
+            printf("corrutina %p\n", o.coro);
             break;
         default:
             printf("unk %d\n", pdcrt_tipo_de_obj(o));
