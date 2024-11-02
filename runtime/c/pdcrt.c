@@ -267,6 +267,55 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx)
 
 static void pdcrt_desactivar_marco(pdcrt_ctx *ctx, pdcrt_marco *m);
 
+static void
+pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h, bool final)
+{
+    if(h->tipo == PDCRT_TGC_MARCO)
+    {
+        pdcrt_marco *m = (pdcrt_marco *) h;
+        if(!final)
+        {
+            assert(m->anterior == NULL && m->siguiente == NULL);
+        }
+    }
+    else if(h->tipo == PDCRT_TGC_TEXTO)
+    {
+        // Elimínalo de la lista de textos
+        for(size_t i = 0; i < ctx->tam_textos; i++)
+        {
+            if(ctx->textos[i] == (pdcrt_texto *) h)
+            {
+                for(size_t j = i + 1; j < ctx->tam_textos; j++)
+                {
+                    ctx->textos[j - 1] = ctx->textos[j];
+                }
+                ctx->tam_textos -= 1;
+                break;
+            }
+        }
+    }
+    else if(h->tipo == PDCRT_TGC_ARREGLO)
+    {
+        pdcrt_arreglo *a = (pdcrt_arreglo *) h;
+        free(a->valores);
+    }
+    else if(h->tipo == PDCRT_TGC_TABLA)
+    {
+        pdcrt_tabla *tbl = (pdcrt_tabla *) h;
+        pdcrt_liberar_tabla(ctx, tbl->buckets, tbl->num_buckets);
+    }
+    else if(h->tipo == PDCRT_TGC_CORO)
+    {
+        pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
+        if(coro->estado == PDCRT_CORO_SUSPENDIDA)
+        {
+            pdcrt_desactivar_marco(ctx, coro->punto_de_suspencion.marco);
+        }
+    }
+
+    free(h);
+}
+
 static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
 {
     for(pdcrt_cabecera_gc *h = ctx->gc.primero; h != NULL;)
@@ -283,47 +332,7 @@ static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
             if(h == ctx->gc.ultimo)
                 ctx->gc.ultimo = h->anterior;
 
-            if(h->tipo == PDCRT_TGC_MARCO)
-            {
-                pdcrt_marco *m = (pdcrt_marco *) h;
-                assert(m->anterior == NULL && m->siguiente == NULL);
-            }
-            else if(h->tipo == PDCRT_TGC_TEXTO)
-            {
-                // Elimínalo de la lista de textos
-                for(size_t i = 0; i < ctx->tam_textos; i++)
-                {
-                    if(ctx->textos[i] == (pdcrt_texto *) h)
-                    {
-                        for(size_t j = i + 1; j < ctx->tam_textos; j++)
-                        {
-                            ctx->textos[j - 1] = ctx->textos[j];
-                        }
-                        ctx->tam_textos -= 1;
-                        break;
-                    }
-                }
-            }
-            else if(h->tipo == PDCRT_TGC_ARREGLO)
-            {
-                pdcrt_arreglo *a = (pdcrt_arreglo *) h;
-                free(a->valores);
-            }
-            else if(h->tipo == PDCRT_TGC_TABLA)
-            {
-                pdcrt_tabla *tbl = (pdcrt_tabla *) h;
-                pdcrt_liberar_tabla(ctx, tbl->buckets, tbl->num_buckets);
-            }
-            else if(h->tipo == PDCRT_TGC_CORO)
-            {
-                pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
-                if(coro->estado == PDCRT_CORO_SUSPENDIDA)
-                {
-                    pdcrt_desactivar_marco(ctx, coro->punto_de_suspencion.marco);
-                }
-            }
-
-            free(h);
+            pdcrt_gc_liberar_objeto(ctx, h, false);
         }
         h = s;
     }
@@ -3614,7 +3623,7 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
     for(pdcrt_cabecera_gc *h = ctx->gc.primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
-        free(h);
+        pdcrt_gc_liberar_objeto(ctx, h, true);
         h = s;
     }
 
