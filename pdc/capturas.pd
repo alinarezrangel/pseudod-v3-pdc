@@ -5,12 +5,8 @@ utilizar bepd/utilidades/arreglo (Únicos)
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
 utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
-utilizar pdc/combinadores (Error)
-utilizar pdc/parser (ErrorComoTraceback, CrearCST)
-utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito)
+utilizar pdc/nombres (TablasDeResoluciónDeNombres)
 utilizar pdc/catamorfismos (Buscando)
-utilizar pdc/abstraer (Abstraer)
 
 
 [DOCUMENTA

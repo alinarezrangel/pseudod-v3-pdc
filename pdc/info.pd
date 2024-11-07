@@ -3,3 +3,6 @@ fijar VERSIÓN a {3.0.0}
 
 variable VERSIÓN_LENGUAGE
 fijar VERSIÓN_LENGUAGE a {3.0.0}
+
+variable IMPL_COMPILADOR
+fijar IMPL_COMPILADOR a {pdc C}

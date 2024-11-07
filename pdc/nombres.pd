@@ -10,6 +10,7 @@ utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
+utilizar pdc/info (IMPL_COMPILADOR)
 
 
 [ Cada identificador del programa que representa una variable se le es asignado
@@ -140,6 +141,33 @@ fijar NombreImportado a CrearTipoDeRegistro: {NombreImportado},
     (Índice#ORDENADO: {idNodo}),
     (Índice#ORDENADO: {nombre}),
     (Índice#ÚNICO: {binding})
+
+[DOCUMENTA
+@brief{Resolución de un condicional estático.}
+
+Los condicionales estáticos son los condicionales de la forma:
+
+@codeblock|{
+si __Impl = {bootstrap}
+    NoImplementado
+sino
+    NoImplementado
+finsi
+}|
+
+@itemlist(
+@item{@code{idNodo}: ID del nodo si.}
+
+@item{@code{valor}: Valor del condicional. Un booleano.}
+
+@item{@code{idBloque}: ID del nodo bloque que es verdadero.}
+)
+DOCUMENTA]
+variable CondicionalEstático
+fijar CondicionalEstático a CrearTipoDeRegistro: {CondicionalEstático},
+    {idNodo}, {valor}, {idBloque},
+    (Índice#ÚNICO: {idNodo}),
+    (Índice#ÚNICO: {idBloque})
 
 [DOCUMENTA
 @brief{Un ámbito del programa.}
@@ -318,7 +346,130 @@ clase TablasDeResoluciónDeNombres
     @brief{Tabla de @pd{InformaciónDeMódulo}.}
     DOCUMENTA]
     atributo tablaInformaciónDeMódulo
+
+    [DOCUMENTA
+    @brief{Tabla de @pd{CondicionalEstático}.}
+    DOCUMENTA]
+    atributo tablaCondicionalEstático
 finclase
+
+[DOCUMENTA
+@brief{Determina si la condicion es estática.}
+
+Una condición estática compara el builtin @code{__Impl} con una literal
+textual.
+
+@devuelve{@pd{NULO} si la condición no es estática. De serlo, devuelve
+@pd{VERDADERO} o @pd{FALSO} dependiendo de que rama del condicional debe ser
+compilada.}
+DOCUMENTA]
+funcion EsCondiciónEstática: condCst, tablas
+    variables lhs, rhs, comp, builtin
+    fijar builtin a tablas#tablaBuiltins#intentaBuscarÚnico: {builtin}, {__Impl}
+    si EsNulo: builtin
+        devolver NULO
+    finsi
+
+    si EsInstancia: condCst, CST#NodoSonIguales
+        fijar lhs a condCst#lhs
+        fijar rhs a condCst#rhs
+        fijar comp a condCst#tipoIgualdad
+    finsi
+    si EsInstancia: condCst, CST#NodoEnviarMensaje
+        si (no condCst#mensaje = {igualA})
+        && (no condCst#mensaje = {distintoDe})
+        && (no condCst#mensaje = {operador_=})
+        && (no condCst#mensaje = {operador_no=})
+            devolver NULO
+        finsi
+        si no condCst#argumentos#longitud = 1
+            devolver NULO
+        finsi
+        si no EsInstancia: (condCst#argumentos#en: 0), CST#NodoExpresion
+            devolver NULO
+        finsi
+        fijar lhs a condCst#objeto
+        fijar rhs a condCst#argumentos#en: 0
+        si (no condCst#mensaje = {igualA})
+        || (no condCst#mensaje = {operador_=})
+            fijar comp a CST#TipoIgualdad#IGUALES
+        sino
+            fijar comp a CST#TipoIgualdad#DIFERENTES
+        finsi
+    finsi
+    si EsInstancia: condCst, CST#NodoOperador
+        fijar lhs a condCst#lhs
+        fijar rhs a condCst#rhs
+        si (no condCst#op#contenido = {=})
+        && (no condCst#op#contenido = {no=})
+            devolver NULO
+        finsi
+        si condCst#op#contenido = {=}
+            fijar comp a CST#TipoIgualdad#IGUALES
+        sino
+            fijar comp a CST#TipoIgualdad#DIFERENTES
+        finsi
+    finsi
+    si EsNulo: comp
+        devolver NULO
+    finsi
+    si comp = CST#TipoIgualdad#IDÉNTICOS
+        devolver NULO
+    finsi
+
+    variables id, txt
+    si ((EsInstancia: lhs, CST#NodoIdentificador)
+        && (EsInstancia: rhs, CST#NodoTextoLiteral))
+    || ((EsInstancia: lhs, CST#NodoTextoLiteral)
+        && (EsInstancia: rhs, CST#NodoIdentificador))
+        si EsInstancia: lhs, CST#NodoIdentificador
+            fijar id a lhs
+            fijar txt a rhs
+        sino
+            fijar id a rhs
+            fijar txt a lhs
+        finsi
+
+        variable rec
+        fijar rec a tablas#tablaUsos#buscarÚnico: {idNodo}, id#id
+        si no rec#binding = builtin#binding
+            devolver NULO
+        finsi
+
+        devolver txt#valor = IMPL_COMPILADOR
+    sino
+        devolver NULO
+    finsi
+finfuncion
+
+[DOCUMENTA
+@brief{Determina los nodos compilables de un condicional si.}
+
+Los nombres de la condición deben estar resueltos.
+
+Si el condicional es estático, llama a @pd{procBloque} con el bloque que se
+debe compilar. Si no, lo llama con ambos bloques.
+
+@pd{condCst} es el @pd{CST#NodoSi}. @pd{tablas} es la
+@pd{TablasDeResoluciónDeNombres}.
+DOCUMENTA]
+procedimiento RegistrarCondiciónEstática: condCst, tablas, procBloque
+    variable res
+    fijar res a EsCondiciónEstática: condCst#condicional, tablas
+    si no EsNulo: res
+        variable bloque
+        si res
+            fijar bloque a condCst#siVerdadero
+        sino
+            fijar bloque a condCst#siFalso
+        finsi
+        %procBloque: bloque
+        tablas#tablaCondicionalEstático#agregar: (CondicionalEstático#crear: condCst#id, res, bloque#id)
+    sino
+        %procBloque: condCst#siVerdadero
+        %procBloque: condCst#siFalso
+    finsi
+finprocedimiento
 
 [DOCUMENTA
 @brief{Resuelve todos los nombres de un programa.}
@@ -344,7 +495,16 @@ funcion ResolverNombres: cst, tablas, bdMod, ámbito, paraElFinDelÁmbito
               || (EsInstancia: nodo, CST#NodoMétodo)
               || (EsInstancia: nodo, CST#NodoFunciónAnónima)
               || (EsInstancia: nodo, CST#NodoUtilizar)
+              || (EsInstancia: nodo, CST#NodoSi)
     finfuncion, funcion: nodo
+        si EsInstancia: nodo, CST#NodoSi
+            ResolverNombres: nodo#condicional, tablas, bdMod, ámbito, paraElFinDelÁmbito
+            RegistrarCondiciónEstática: nodo, tablas, procedimiento: bloque
+                ResolverNombres: bloque, tablas, bdMod, ámbito, paraElFinDelÁmbito
+            finprocedimiento
+            devolver NULO
+        finsi
+
         si EsInstancia: nodo, CST#NodoIdentificador
             necesitas no nodo#esLiteral
             si nodo#esDefinición

@@ -1,0 +1,66 @@
+si __Impl = {pdc C}
+    escribir {C}
+sino
+    escribir {no C}
+finsi
+nl
+
+si __Impl = {yara}
+    escribir {no C}
+sino
+    escribir {C?}
+finsi
+nl
+
+si __Impl = {yara}
+    escribir {no C}
+    nl
+finsi
+
+si __Impl = {pdc C}
+    escribir {C!}
+    nl
+finsi
+
+
+si son iguales __Impl y {pdc C}
+    escribir {C}
+    nl
+finsi
+
+si son iguales __Impl y {yara}
+    escribir {no C}
+    nl
+finsi
+
+si son diferentes __Impl y {pdc C}
+    escribir {no C}
+    nl
+finsi
+
+si son diferentes __Impl y {yara}
+    escribir {C?}
+    nl
+finsi
+
+si __Impl#\operador_=\: {pdc C}
+    escribir {C}
+    nl
+finsi
+
+si __Impl#\operador_no=\: {yara}
+    escribir {C?}
+    nl
+finsi
+
+si __Impl#igualA: {yara}
+    escribir {no C}
+    nl
+finsi
+
+variable X
+fijar X a {pdc C}
+si __Impl = X
+    escribir {no estatico}
+    nl
+finsi

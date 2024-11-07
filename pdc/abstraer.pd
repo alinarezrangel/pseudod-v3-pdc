@@ -6,7 +6,7 @@ utilizar pdc/ast como AST
 utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, EntablarÁrbol, EscribirTabla)
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado, CondicionalEstático)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 
 
@@ -26,6 +26,8 @@ finfuncion
 
 @pd{nodoCst} es el CST a convertir. Devuelve el AST equivalente.
 
+@pd{tablaCst} es la tabla de nodos CST.
+
 @pd{tablasRnCst} es un @pd{TablasDeResoluciónDeNombres} con la información de
 nombres del CST.
 
@@ -39,17 +41,17 @@ llamar a todas las funciones que se guardarán allí.
 @pd{ámbitoActual} es el ámbito actual del CST. Si vas a convertir un programa
 entero puede ser @pd{NULO}.
 DOCUMENTA]
-funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
+funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     procedimiento registrarParche: parche
         parches#agregarAlFinal: parche
     finprocedimiento
 
     funcion abstraer: nodoCst
-        devolver Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
+        devolver Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     finfuncion
 
     funcion abstraer': nodoCst, ámbito
-        devolver Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbito
+        devolver Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbito
     finfuncion
 
     funcion abstraerArgumentos: args
@@ -225,8 +227,16 @@ funcion Abstraer: nodoCst, tablasRnCst, tablasRnAst, parches, ámbitoActual
     finsi
 
     si EsInstancia: nodoCst, CST#NodoSi
-        devolver AST#NodoSi#crear: nodoCst#áreaTextual,
-            (abstraer: nodoCst#condicional), (abstraer: nodoCst#siVerdadero), (abstraer: nodoCst#siFalso)
+        variable rec
+        fijar rec a tablasRnCst#tablaCondicionalEstático#intentaBuscarÚnico: {idNodo}, nodoCst#id
+        si EsNulo: rec
+            devolver AST#NodoSi#crear: nodoCst#áreaTextual,
+                (abstraer: nodoCst#condicional), (abstraer: nodoCst#siVerdadero), (abstraer: nodoCst#siFalso)
+        sino
+            variable bloque
+            fijar bloque a tablaCst#buscarÚnico: {id}, rec#idBloque
+            devolver abstraer: bloque#nodo
+        finsi
     finsi
 
     si EsInstancia: nodoCst, CST#NodoMientras

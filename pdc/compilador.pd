@@ -20,7 +20,7 @@ utilizar pdc/tabla (CrearTipoDeRegistro, Tabla, Índice, NodoDeÁrbol, Entablar�
 utilizar pdc/combinadores (Error)
 utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/validación (ValidaLlamadasAutoejecutables, ValidaDevolverFueraDeFunción)
-utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado)
+utilizar pdc/nombres (NombreResuelto, UsoDeNombre, DefiniciónDeNombre, Ámbitos, TablasDeResoluciónDeNombres, ResolverNombres, Ámbito, Builtin, NombreImportado, CondicionalEstático)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/abstraer (Abstraer)
 utilizar pdc/capturas (EsCapturada, CapturasDeFunción, LocalesDeFunción, TablasDeCapturas, MarcarCapturas)
@@ -112,6 +112,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar tablasRnCst#tablaBuiltins a Tabla#vacíaConEsquema: Builtin
     fijar tablasRnCst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
     fijar tablasRnCst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+    fijar tablasRnCst#tablaCondicionalEstático a Tabla#vacíaConEsquema: CondicionalEstático
 
     fijar tablasRnAst a TablasDeResoluciónDeNombres#crear
     fijar tablasRnAst#tablaNombres a tablaNombres
@@ -121,6 +122,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar tablasRnAst#tablaBuiltins a tablasRnCst#tablaBuiltins
     fijar tablasRnAst#tablaNombresImportados a Tabla#vacíaConEsquema: NombreImportado
     fijar tablasRnAst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
+    fijar tablasRnAst#tablaCondicionalEstático a Tabla#vacíaConEsquema: CondicionalEstático
 
     fijar cst a CrearCST: código, archivo
     fijar tablaCst a EntablarÁrbol: cst
@@ -133,6 +135,9 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
         variables btObjetoRuntime
         fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
         tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
+        variables btImpl
+        fijar btImpl a (ámbito#crear: {__Impl}, FALSO)#binding
+        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btImpl, {__Impl})
     finsi
 
     ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
@@ -140,7 +145,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     ValidaLlamadasAutoejecutables: cst, tablasRnCst
 
     fijar parchesAbstraer a Arreglo#vacio
-    fijar ast a Abstraer: cst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
+    fijar ast a Abstraer: cst, tablaCst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
     fijar tablaAst a EntablarÁrbol: ast
     ParaCadaElemento: parchesAbstraer, (MétodoComoFunción: {llamar})
     ValidaDevolverFueraDeFunción: ast

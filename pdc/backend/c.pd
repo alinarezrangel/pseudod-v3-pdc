@@ -5,6 +5,7 @@ utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 
 utilizar pdc/ast como AST
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/info (IMPL_COMPILADOR)
 
 
 clase Emisor
@@ -483,6 +484,10 @@ metodo EstadoDeEmisión#emitir: ast
         finsi
         si ast#nombre = {obtenerRuntime}
             yo#emisor#emitir: Opcode#obtenerRuntime
+            devolver NULO
+        finsi
+        si ast#nombre = {__Impl}
+            yo#emisor#emitir: Opcode#empujarTexto, IMPL_COMPILADOR
             devolver NULO
         finsi
         Escribir: {Builtin}, ast#nombre
