@@ -1,0 +1,28 @@
+funcion CrearArreglo: ...vs
+    devolver vs
+finfuncion
+
+funcion Divisible: A, B
+    variable x
+    fijar x a A / B
+    devolver x = x#piso
+finfuncion
+
+variables i, L
+fijar L a %(funcion finfuncion)
+fijar i a 0
+mientras i < 300000
+    si Divisible: i, 1000
+        escribir {#}
+        escribir i#comoTexto
+        nl
+    finsi
+
+    fijar L a CrearArreglo: i, L
+    fijar i a i + 1
+finmientras
+escribir {listo}
+nl
+__RT#recolectarBasura
+escribir {gc}
+nl

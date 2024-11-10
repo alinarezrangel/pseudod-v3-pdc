@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <limits.h>
+#include <time.h>
 
 #define PDCRT_INTERNO
 #include "pdcrt.h"
@@ -72,12 +73,54 @@ static pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k);
 static void pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista);
 
 
-static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj);
+static void pdcrt_gc_eliminar_de_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
+{
+    assert(h->grupo == grupo->grupo);
+    assert(grupo->grupo != PDCRT_TGRP_NINGUNO);
+    if(h->anterior)
+        h->anterior->siguiente = h->siguiente;
+    if(h->siguiente)
+        h->siguiente->anterior = h->anterior;
+    if(h == grupo->primero)
+        grupo->primero = h->siguiente;
+    if(h == grupo->ultimo)
+        grupo->ultimo = h->anterior;
+    h->anterior = h->siguiente = NULL;
+    h->grupo = PDCRT_TGRP_NINGUNO;
+}
+
+static void pdcrt_gc_agregar_a_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
+{
+    assert(!h->anterior);
+    assert(!h->siguiente);
+    assert(h->grupo == PDCRT_TGRP_NINGUNO);
+    assert(grupo->grupo != PDCRT_TGRP_NINGUNO);
+    if(grupo->ultimo)
+    {
+        grupo->ultimo->siguiente = h;
+        h->anterior = grupo->ultimo;
+        grupo->ultimo = h;
+    }
+    else
+    {
+        assert(!grupo->primero);
+        grupo->primero = grupo->ultimo = h;
+    }
+    h->grupo = grupo->grupo;
+}
+
+static void pdcrt_gc_mover_a_grupo(pdcrt_gc_grupo *desde, pdcrt_gc_grupo *hacia, pdcrt_cabecera_gc *h)
+{
+    pdcrt_gc_eliminar_de_grupo(desde, h);
+    pdcrt_gc_agregar_a_grupo(hacia, h);
+}
+
+static void pdcrt_gc_marcar_obj(pdcrt_ctx *ctx, pdcrt_obj obj);
 static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx);
 
 static void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx)
 {
-    if(ctx->recolector_de_basura_activo && (ctx->cnt % 2 == 0))
+    if(ctx->recolector_de_basura_activo && (ctx->cnt++ % 10000 == 0))
     {
         pdcrt_recolectar_basura_simple(ctx);
     }
@@ -98,169 +141,201 @@ static void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_tipo_obj_gc tipo, size_t sz)
     pdcrt_intenta_invocar_al_recolector(ctx);
     pdcrt_cabecera_gc *h = malloc(sz);
     assert(h);
-    h->generacion = ctx->gc.generacion;
     h->tipo = tipo;
-    if(!ctx->gc.primero)
-        ctx->gc.primero = h;
-    h->siguiente = NULL;
-    h->anterior = ctx->gc.ultimo;
-    if(h->anterior)
-        h->anterior->siguiente = h;
-    ctx->gc.ultimo = h;
+    h->grupo = PDCRT_TGRP_NINGUNO;
+    h->anterior = h->siguiente = NULL;
+    pdcrt_gc_agregar_a_grupo(&ctx->gc.blanco, h);
     return h;
 }
 
 #define PDCRT_CABECERA_GC(v) ((pdcrt_cabecera_gc *) (v))
 
-static void pdcrt_gc_marcar_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
+static pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o)
 {
-    switch(h->tipo)
+    switch(pdcrt_tipo_de_obj(o))
     {
-    case PDCRT_TGC_MARCO:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_marco *m = (pdcrt_marco *) h;
-        if(m->k.marco)
-            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m->k.marco));
-        for(size_t i = 0; i < (m->num_locales + m->num_capturas); i++)
-            pdcrt_gc_marcar(ctx, m->locales_y_capturas[i]);
-        break;
-    }
-    case PDCRT_TGC_TEXTO:
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        break;
-    case PDCRT_TGC_ARREGLO:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_arreglo *a = (pdcrt_arreglo *) h;
-        for(size_t i = 0; i < a->longitud; i++)
-            pdcrt_gc_marcar(ctx, a->valores[i]);
-        break;
-    }
-    case PDCRT_TGC_CLOSURE:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_closure *c = (pdcrt_closure *) h;
-        for(size_t i = 0; i < c->num_capturas; i++)
-            pdcrt_gc_marcar(ctx, c->capturas[i]);
-        break;
-    }
-    case PDCRT_TGC_CAJA:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_caja *c = (pdcrt_caja *) h;
-        pdcrt_gc_marcar(ctx, c->valor);
-        break;
-    }
-    case PDCRT_TGC_TABLA:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_tabla *tbl = (pdcrt_tabla *) h;
-        for(size_t i = 0; i < tbl->num_buckets; i++)
-        {
-            pdcrt_bucket *b = &tbl->buckets[i];
-            if(!b->activo)
-                continue;
-            while(b)
-            {
-                pdcrt_gc_marcar(ctx, b->llave);
-                pdcrt_gc_marcar(ctx, b->valor);
-                b = b->siguiente_colision;
-            }
-        }
-        break;
-    }
-    case PDCRT_TGC_VALOP:
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        break;
-    case PDCRT_TGC_CORO:
-    {
-        if(h->generacion == ctx->gc.generacion)
-            break;
-        h->generacion = ctx->gc.generacion;
-        pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
-        if(coro->estado == PDCRT_CORO_INICIAL)
-        {
-            pdcrt_gc_marcar(ctx, coro->punto_de_inicio);
-        }
-        else if(coro->estado == PDCRT_CORO_SUSPENDIDA)
-        {
-            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(
-                    coro->punto_de_suspencion.marco));
-        }
-        else if(coro->estado == PDCRT_CORO_EJECUTANDOSE)
-        {
-            pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(
-                    coro->punto_de_continuacion.marco));
-        }
-        break;
-    }
+        case PDCRT_TOBJ_NULO:
+        case PDCRT_TOBJ_ENTERO:
+        case PDCRT_TOBJ_FLOAT:
+        case PDCRT_TOBJ_BOOLEANO:
+        case PDCRT_TOBJ_RUNTIME:
+        case PDCRT_TOBJ_VOIDPTR:
+            return NULL;
+        case PDCRT_TOBJ_MARCO:
+        case PDCRT_TOBJ_TEXTO:
+        case PDCRT_TOBJ_ARREGLO:
+        case PDCRT_TOBJ_CLOSURE:
+        case PDCRT_TOBJ_CAJA:
+        case PDCRT_TOBJ_TABLA:
+        case PDCRT_TOBJ_ESPACIO_DE_NOMBRES:
+        case PDCRT_TOBJ_VALOP:
+        case PDCRT_TOBJ_CORRUTINA:
+            return o.gc;
     }
 }
 
-static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_obj obj)
+static void pdcrt_gc_marcar_mover_a_gris(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
 {
-    pdcrt_cabecera_gc *h;
-    switch(pdcrt_tipo_de_obj(obj))
+    assert(h->grupo != PDCRT_TGRP_NINGUNO);
+    if(h->grupo == PDCRT_TGRP_BLANCO)
     {
-    case PDCRT_TOBJ_NULO:
-    case PDCRT_TOBJ_ENTERO:
-    case PDCRT_TOBJ_FLOAT:
-    case PDCRT_TOBJ_BOOLEANO:
-    case PDCRT_TOBJ_RUNTIME:
-    case PDCRT_TOBJ_VOIDPTR:
-        return;
-    case PDCRT_TOBJ_MARCO:
-    case PDCRT_TOBJ_TEXTO:
-    case PDCRT_TOBJ_ARREGLO:
-    case PDCRT_TOBJ_CLOSURE:
-    case PDCRT_TOBJ_CAJA:
-    case PDCRT_TOBJ_TABLA:
-    case PDCRT_TOBJ_ESPACIO_DE_NOMBRES:
-    case PDCRT_TOBJ_VALOP:
-    case PDCRT_TOBJ_CORRUTINA:
-        h = obj.gc;
-        break;
+        pdcrt_gc_mover_a_grupo(&ctx->gc.blanco, &ctx->gc.gris, h);
     }
-    pdcrt_gc_marcar_cabecera(ctx, h);
+    else if(h->grupo == PDCRT_TGRP_GRIS)
+    {
+        // Nada que hacer, será visitado en la siguiente iteración
+    }
+    else if(h->grupo == PDCRT_TGRP_NEGRO)
+    {
+        // Nada que hacer, ya es alcanzable.
+    }
+}
+
+static void pdcrt_gc_marcar_mover_a_gris_obj(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    pdcrt_cabecera_gc *h = pdcrt_gc_cabecera_de(o);
+    if(h)
+        pdcrt_gc_marcar_mover_a_gris(ctx, o.gc);
+}
+
+static void pdcrt_gc_no_debe_ser_blanco(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
+{
+    assert(h->grupo != PDCRT_TGRP_BLANCO);
+}
+
+static void pdcrt_gc_no_debe_ser_blanco_obj(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    pdcrt_cabecera_gc *h = pdcrt_gc_cabecera_de(o);
+    if(h)
+        pdcrt_gc_no_debe_ser_blanco(ctx, o.gc);
+}
+
+static void pdcrt_gc_visitar_contenido(pdcrt_ctx *ctx,
+                                       pdcrt_cabecera_gc *h,
+                                       void (*f)(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h),
+                                       void (*f_obj)(pdcrt_ctx *ctx, pdcrt_obj o))
+{
+    switch(h->tipo)
+    {
+        case PDCRT_TGC_TEXTO:
+        case PDCRT_TGC_VALOP:
+            break;
+        case PDCRT_TGC_MARCO:
+        {
+            pdcrt_marco *m = (pdcrt_marco *) h;
+            if(m->k.marco)
+                f(ctx, PDCRT_CABECERA_GC(m->k.marco));
+            for(size_t i = 0; i < (m->num_locales + m->num_capturas); i++)
+                f_obj(ctx, m->locales_y_capturas[i]);
+            break;
+        }
+        case PDCRT_TGC_ARREGLO:
+        {
+            pdcrt_arreglo *a = (pdcrt_arreglo *) h;
+            for(size_t i = 0; i < a->longitud; i++)
+                f_obj(ctx, a->valores[i]);
+            break;
+        }
+        case PDCRT_TGC_CLOSURE:
+        {
+            pdcrt_closure *c = (pdcrt_closure *) h;
+            for(size_t i = 0; i < c->num_capturas; i++)
+                f_obj(ctx, c->capturas[i]);
+            break;
+        }
+        case PDCRT_TGC_CAJA:
+        {
+            pdcrt_caja *c = (pdcrt_caja *) h;
+            f_obj(ctx, c->valor);
+            break;
+        }
+        case PDCRT_TGC_TABLA:
+        {
+            pdcrt_tabla *tbl = (pdcrt_tabla *) h;
+            for(size_t i = 0; i < tbl->num_buckets; i++)
+            {
+                pdcrt_bucket *b = &tbl->buckets[i];
+                if(!b->activo)
+                    continue;
+                while(b)
+                {
+                    f_obj(ctx, b->llave);
+                    f_obj(ctx, b->valor);
+                    b = b->siguiente_colision;
+                }
+            }
+            break;
+        }
+        case PDCRT_TGC_CORO:
+        {
+            pdcrt_corrutina *coro = (pdcrt_corrutina *) h;
+            if(coro->estado == PDCRT_CORO_INICIAL)
+            {
+                f_obj(ctx, coro->punto_de_inicio);
+            }
+            else if(coro->estado == PDCRT_CORO_SUSPENDIDA)
+            {
+                f(ctx, PDCRT_CABECERA_GC(coro->punto_de_suspencion.marco));
+            }
+            else if(coro->estado == PDCRT_CORO_EJECUTANDOSE)
+            {
+                f(ctx, PDCRT_CABECERA_GC(coro->punto_de_continuacion.marco));
+            }
+            break;
+        }
+    }
+}
+
+static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
+{
+    assert(h->grupo != PDCRT_TGRP_NINGUNO);
+    if(h->grupo == PDCRT_TGRP_NEGRO)
+    {
+        pdcrt_gc_visitar_contenido(ctx, h, &pdcrt_gc_no_debe_ser_blanco, &pdcrt_gc_no_debe_ser_blanco_obj);
+        return;
+    }
+    else if(h->grupo == PDCRT_TGRP_BLANCO)
+    {
+        pdcrt_gc_mover_a_grupo(&ctx->gc.blanco, &ctx->gc.gris, h);
+        return;
+    }
+    else
+    {
+        assert(h->grupo == PDCRT_TGRP_GRIS);
+        pdcrt_gc_visitar_contenido(ctx, h, &pdcrt_gc_marcar_mover_a_gris, &pdcrt_gc_marcar_mover_a_gris_obj);
+        pdcrt_gc_mover_a_grupo(&ctx->gc.gris, &ctx->gc.negro, h);
+    }
+}
+
+static void pdcrt_gc_marcar_obj(pdcrt_ctx *ctx, pdcrt_obj obj)
+{
+    pdcrt_cabecera_gc *h = pdcrt_gc_cabecera_de(obj);
+    if(h)
+        pdcrt_gc_marcar(ctx, h);
 }
 
 static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx)
 {
     for(size_t i = 0; i < ctx->tam_pila; i++)
-        pdcrt_gc_marcar(ctx, ctx->pila[i]);
+        pdcrt_gc_marcar_obj(ctx, ctx->pila[i]);
 
     for(pdcrt_marco *m = ctx->primer_marco_activo; m; m = m->siguiente)
-        pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(m));
+        pdcrt_gc_marcar(ctx, PDCRT_CABECERA_GC(m));
 
-    pdcrt_gc_marcar(ctx, ctx->funcion_igualdad);
-    pdcrt_gc_marcar(ctx, ctx->funcion_hash);
-    pdcrt_gc_marcar(ctx, ctx->registro_de_espacios_de_nombres);
-    pdcrt_gc_marcar(ctx, ctx->registro_de_modulos);
+    pdcrt_gc_marcar_obj(ctx, ctx->funcion_igualdad);
+    pdcrt_gc_marcar_obj(ctx, ctx->funcion_hash);
+    pdcrt_gc_marcar_obj(ctx, ctx->registro_de_espacios_de_nombres);
+    pdcrt_gc_marcar_obj(ctx, ctx->registro_de_modulos);
 
     if(ctx->continuacion_actual.marco)
     {
         pdcrt_obj obj = pdcrt_objeto_marco(ctx->continuacion_actual.marco);
-        pdcrt_gc_marcar(ctx, obj);
+        pdcrt_gc_marcar_obj(ctx, obj);
     }
 
 #define PDCRT_X(nombre, _texto)                                         \
     if(ctx->textos_globales.nombre)                                     \
-        pdcrt_gc_marcar_cabecera(ctx, PDCRT_CABECERA_GC(ctx->textos_globales.nombre));
+        pdcrt_gc_marcar(ctx, PDCRT_CABECERA_GC(ctx->textos_globales.nombre));
     PDCRT_TABLA_TEXTOS(PDCRT_X);
 #undef PDCRT_X
 }
@@ -318,35 +393,48 @@ pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h, bool final)
 
 static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
 {
-    for(pdcrt_cabecera_gc *h = ctx->gc.primero; h != NULL;)
+    for(pdcrt_cabecera_gc *h = ctx->gc.blanco.primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
-        if(h->generacion != ctx->gc.generacion)
-        {
-            if(h->anterior)
-                h->anterior->siguiente = h->siguiente;
-            if(h->siguiente)
-                h->siguiente->anterior = h->anterior;
-            if(h == ctx->gc.primero)
-                ctx->gc.primero = h->siguiente;
-            if(h == ctx->gc.ultimo)
-                ctx->gc.ultimo = h->anterior;
-
-            pdcrt_gc_liberar_objeto(ctx, h, false);
-        }
+        assert(h->grupo == PDCRT_TGRP_BLANCO);
+        pdcrt_gc_eliminar_de_grupo(&ctx->gc.blanco, h);
+        pdcrt_gc_liberar_objeto(ctx, h, false);
         h = s;
     }
 }
 
+static void pdcrt_gc_marcar_todos_los_grises(pdcrt_ctx *ctx);
+static void pdcrt_gc_mover_negros_a_blancos(pdcrt_ctx *ctx);
+
 static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx)
 {
-    if(ctx->gc.generacion == INT_MAX)
-        ctx->gc.generacion = 0;
-    else
-        ctx->gc.generacion += 1;
-
     pdcrt_gc_marcar_todo(ctx);
+    while(ctx->gc.gris.primero)
+    {
+        pdcrt_gc_marcar_todos_los_grises(ctx);
+    }
     pdcrt_gc_recolectar(ctx);
+    pdcrt_gc_mover_negros_a_blancos(ctx);
+}
+
+static void pdcrt_gc_marcar_todos_los_grises(pdcrt_ctx *ctx)
+{
+    for(pdcrt_cabecera_gc *h = ctx->gc.gris.primero; h; h = h->siguiente)
+    {
+        assert(h->grupo == PDCRT_TGRP_GRIS);
+        pdcrt_gc_marcar(ctx, h);
+    }
+}
+
+static void pdcrt_gc_mover_negros_a_blancos(pdcrt_ctx *ctx)
+{
+    for(pdcrt_cabecera_gc *h = ctx->gc.negro.primero; h;)
+    {
+        assert(h->grupo == PDCRT_TGRP_NEGRO);
+        pdcrt_cabecera_gc *s = h->siguiente;
+        pdcrt_gc_mover_a_grupo(&ctx->gc.negro, &ctx->gc.blanco, h);
+        h = s;
+    }
 }
 
 
@@ -2963,11 +3051,20 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.crearCorrutina))
     {
-
         if(args != 1)
             pdcrt_error(ctx, "Runtime: crearCorrutina necesita 1 argumento");
         pdcrt_extender_pila(ctx, 1);
         pdcrt_empujar_corrutina(ctx, -1);
+        PDCRT_SACAR_PRELUDIO();
+        return k.kf(ctx, k.marco);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.recolectar_basura))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Runtime: recolectarBasura no necesita argumentos");
+        pdcrt_recolectar_basura_simple(ctx);
+        pdcrt_extender_pila(ctx, 1);
+        pdcrt_empujar_nulo(ctx);
         PDCRT_SACAR_PRELUDIO();
         return k.kf(ctx, k.marco);
     }
@@ -3563,8 +3660,13 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
     ctx->pila = NULL;
     ctx->cap_pila = 0;
 
-    ctx->gc.primero = ctx->gc.ultimo = NULL;
-    ctx->gc.generacion = 0;
+    ctx->gc.blanco.primero = ctx->gc.blanco.ultimo = NULL;
+    ctx->gc.blanco.grupo = PDCRT_TGRP_BLANCO;
+    ctx->gc.gris.primero = ctx->gc.gris.ultimo = NULL;
+    ctx->gc.gris.grupo = PDCRT_TGRP_GRIS;
+    ctx->gc.negro.primero = ctx->gc.negro.ultimo = NULL;
+    ctx->gc.negro.grupo = PDCRT_TGRP_NEGRO;
+
     ctx->primer_marco_activo = ctx->ultimo_marco_activo = NULL;
     ctx->cnt = 0;
 
@@ -3618,15 +3720,21 @@ static void pdcrt_preparar_registros(pdcrt_ctx *ctx, size_t num_mods)
     ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, num_mods));
 }
 
-void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
+static void pdcrt_liberar_grupo(pdcrt_ctx *ctx, pdcrt_gc_grupo *grupo)
 {
-    for(pdcrt_cabecera_gc *h = ctx->gc.primero; h != NULL;)
+    for(pdcrt_cabecera_gc *h = grupo->primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
         pdcrt_gc_liberar_objeto(ctx, h, true);
         h = s;
     }
+}
 
+void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
+{
+    pdcrt_liberar_grupo(ctx, &ctx->gc.blanco);
+    pdcrt_liberar_grupo(ctx, &ctx->gc.gris);
+    pdcrt_liberar_grupo(ctx, &ctx->gc.negro);
     free(ctx->textos);
     free(ctx->pila);
     free(ctx);

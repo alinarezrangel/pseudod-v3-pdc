@@ -97,17 +97,30 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_CORO,
 } pdcrt_tipo_obj_gc;
 
+typedef enum pdcrt_gc_tipo_grupo
+{
+    PDCRT_TGRP_BLANCO,
+    PDCRT_TGRP_GRIS,
+    PDCRT_TGRP_NEGRO,
+    PDCRT_TGRP_NINGUNO,
+} pdcrt_gc_tipo_grupo;
+
 typedef struct pdcrt_cabecera_gc
 {
     struct pdcrt_cabecera_gc *siguiente, *anterior;
-    int generacion;
-    pdcrt_tipo_obj_gc tipo;
+    pdcrt_tipo_obj_gc tipo : 4;
+    pdcrt_gc_tipo_grupo grupo : 4;
 } pdcrt_cabecera_gc;
+
+typedef struct pdcrt_gc_grupo
+{
+    pdcrt_gc_tipo_grupo grupo;
+    pdcrt_cabecera_gc *primero, *ultimo;
+} pdcrt_gc_grupo;
 
 typedef struct pdcrt_gc
 {
-    pdcrt_cabecera_gc *primero, *ultimo;
-    int generacion;
+    pdcrt_gc_grupo blanco, gris, negro;
 } pdcrt_gc;
 
 
@@ -314,7 +327,8 @@ struct pdcrt_marco
     X(paraCadaPar, "paraCadaPar")                                       \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
-    X(finalizada, "finalizada")
+    X(finalizada, "finalizada")                                         \
+    X(recolectar_basura, "recolectarBasura")
 
 typedef struct pdcrt_textos
 {
