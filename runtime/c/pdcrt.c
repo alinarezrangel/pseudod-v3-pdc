@@ -3558,6 +3558,7 @@ pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad)
     }
     a->longitud = 0;
     a->capacidad = capacidad;
+    return a;
 }
 
 pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas)
