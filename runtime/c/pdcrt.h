@@ -13,6 +13,13 @@
 #include <stdlib.h>
 
 
+#ifdef __GNUC__
+#define PDCRT_INLINE __attribute__((always_inline)) inline
+#else
+#define PDCRT_INLINE
+#endif
+
+
 typedef int64_t pdcrt_entero;
 
 #define PDCRT_ENTERO_MAX INT64_MAX
@@ -262,7 +269,6 @@ typedef enum pdcrt_tipo
 struct pdcrt_marco
 {
     pdcrt_cabecera_gc gc;
-    pdcrt_marco *siguiente, *anterior;
     int args;
     pdcrt_k k;
     size_t num_locales;
@@ -351,8 +357,6 @@ struct pdcrt_ctx
     pdcrt_marco *primer_marco_activo;
     pdcrt_marco *ultimo_marco_activo;
 
-    pdcrt_obj runtime;
-
     unsigned int cnt;
 
     pdcrt_texto **textos;
@@ -379,24 +383,24 @@ struct pdcrt_ctx
 pdcrt_ctx *pdcrt_crear_contexto(void);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
-void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
+void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem);
 
 typedef ssize_t pdcrt_stp;
 
-void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_entero i);
-void pdcrt_empujar_booleano(pdcrt_ctx *ctx, bool v);
-void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_float f);
-void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx);
-void pdcrt_empujar_texto(pdcrt_ctx *ctx, const char *str, size_t len);
-void pdcrt_empujar_texto_cstr(pdcrt_ctx *ctx, const char *str);
-void pdcrt_empujar_nulo(pdcrt_ctx *ctx);
-void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
-void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx);
-void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, size_t capacidad);
-void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx);
-void* pdcrt_empujar_valop(pdcrt_ctx *ctx, size_t num_bytes);
-void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, void* ptr);
-void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_stp f);
+void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_entero i);
+void pdcrt_empujar_booleano(pdcrt_ctx *ctx, pdcrt_marco *m, bool v);
+void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_float f);
+void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m);
+void pdcrt_empujar_texto(pdcrt_ctx *ctx, pdcrt_marco *m, const char *str, size_t len);
+void pdcrt_empujar_texto_cstr(pdcrt_ctx *ctx, pdcrt_marco *m, const char *str);
+void pdcrt_empujar_nulo(pdcrt_ctx *ctx, pdcrt_marco *m);
+void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
+void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco *m);
+void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
+void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx, pdcrt_marco *m);
+void* pdcrt_empujar_valop(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_bytes);
+void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, pdcrt_marco *m, void* ptr);
+void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp f);
 
 
 pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
@@ -406,14 +410,14 @@ size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
 void* pdcrt_obtener_valop(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
 
-void pdcrt_envolver_en_caja(pdcrt_ctx *ctx);
+void pdcrt_envolver_en_caja(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 void pdcrt_negar(pdcrt_ctx *ctx);
 
 void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 
-void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_stp i);
+void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp i);
 void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i);
 void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos);
 
@@ -423,12 +427,12 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 #ifdef PDCRT_INTERNO
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
-pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, size_t capacidad);
-pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t capturas);
-pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_obj valor);
-pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, size_t capacidad);
-pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, size_t num_bytes);
-pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_stp f_idx);
+pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
+pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_f f, size_t capturas);
+pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj valor);
+pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
+pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_bytes);
+pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp f_idx);
 
 //#define PDCRT_EMP_INTR
 
@@ -453,10 +457,10 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
 #define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
 #define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
 
-pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx);
+pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
-void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_stp arr);
+void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp arr);
 
 void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
 void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
@@ -470,7 +474,7 @@ pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
                      bool variadic,
                      pdcrt_kf kf);
 
-void pdcrt_variadic(pdcrt_ctx *ctx, int params);
+void pdcrt_variadic(pdcrt_ctx *ctx, pdcrt_marco *m, int params);
 
 bool pdcrt_saltar_condicional(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
@@ -487,11 +491,12 @@ pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_
 pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, bool autoejec, pdcrt_kf kf);
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo);
 
-void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_f f, size_t num_caps);
+void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_f f, size_t num_caps);
 
 void pdcrt_assert(pdcrt_ctx *ctx);
 
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
+                                 pdcrt_marco *m,
                                  pdcrt_arreglo *arr,
                                  size_t espacio);
 
@@ -500,7 +505,7 @@ bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
 void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
 void pdcrt_inspeccionar_texto(pdcrt_texto *txt);
 
-void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx);
+void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods);
 void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, size_t tam_nombre);

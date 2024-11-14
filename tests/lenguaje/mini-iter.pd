@@ -1,0 +1,29 @@
+procedimiento ParaCadaNúmero: n, proc
+    variable i
+    fijar i a 0
+    mientras i < n
+        %proc: i
+        fijar i a i + 1
+    finmientras
+finprocedimiento
+
+funcion Divisible: A, B
+    variable x
+    fijar x a A / B
+    devolver x = x#piso
+finfuncion
+
+
+ParaCadaNúmero: 10, procedimiento: n
+    variable w
+    fijar w a 0
+    ParaCadaNúmero: 1000, procedimiento: m
+        fijar w a (m + n) + w
+    finprocedimiento
+
+    escribir {#}
+    escribir n#comoTexto
+    escribir { = }
+    escribir w#comoTexto
+    nl
+finprocedimiento

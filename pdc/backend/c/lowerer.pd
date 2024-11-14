@@ -159,7 +159,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#variadic
-        EmitirLínea: puerto, {pdcrt_variadic(ctx, }, (tupla#en: 1), {);}
+        EmitirLínea: puerto, {pdcrt_variadic(ctx, m, }, (tupla#en: 1), {);}
     finsi
 
     si opcode = Opcode#fijarLocal
@@ -171,17 +171,17 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerLocal
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, 1);}
         EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {));}
     finsi
 
     si opcode = Opcode#obtenerLocalC
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, 1);}
         EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_captura(ctx, m, }, (tupla#en: 1), {));}
     finsi
 
     si opcode = Opcode#caja
-        EmitirLínea: puerto, {pdcrt_envolver_en_caja(ctx);}
+        EmitirLínea: puerto, {pdcrt_envolver_en_caja(ctx, m);}
     finsi
 
     si opcode = Opcode#fijarCaja
@@ -193,12 +193,12 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerCaja
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, 1);}
         EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_caja(ctx, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {)));}
     finsi
 
     si opcode = Opcode#obtenerCajaC
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, 1);}
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, 1);}
         EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_caja(ctx, pdcrt_obtener_captura(ctx, m, }, (tupla#en: 1), {)));}
     finsi
 
@@ -222,18 +222,18 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         variable n
         fijar n a tupla#en: 1
         si n#techo = n
-            EmitirLínea: puerto, {pdcrt_empujar_entero(ctx, PDCRT_ENTERO_C(}, n, {));}
+            EmitirLínea: puerto, {pdcrt_empujar_entero(ctx, m, PDCRT_ENTERO_C(}, n, {));}
         sino
-            EmitirLínea: puerto, {pdcrt_empujar_float(ctx, PDCRT_FLOAT_C(}, n, {));}
+            EmitirLínea: puerto, {pdcrt_empujar_float(ctx, m, PDCRT_FLOAT_C(}, n, {));}
         finsi
     finsi
 
     si opcode = Opcode#empujarTexto
-        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {);}
+        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {);}
     finsi
 
     si opcode = Opcode#empujarNulo
-        EmitirLínea: puerto, {pdcrt_empujar_nulo(ctx);}
+        EmitirLínea: puerto, {pdcrt_empujar_nulo(ctx, m);}
     finsi
 
     si opcode = Opcode#negar
@@ -249,7 +249,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#mkclz
-        EmitirLínea: puerto, {pdcrt_empujar_closure(ctx, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 1)), {, }, (tupla#en: 2), {);}
+        EmitirLínea: puerto, {pdcrt_empujar_closure(ctx, m, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 1)), {, }, (tupla#en: 2), {);}
     finsi
 
     si opcode = Opcode#continuar
@@ -257,7 +257,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#empujarEspacioDeNombres
-        EmitirLínea: puerto, {pdcrt_empujar_espacio_de_nombres(ctx);}
+        EmitirLínea: puerto, {pdcrt_empujar_espacio_de_nombres(ctx, m);}
     finsi
 
     si opcode = Opcode#agregarNombre
@@ -269,7 +269,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerRuntime
-        EmitirLínea: puerto, {pdcrt_obtener_objeto_runtime(ctx);}
+        EmitirLínea: puerto, {pdcrt_obtener_objeto_runtime(ctx, m);}
     finsi
 
     si opcode = Opcode#importar
@@ -281,7 +281,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#comoEspacioDeNombres
-        EmitirLínea: puerto, {pdcrt_convertir_a_espacio_de_nombres(ctx);}
+        EmitirLínea: puerto, {pdcrt_convertir_a_espacio_de_nombres(ctx, m);}
     finsi
 
     si opcode = Opcode#sacar
