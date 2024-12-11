@@ -21,6 +21,7 @@ checkprogram ysh "The YSH shell is not installed, see https://www.oilshell.org/"
 checkprogram lr "The lr program is not installed, see https://git.vuxu.org/lr/about/"
 checkprogram xe "The xe program is not installed, see https://git.vuxu.org/xe/about/"
 checkprogram awk "The AWK language is not installed"
+checkprogram python3 "The Python 3 language is not installed"
 
 if [ "$notfound" = "1" ]; then
     exit 1
