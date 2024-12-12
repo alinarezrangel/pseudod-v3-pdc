@@ -1,9 +1,24 @@
+-- 3 dependencies: sqlite3, lpeg and luaposix
 local lpeg = require "lpeg"
 local re = require "re"
 local sqlite3 = require "lsqlite3"
+local stat = require "posix.sys.stat"
+local dirent = require "posix.dirent"
+local errno = require "posix.errno"
 
 
 local VERSION = "pddoc 1.0"
+
+
+local function read_file(name)
+   local handle <close> = io.open(name, "rb")
+   return handle:read "a"
+end
+
+local function write_file(name, content)
+   local handle <close> = io.open(name, "wb")
+   handle:write(content)
+end
 
 
 local WORD_CHAR = "^[a-zA-Z_0-9%+%-%*/<>=$~\xc0-\xfc\x80-\xbf]$"
@@ -715,6 +730,13 @@ local function collect(tokens)
    return res, tq
 end
 
+local function collect_direct(code)
+   local ast = parse_scribble(code)
+   return {
+      { doc = ast }
+   }, {}
+end
+
 local function is_tag(t)
    return type(t) == "table"
       and getmetatable(t)
@@ -786,19 +808,19 @@ local function parse_args(name, args, sig)
    end
 
    if type(sig) == "number" then
-      assert(#pos == sig and nkw == 0, "expected " .. sig .. " arguments to " .. name)
+      assert(#pos == sig and nkw == 0, "se esperaban " .. sig .. " argumentos para " .. name)
    else
       local npos, limit, c = string.match(sig, "^([0-9]+)([-+]?)()")
       if not npos or not limit or not c then
-         error("bad signature to " .. name)
+         error("declaración errónea " .. name)
       end
       npos = tonumber(npos)
       if limit == "+" then
-         assert(#pos >= npos, "expected " .. npos .. " arguments or more to " .. name)
+         assert(#pos >= npos, "se esperaban " .. npos .. " argumentos o más para " .. name)
       elseif limit == "-" then
-         assert(#pos <= npos, "expected " .. npos .. " arguments or fewer to " .. name)
+         assert(#pos <= npos, "se esperaban " .. npos .. " argumentos o menos para " .. name)
       else
-         assert(#pos == npos, "expected " .. npos .. " arguments to " .. name)
+         assert(#pos == npos, "se esperaban " .. npos .. " argumentos para " .. name)
       end
 
       local unproc = {}
@@ -814,7 +836,7 @@ local function parse_args(name, args, sig)
 
          if opt == "_" then
             -- required
-            assert(kw[kwname] ~= nil, "expected keyword argument #:" .. kwname)
+            assert(kw[kwname] ~= nil, "se esperaba argumento con nombre #:" .. kwname)
          end
          unproc[kwname] = nil
       end
@@ -822,7 +844,7 @@ local function parse_args(name, args, sig)
       local optkw = string.match(sig, "%s+(%*?)", c)
       if optkw ~= "*" and next(unproc) then
          local kwname = next(unproc)
-         error("unexpected keyword argument #:" .. kwname)
+         error("argumento con nombre inesperado #:" .. kwname)
       end
    end
 
@@ -953,7 +975,7 @@ function globals.modulo(args)
    local exports = {}
    for i = 1, #pos do
       local t = pos[i]
-      assert(is_tagged(t, "exporta"), "modulo accepts only @exporta-modulo and @exporta-ids")
+      assert(is_tagged(t, "exporta"), "@modulo solo acepta @exporta-modulo y @exporta-ids")
       if t.modulo then
          exports[#exports + 1] = make_tag(
             "li", {},
@@ -1044,7 +1066,7 @@ local function eval_tag(tag, env)
          end
       end
       if type(fn) ~= "function" then
-         error("cannot call non-function")
+         error("no se puede llamar a una no-función")
       else
          return fn(args)
       end
@@ -1061,7 +1083,7 @@ local function eval_list(ls, env)
       args[#args + 1] = eval_sexpr(ls[i], env)
    end
    if type(fn) ~= "function" then
-      error("cannot call non-function")
+      error("no se puede llamar a una no-función")
    else
       return fn(args)
    end
@@ -1069,7 +1091,7 @@ end
 
 local function eval_sym(sym, env)
    local name = sym.s
-   return assert(env[name], "unknown name " .. name)
+   return assert(env[name], "nombre sin definir " .. name)
 end
 
 local L_hex = lpeg.R"09" + lpeg.R"af" + lpeg.R"AF"
@@ -1153,7 +1175,7 @@ eval_sexpr = function(sexpr, env)
    elseif sexpr.tag == "quote" then
       return eval_quote(sexpr, env)
    else
-      error("unreachable: sexpr of type " .. sexpr.tag)
+      error("unreachable: sexpr con tipo " .. sexpr.tag)
    end
 end
 
@@ -1489,7 +1511,7 @@ local function write_doc(out, doc, ind)
    elseif type(doc) == "number" then
       out:write(tostring(doc))
    else
-      error("unknown datum " .. type(doc))
+      error("dato desconocido " .. type(doc))
    end
 end
 
@@ -1539,14 +1561,14 @@ local function write_html(out, doc, ind)
       if HTML_SYMS[sym] then
          out:write("&" .. HTML_SYMS[sym] .. ";")
       else
-         error("invalid symbol: " .. sym)
+         error("símbolo inválido: " .. sym)
       end
    elseif is_kw(doc) then
-      error("unknown datum: keyword")
+      error("dato inválido: llave")
    elseif type(doc) == "number" then
       out:write(tostring(doc))
    else
-      error("unknown datum " .. type(doc))
+      error("dato inválido: " .. type(doc))
    end
 end
 
@@ -1571,7 +1593,12 @@ end
 
 
 local function prepare_db(name)
-   local db = sqlite3.open(name)
+   local db
+   if name then
+      db = sqlite3.open(name)
+   else
+      db = sqlite3.open_memory()
+   end
    db:exec [[
       create table if not exists docs (
          id integer primary key,
@@ -1653,7 +1680,7 @@ query_mod = function(db, kind, q)
       prep = db:prepare "select * from docs where module = ?"
       prep:bind(1, q)
    else
-      error("invalid mod query " .. kind)
+      error("query de módulo inválida " .. kind)
    end
 
    for row in prep:nrows() do
@@ -1776,7 +1803,7 @@ local function load_config(config_file)
 
    local chunk, err = load(cfg, config_file, "t", env)
    if not chunk then
-      error("syntax error in the config: " .. err)
+      error("error de sintáxis en la configuración: " .. err)
    end
    local co = coroutine.create(function() chunk() end)
    local ok, err = coroutine.resume(co)
@@ -1784,7 +1811,7 @@ local function load_config(config_file)
       error(err)
    end
    if coroutine.status(co) ~= "dead" then
-      error("cannot yield from config")
+      error("no puedes yieldiar desde la configuración")
    end
 
    validate_config(env)
@@ -1797,16 +1824,20 @@ local DEFAULT_TEMPLATE = [=[
 <html lang="es">
     <head>
         <meta charset="utf-8" />
-        <title>$=nombre_del_modulo$ - $nombre_del_proyecto$</title>
+        <title>$=nombre_del_modulo$ - $=nombre_del_proyecto$</title>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
 
         $if links_css then$
         $for i = 1, #links_css do$
         $local link = links_css[i]$
-        <link rel="stylesheet" href="$=link$" type="text/css" />
+        <link rel="stylesheet" href="$=url+attr=link$" type="text/css" />
         $end$
         $end$
 
-        $color_rx = "^#[a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9]$"$
+        <link rel="stylesheet" href="$=url+attr=css_principal$" type="text/css" />
+
+        $local color_rx = "^#[a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9]$$"$
 
         <style>
          $if color_primario then$
@@ -1826,41 +1857,93 @@ local DEFAULT_TEMPLATE = [=[
         $if links_js then$
         $for i = 1, #links_js do$
         $local link = links_js[i]$
-        <script defer type="text/javascript" src="$=link$"></script>
+        <script defer type="text/javascript" src="$=url+attr=link$"></script>
         $end$
         $end$
+
+        <script defer type="text/javascript" src="$=url+attr=js_principal$"></script>
 
         $=html_final_de_head$
     </head>
     <body>
+        <nav class="topnav">
+            <ul class="topnav--list">
+                $if url_pagina_principal then$
+                <li class="topnav--main-page-link">
+                    <a href="$=url+attr=url_pagina_principal$">Página principal</a>
+                </li>
+                $end$
+
+                $local nombre_paquete = string.match(nombre_del_modulo, "^([^/]+)")$
+                <li class="topnav--pkg-name">
+                    $=html=nombre_paquete$
+                </li>
+
+                <li class="topnav--pkg-version">
+                    $=html=version$
+                </li>
+
+                <li class="topnav--search">
+                    <form class="search" id="search">
+                        <label for="searchbox" class="search--label">Search:</label>
+                        <input id="searchbox"
+                               name="searchbox"
+                               class="search--input"
+                               type="text" />
+                        <button class="search--btn"
+                                type="submit">
+                            Search
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </nav>
+
         <header class="header">
             <div class="header--title-line">
                 $if logo then$
                 $local function img()$
-                <img class="header--logo" src="$=logo.url$" width="$=logo.ancho$" height="$=logo.alto$" />
+                <img class="header--logo"
+                     src="$=url+attr=logo.url$"
+                     width="$=attr=logo.ancho$"
+                     height="$=attr=logo.alto$" />
                 $end$
 
                 $if url then$
-                <a class="header--logo-container" href="$=url$">$img()$</a>
+                <a class="header--logo-container"
+                   href="$=url+attr=url$">$img()$</a>
                 $else$
                 <span class="header--logo-container">$img()$</span>
                 $end$
                 $end$
-                <h1 class="header--title">$=nombre_del_proyecto$</h1>
+                <h1 class="header--title">$=html=nombre_del_proyecto$</h1>
             </div>
-            <h2 class="header--subtitle">$=nombre_del_modulo$</h2>
+            <h2 class="header--subtitle">$=html=nombre_del_modulo$</h2>
         </header>
 
         <nav class="nav">
-            <h2 class="nav--tree-title nav--tree-toc">Tabla de Contenido</h2>
-            <ul class="nav--tree">
-                $for i = 1, #toc do$
-                $local el = toc[i]$
+            $if #lista_de_modulos > 0 then$
+            <h2 class="nav--tree-title nav--tree-modlist">Módulos</h2>
+            <ul class="nav--tree nav--tree-modlist">
+                $for i = 1, #lista_de_modulos do$
+                $local el = lista_de_modulos[i]$
                 <li>
-                    <a href="$=el.target$">$=el.name$</a>
+                    <a href="$=url+attr=el.url$"><code class="lang-none">$=html=el.module$</code></a>
                 </li>
                 $end$
             </ul>
+            $end$
+            $if #toc > 0 then$
+            <h2 class="nav--tree-title nav--tree-toc">Tabla de Contenido</h2>
+            <ul class="nav--tree nav--tree-toc">
+                $for i = 1, #toc do$
+                $local el = toc[i]$
+                <li>
+                    <a href="$=url+attr=el.target$"><code class="lang-none">$=html=el.name$</code></a>
+                </li>
+                $end$
+            </ul>
+            $end$
         </nav>
 
         <div class="content">
@@ -1868,6 +1951,17 @@ local DEFAULT_TEMPLATE = [=[
         </div>
 
         <footer class="footer">
+            $if licencia_doc then$
+            <p>
+                Licenciado bajo
+                $if licencia_doc.url then$
+                <a href="$=url+attr=licencia_doc.url$">$=html=licencia_doc.nombre$</a>
+                $else$
+                $=html=licencia_doc.nombre$
+                $end$
+            </p>
+            $end$
+
             $=html_pie_de_pagina$
         </footer>
 
@@ -1876,13 +1970,244 @@ local DEFAULT_TEMPLATE = [=[
 </html>
 ]=]
 
+local DEFAULT_CSS = [=[
+:root {
+    /* defined at page: --pddoc-primary-color and --pddoc-primary-contrast-color */
+    --pddoc-topnav-color: #f1f1f1;
+    --pddoc-topnav-contrast-color: black;
+    --pddoc-footer-color: black;
+    --pddoc-footer-contrast-color: white;
+    --doc-border-color: black;
+    --signature-background: white;
+    --signature-color: black;
+
+    --syn-kw: #771c76;
+    --syn-comment: #423e42;
+    --syn-string: #245900;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    display: grid;
+    grid-template:
+        "topnav" auto
+        "header" auto
+        "toc" auto
+        "content" 1fr
+        "footer" auto;
+}
+
+@media (min-width: 756px) {
+    body {
+        grid-template:
+            "topnav topnav" auto
+            "header header" auto
+            "toc   content" 1fr
+            "footer footer" auto
+            / auto 1fr auto;
+    }
+}
+
+.topnav {
+    grid-area: topnav;
+
+    width: 100%;
+    margin: 0;
+    margin-bottom: 16px;
+    padding: 8px;
+    background: var(--pddoc-topnav-color);
+    color: var(--pddoc-topnav-contrast-color);
+    border-bottom: 1px solid var(--pddoc-topnav-contrast-color);
+}
+
+.topnav--list {
+    list-style: none;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-start;
+    padding: 0;
+    margin: 0;
+}
+
+.topnav--list > li {
+    padding: 0;
+    margin: 4px 8px;
+}
+
+.topnav--list > li.topnav--search {
+    margin-left: auto;
+}
+
+.header {
+    grid-area: header;
+
+    padding: 0 6px;
+    margin: 4px 6px;
+    border: 4px solid var(--pddoc-primary-color);
+}
+
+.header--title-line {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin: 8px 0;
+}
+
+.header--subtitle {
+    text-align: center;
+    padding: 16px 0;
+    margin: 0 -6px;
+    border-top: 4px solid var(--pddoc-primary-color);
+    background: var(--pddoc-primary-color);
+    color: var(--pddoc-primary-contrast-color);
+}
+
+.nav {
+    grid-area: toc;
+
+    margin: 0 8px;
+}
+
+.nav--tree-title {
+    background: var(--pddoc-primary-color);
+    color: var(--pddoc-primary-contrast-color);
+    padding: 4px 8px;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+}
+
+.nav--tree-title + .nav--tree {
+    border: 2px solid var(--pddoc-primary-color);
+    border-top: 0;
+    margin-top: 0;
+}
+
+.nav--tree {
+    padding: 8px 24px;
+}
+
+.content {
+    grid-area: content;
+    max-width: 80rem;
+    margin: 4px;
+    padding: 0 8px;
+}
+
+.footer {
+    grid-area: footer;
+
+    background: var(--pddoc-footer-color);
+    color: var(--pddoc-footer-contrast-color);
+
+    padding: 8px 16px;
+}
+
+.footer a {
+    color: var(--pddoc-footer-contrast-color);
+}
+
+
+.doc {
+    border-left: 2px solid var(--doc-border-color);
+    margin-bottom: 16px;
+    padding: 4px 8px;
+}
+
+.signature {
+    font-size: 1rem;
+    background: var(--signature-background);
+    color: var(--signature-color);
+    padding: 8px;
+    margin: -4px -8px;
+
+    border: 2px solid var(--doc-border-color);
+    border-left: 0;
+}
+
+.syn-kw {
+    color: var(--syn-kw);
+}
+
+.syn-comment {
+    color: var(--syn-comment);
+}
+
+.syn-string {
+    color: var(--syn-string);
+}
+
+.syn-special {
+    font-weight: bold;
+}
+]=]
+
+local DEFAULT_JS = [=[
+window.addEventListener("load", function() {
+    "use strict";
+
+    const search = document.querySelector("#search");
+});
+]=]
+
 local TMPL_GRAMMAR = re.compile [[
 
 grammar <- {| fragment (code fragment)* |} {}
 fragment <- {[^$]*}
-code <- '$' {([^$] / '$$' -> '$')*} '$'
+code <- '$' {~ ([^$] / '$$' -> '$')* ~} '$' ! '$'
 
 ]]
+
+local FILTERS = {}
+
+function FILTERS.url(text)
+   local function esc(c)
+      return string.format("%%%02X", string.byte(c))
+   end
+   -- See <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI#description>
+   return string.gsub(text, "([^-A-Za-z0-9_.!~*'();/?:@&=+$,#])", esc)
+end
+
+function FILTERS.attr(text)
+   local REPLS = {
+      ["'"] = "&#39;",
+      ['"'] = "&quot;",
+      ["<"] = "&lt;",
+      [">"] = "&gt;",
+      ["&"] = "&amp;",
+   }
+   return string.gsub(text, "([\"'<>&])", REPLS)
+end
+
+function FILTERS.html(text)
+   local REPLS = {
+      ["<"] = "&lt;",
+      [">"] = "&gt;",
+      ["&"] = "&amp;",
+   }
+   return string.gsub(text, "([<>&])", REPLS)
+end
+
+local function escape(filters, val)
+   for filter in string.gmatch(filters, "([a-zA-Z0-9_]+)") do
+      val = assert(FILTERS[filter], "el filtro no existe: " .. filter)(val)
+   end
+   return val
+end
 
 local function interpolate_template(tmpl, env)
    local segments, pos = TMPL_GRAMMAR:match(tmpl)
@@ -1899,7 +2224,13 @@ local function interpolate_template(tmpl, env)
       local is_code = i % 2 == 0
       if is_code then
          if string.sub(seg, 1, 1) == "=" then
-            code[#code + 1] = string.format(" ;emit(%s); ", string.sub(seg, 2))
+            local body = string.sub(seg, 2)
+            local filters, expr = string.match(body, "^([a-zA-Z0-9_+]+)=(.*)$")
+            if filters and expr then
+               code[#code + 1] = string.format(" ;emit(escape(%q, %s)); ", filters, expr)
+            else
+               code[#code + 1] = string.format(" ;emit(%s); ", body)
+            end
          else
             code[#code + 1] = " " .. seg .. " "
          end
@@ -1918,9 +2249,10 @@ local function interpolate_template(tmpl, env)
       res[#res + 1] = data
    end
    env.emit = emit
-   local chunk, err = load(code, "template", "t", env)
+   local chunk, err = load(code, "template", "t", setmetatable({escape = escape}, {__index = env}))
    if not chunk then
-      error("syntax error in the template: " .. err)
+      print(code)
+      error("error de sintáxis en la plantilla: " .. err)
    end
    chunk()
 
@@ -1928,15 +2260,148 @@ local function interpolate_template(tmpl, env)
 end
 
 
+local INDEX_MODULE_NAME = "inicio.pddoc"
+
+local function gen_output(db, output_dir, project_cfg, rsc)
+   local prefix = output_dir
+   if string.sub(prefix, -1, -1) ~= "/" then
+      prefix = prefix .. "/"
+   end
+
+   local MAIN_CSS_NAME, MAIN_JS_NAME, MAIN_INDEX_NAME = "main.css", "main.js", "index.html"
+   local generated = {}
+   generated[#generated + 1] = prefix .. MAIN_CSS_NAME
+   write_file(prefix .. MAIN_CSS_NAME, rsc.main_css)
+   generated[#generated + 1] = prefix .. MAIN_JS_NAME
+   write_file(prefix .. MAIN_JS_NAME, rsc.main_js)
+
+   local prep = db:prepare "select * from docs"
+   local modlist = {}
+   for doc in prep:nrows() do
+      modlist[#modlist + 1] = {
+         module = doc.module,
+         url = doc.output_file,
+      }
+      if doc.module == INDEX_MODULE_NAME then
+         modlist[#modlist].url = MAIN_INDEX_NAME
+      end
+   end
+   prep:finalize()
+
+   local function mod_lt(a, b)
+      return a.module < b.module
+   end
+   table.sort(modlist, mod_lt)
+
+   prep = db:prepare "select * from docs"
+   for doc in prep:nrows() do
+      generated[#generated + 1] = prefix .. doc.output_file
+
+      doc.exports = {}
+      local exps = db:prepare "select * from exports where doc_id = ?"
+      exps:bind(1, doc.id)
+      for exp in exps:nrows() do
+         doc.exports[#doc.exports + 1] = exp
+      end
+      exps:finalize()
+
+      local toc = {}
+      for i = 1, #doc.exports do
+         local exp = doc.exports[i]
+         if exp.target_doc_id == doc.id then
+            toc[#toc + 1] = {
+               name = exp.name,
+               target = exp.target_link,
+               own = true,
+            }
+         else
+            local src = get_src(doc, exp.name, function(kind, q) return query_mod(db, kind, q) end)
+            if src then
+               local mod = query_mod(db, "id", src.doc_id)
+               toc[#toc + 1] = {
+                  name = exp.name,
+                  target = mod.output_file .. src.target,
+                  own = false,
+                  from_module = mod.module,
+               }
+            end
+         end
+      end
+
+      local function toc_lt(a, b)
+         if a.own and not b.own then
+            return true
+         elseif not a.own and b.own then
+            return false
+         else
+            return a.name < b.name
+         end
+      end
+      table.sort(toc, toc_lt)
+
+      local interp_env = setmetatable(
+         {
+            contenido = doc.html,
+            nombre_del_modulo = doc.module,
+            toc = toc,
+            lista_de_modulos = modlist,
+            css_principal = MAIN_CSS_NAME,
+            js_principal = MAIN_JS_NAME,
+            url_pagina_principal = MAIN_INDEX_NAME,
+         },
+         {__index = project_cfg}
+      )
+      local res = interpolate_template(rsc.template, interp_env)
+      if doc.module == INDEX_MODULE_NAME then
+         generated[#generated + 1] = prefix .. MAIN_INDEX_NAME
+         write_file(prefix .. MAIN_INDEX_NAME, res)
+      else
+         write_file(prefix .. doc.output_file, res)
+      end
+   end
+   prep:finalize()
+
+   return generated
+end
+
+local function report_to_be_cleaned(output_dir, generated)
+   local prefix = output_dir
+   if string.sub(prefix, -1, -1) ~= "/" then
+      prefix = prefix .. "/"
+   end
+
+   local files, errmsg = dirent.dir(output_dir)
+   if not files then
+      error("no se pudo leer el directorio: " .. errmsg)
+   end
+
+   local prelude = false
+   local gen_by_name = {}
+   for i = 1, #generated do
+      gen_by_name[generated[i]] = true
+   end
+   for i = 1, #files do
+      local file = files[i]
+      if file ~= "." and file ~= ".." and not gen_by_name[prefix .. file] then
+         if not prelude then
+            print("The following files were not generated automatically:")
+            prelude = true
+         end
+         print("- " .. file)
+      end
+   end
+end
+
+
 local function mangle_module_name(module_name)
    local function esc(c)
       if c == "/" then
-         return "--"
+         return "---"
       else
          return string.format("-%02X", string.byte(c))
       end
    end
-   return (string.gsub(module_name, "([^a-zA-Z0-9_])", esc))
+   return "_" .. (string.gsub(module_name, "([^a-zA-Z0-9_])", esc))
 end
 
 local function parse_opts(args)
@@ -2032,30 +2497,61 @@ local function parse_opts(args)
 
    config.to_process = to_process
 
-   if not config.database then
-      error("debes especificar la base de datos a usar")
-   end
+   assert(config.config_file, "debes especificar el archivo de configuración con --config")
 
    return config
 end
 
+local function get_ext(name)
+   return (string.match(name, "%.([^.]+)$"))
+end
 
 
 local config = parse_opts({...})
 
 local db = prepare_db(config.database)
 
+local project_cfg = load_config(config.config_file)
+
 for i = 1, #config.to_process do
    local p = config.to_process[i]
-   local tokens
-   do
-      local input_file <close> = io.open(p.input_file, "rb")
-      tokens = tokenize(input_file)
+   local handle <close> = io.open(p.input_file, "rb")
+   local input_ext = get_ext(p.input_file)
+   if input_ext == "pd" or input_ext == "psd" or input_ext == "pseudo" or input_ext == "pseudod" then
+      local tokens = tokenize(handle)
+      local r, tq = collect(tokens)
+      local frags, defs = eval(tq, r, globals, db, prepare_global_env)
+      local doc_id, written = new_doc(db, group_module(frags), p.input_file, p.module, p.output_file)
+      save_into_db(db, tq, doc_id, frags, defs)
+   elseif input_ext == "pddoc" then
+      local r, tq = collect_direct(handle:read "a")
+      local frags, defs = eval(tq, r, globals, db, prepare_global_env)
+      local doc_id, written = new_doc(db, group_module(frags), p.input_file, p.module, p.output_file)
+      save_into_db(db, tq, doc_id, frags, defs)
+   else
+      error("archivo de entrada sin reconocer: " .. p.input_file .. " (extensión " .. input_ext .. ")")
    end
-   local r, tq = collect(tokens)
-   local frags, defs = eval(tq, r, globals, db, prepare_global_env)
-   local doc_id, written = new_doc(db, group_module(frags), p.input_file, p.module, p.output_file)
-   save_into_db(db, tq, doc_id, frags, defs)
+end
+
+if config.output_dir then
+   local ok, errmsg, errnum = stat.mkdir(config.output_dir)
+   if not ok and errnum ~= errno.EEXIST then
+      error("error creando " .. config.output_dir .. ": " .. errmsg)
+   end
+
+   local rsc = {
+      main_css = DEFAULT_CSS,
+      main_js = DEFAULT_JS,
+   }
+
+   if config.template_file then
+      rsc.template = read_file(config.template_file)
+   else
+      rsc.template = DEFAULT_TEMPLATE
+   end
+
+   local generated = gen_output(db, config.output_dir, project_cfg, rsc)
+   report_to_be_cleaned(config.output_dir, generated)
 end
 
 db:close()

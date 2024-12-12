@@ -3,7 +3,7 @@ version = "3.0.0"
 url = "http://alinarezrangel.github.io/pseudod/"
 logo = {
    url = "file:///home/alinarezrangel/Mega/MEGAsync/PRogramacion-nuevo/pseudod/new-new/docs/logo-128.png",
-   ancho = 128, alto = 128,
+   ancho = 64, alto = 64,
    alt = "Logo de PseudoD",
 }
 color_primario = {
