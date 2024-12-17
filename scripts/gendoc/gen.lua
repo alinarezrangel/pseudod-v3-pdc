@@ -21,7 +21,7 @@ local function write_file(name, content)
 end
 
 
-local WORD_CHAR = "^[a-zA-Z_0-9%+%-%*/<>=$~\xc0-\xfc\x80-\xbf]$"
+local WORD_CHAR = "^[a-zA-Z_0-9%+%-%*/<>=$~\xc0-\xfc\x80-\xbf']$"
 local OTHER_CHAR = "^[.,;:()%%&#]$"
 
 local function tokenize(input_stream)
@@ -205,6 +205,45 @@ local function wrap(state, str)
       return str
    end
 end
+
+
+local FILTERS = {}
+
+function FILTERS.url(text)
+   local function esc(c)
+      return string.format("%%%02X", string.byte(c))
+   end
+   -- See <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI#description>
+   return string.gsub(text, "([^-A-Za-z0-9_.!~*'();/?:@&=+$,#])", esc)
+end
+
+function FILTERS.attr(text)
+   local REPLS = {
+      ["'"] = "&#39;",
+      ['"'] = "&quot;",
+      ["<"] = "&lt;",
+      [">"] = "&gt;",
+      ["&"] = "&amp;",
+   }
+   return string.gsub(text, "([\"'<>&])", REPLS)
+end
+
+function FILTERS.html(text)
+   local REPLS = {
+      ["<"] = "&lt;",
+      [">"] = "&gt;",
+      ["&"] = "&amp;",
+   }
+   return string.gsub(text, "([<>&])", REPLS)
+end
+
+local function escape(filters, val)
+   for filter in string.gmatch(filters, "([a-zA-Z0-9_]+)") do
+      val = assert(FILTERS[filter], "el filtro no existe: " .. filter)(val)
+   end
+   return val
+end
+
 
 local grammar = re.compile [[
 
@@ -970,6 +1009,13 @@ local BLOCKS = {
    hr = true,
    article = true,
    p = true,
+   pre = true,
+   h1 = true,
+   h2 = true,
+   h3 = true,
+   h4 = true,
+   h5 = true,
+   h6 = true,
 }
 
 function globals.para(args)
@@ -1044,7 +1090,7 @@ function globals.itemlist(args)
       res[i] = make_tag("li", {}, {t.content})
    end
 
-   return make_tag(tagname, {class = "list"}, {pos})
+   return make_tag(tagname, {class = "list"}, {res})
 end
 
 function globals.item(args)
@@ -1054,7 +1100,7 @@ end
 
 function globals.devuelve(args)
    local pos, kw = parse_args("devuelve", args, "0+")
-   return make_tag("span", {class = "returns"}, {pos})
+   return make_tag("span", {class = "returns"}, {make_tag("b", {}, {"Devuelve:"}), " ", pos})
 end
 
 macros.defparam = true
@@ -1115,7 +1161,9 @@ local function prepare_global_env(env)
                                            syntax_highlight("pseudod", t.name, stx_ctx)})
          params[#params + 1] = make_tag("dd", {class = "param-def"}, {t.body})
       end
-      return make_tag("dl", {class = "params"}, {params})
+      return make_tag("section", {class = "params"}, {
+                         make_tag("h3", {class = "params--title"}, {"Parámetros"}),
+                         make_tag("dl", {class = "params--body"}, {params})})
    end
 
    function globals.ejemplo(args)
@@ -1616,38 +1664,33 @@ local function write_doc(out, doc, ind)
    end
 end
 
-local HTML_SYMS = {
-}
+local HTML_SYMS = {}
 
-local function write_html_attr(out, v)
-   local repls = {
-      ["<"] = "&lt;",
-      [">"] = "&gt;",
-      ["&"] = "&amp;",
-      ['"'] = "&quot;",
-   }
-   out:write('"' .. (string.gsub(v, "([<>&\"])", repls)) .. '"')
-end
+local HTML_BLOCKS = {
+   p = true,
+   ul = true,
+   ol = true,
+   dl = true,
+   div = true,
+   script = true,
+   section = true,
+   article = true,
+   main = true,
+   nav = true,
+}
 
 local function write_html(out, doc, ind)
    ind = ind or 0
    if type(doc) == "string" then
-      local repls = {
-         ["<"] = "&lt;",
-         [">"] = "&gt;",
-         ["&"] = "&amp;",
-         ['"'] = "&quot;",
-      }
-      out:write((string.gsub(doc, "([<>&\"])", repls)))
+      out:write(escape("html", doc))
    elseif is_tag(doc) then
       out:write("<" .. doc.name)
       if next(doc.attrs) then
          for k, v in pairs(doc.attrs) do
-            out:write(" " .. k .. "=")
-            write_html_attr(out, v)
+            out:write(" " .. k .. "=" .. escape("attr", v))
          end
       end
-      if #doc.body > 0 then
+      if #doc.body > 0 or HTML_BLOCKS[string.lower(doc.name)] then
          out:write ">"
          for i = 1, #doc.body do
             local el = doc.body[i]
@@ -2272,43 +2315,6 @@ fragment <- {[^$]*}
 code <- '$' {~ ([^$] / '$$' -> '$')* ~} '$' ! '$'
 
 ]]
-
-local FILTERS = {}
-
-function FILTERS.url(text)
-   local function esc(c)
-      return string.format("%%%02X", string.byte(c))
-   end
-   -- See <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI#description>
-   return string.gsub(text, "([^-A-Za-z0-9_.!~*'();/?:@&=+$,#])", esc)
-end
-
-function FILTERS.attr(text)
-   local REPLS = {
-      ["'"] = "&#39;",
-      ['"'] = "&quot;",
-      ["<"] = "&lt;",
-      [">"] = "&gt;",
-      ["&"] = "&amp;",
-   }
-   return string.gsub(text, "([\"'<>&])", REPLS)
-end
-
-function FILTERS.html(text)
-   local REPLS = {
-      ["<"] = "&lt;",
-      [">"] = "&gt;",
-      ["&"] = "&amp;",
-   }
-   return string.gsub(text, "([<>&])", REPLS)
-end
-
-local function escape(filters, val)
-   for filter in string.gmatch(filters, "([a-zA-Z0-9_]+)") do
-      val = assert(FILTERS[filter], "el filtro no existe: " .. filter)(val)
-   end
-   return val
-end
 
 local function interpolate_template(tmpl, env)
    local segments, pos = TMPL_GRAMMAR:match(tmpl)

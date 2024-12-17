@@ -647,8 +647,8 @@ necesitas (ArregloConFinal: A) = A
 necesitas (ArregloConFinal: 5, 7, B) = (Arreglo#crearCon: 5, 7)
 }|
 
-Nota como @pd{ArregloConFinal: valores..., Arreglo#vacio} es lo mismo que
-@pd{Arreglo#crearCon: valores...}.
+Nota como @pd{ArregloConFinal: ...valores, Arreglo#vacio} es lo mismo que
+@pd{Arreglo#crearCon: ...valores}.
 DOCUMENTA]
 funcion ArregloConFinal: ...valores
     variable res
@@ -699,10 +699,10 @@ finprocedimiento
 [DOCUMENTA
 @brief{Como @pd{Aplicar'} pero "@italic{a la izquierda}".}
 
-Mientras que @pd{Aplicar': proc, a, b, c..., args} es equivalente a
-@pd{Aplicar: proc, (ArregloConFinal: a, b, c..., args)},
-@pd{Aplicar'i: proc, a, b, c..., args} es equivalente a
-@pd{Aplicar: proc, (Concatenar: args, (Arreglo#crearCon: a, b, c...))}.
+Mientras que @pd{Aplicar': proc, a, b, ...c, args} es equivalente a
+@pd{Aplicar: proc, (ArregloConFinal: a, b, ...c, args)},
+@pd{Aplicar'i: proc, a, b, ...c, args} es equivalente a
+@pd{Aplicar: proc, (Concatenar: args, (Arreglo#crearCon: a, b, ...c))}.
 Nota como @pd{args} ahora aparece en el otro lado de los demás argumentos.
 DOCUMENTA]
 procedimiento Aplicar'i: proc, ...argsYFinal
