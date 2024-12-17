@@ -214,16 +214,17 @@ ws <- %s*
 
 text <- {| {:tag: '' -> 'text' :} (textlit / tag)* |}
 textlit <- { textlitchr+ / %nl+ }
-textlitchr <- [^@{}%nl] / '{' textlit '}'
+textlitchr <- [^@{}%nl] / '{' textlit? '}'
 tag <- {| {:tag: '' -> 'tag' :}
        '@' ws {:name: atom :}
-       ( ws {:p: parens :}? ws {:i: inner :}
-       / ws {:p: parens :}
-       / ! '(' ! '{') |}
+       ( {:p: parens :} {:i: inner :}
+       / {:i: inner :}
+       / {:p: parens :}
+       / ! '(' ! '|{' ! '{') |}
 value <- tag / parens / atom
 atom <- str / bool / num / kw / sym / quote
 sym <- {| {:tag: '' -> 'sym' :} symi |}
-symi <- {:s: { [a-zA-Z0-9_+*/!?~=<>|%%-]+ } :}
+symi <- {:s: { [a-zA-Z0-9_+*/!?~=<>%-]+ } :}
 str <- {| {:tag: '' -> 'str' :} '"' {:s: { strchr* } :} '"' |}
 strchr <- '\' (["nrt\] / 'x' hex hex / 'u' hex4 / 'U' hex4 hex4) / [^\"]
 hex4 <- hex hex hex hex
@@ -233,7 +234,7 @@ num <- {| {:tag: '' -> 'num' :} {:n: { '-'? [0-9]+ ('.' [0-9]+)? } :} |}
 kw <- {| {:tag: '' -> 'kw' :} '#:' symi |}
 parens <- {| {:tag: '' -> 'list' :} '(' (ws value)* ws ')' |}
 inner <- innerlit / innernorm
-innerlit <- '|{' { (! '}|' .)* } '}|'
+innerlit <- '|{' {| {:tag: '' -> 'text' :} { (! '}|' .)* } |} '}|'
 innernorm <- '{' text '}'
 quote <- {| {:tag: '' -> 'quote' :} "'" {:v: value :} |}
 
@@ -901,6 +902,10 @@ local function syntax_highlight(lang, code, stx_ctx)
    end
    stx_ctx = stx_ctx or {}
 
+   if lang ~= "pseudod" then
+      return make_tag("code", {class = "lang-" .. lang}, {code})
+   end
+
    local tokens = tokenize_string(code)
 
    local res = {}
@@ -939,7 +944,20 @@ local function syntax_highlight(lang, code, stx_ctx)
    return make_tag("code", {class = "lang-" .. lang}, {res})
 end
 
-local globals = {}
+local function slice(tbl, i, j)
+   if not i then
+      i = 1
+   end
+   if not j then
+      j = #tbl
+   end
+   local res = {}
+   table.move(tbl, i, j, 1, res)
+   return res
+end
+
+local globals, macros = {}, {}
+globals.__macros = macros
 
 function globals.list(args)
    local pos, kw = parse_args("list", args, "0+")
@@ -968,33 +986,6 @@ end
 function globals.toplevel(args)
    local pos, kw = parse_args("modulo", args, "0")
    return {}
-end
-
-function globals.modulo(args)
-   local pos, kw = parse_args("modulo", args, "0+")
-   local exports = {}
-   for i = 1, #pos do
-      local t = pos[i]
-      assert(is_tagged(t, "exporta"), "@modulo solo acepta @exporta-modulo y @exporta-ids")
-      if t.modulo then
-         exports[#exports + 1] = make_tag(
-            "li", {},
-            {"Todo lo exportado por ", syntax_highlight("pseudod", t.modulo)}
-         )
-      else
-         exports[#exports + 1] = make_tag(
-            "li", {},
-            {"Los identificadores ", comma_sep(map(t.ids, function(id) return syntax_highlight("pseudod", id) end))}
-         )
-      end
-   end
-   return make_tag(
-      "div", {class = "module-exports"}, {
-         make_tag("p", {class = "module-exports--label"}, {"Exporta:"}),
-         make_tag("ul", {class = "module-exports--things"}, {
-                     exports
-         }),
-   })
 end
 
 globals["exporta-modulo"] = function(args)
@@ -1032,6 +1023,53 @@ function globals.code(args)
    return make_tag("code", {class = "lang-none"}, {pos})
 end
 
+function globals.brief(args)
+   local pos, kw = parse_args("brief", args, "0+")
+   return make_tag("span", {class = "brief"}, {pos})
+end
+
+function globals.itemlist(args)
+   local pos, kw = parse_args("itemlist", args, "0+ #:style ?")
+   local tagname
+   if kw.style and is_sym(kw.style) and get_sym(kw.style) == "ordered" then
+      tagname = "ol"
+   else
+      tagname = "ul"
+   end
+
+   local res = {}
+   for i = 1, #pos do
+      local t = pos[i]
+      assert(is_tagged(t, "item"), "@itemlist solo acepta etiquetas @item")
+      res[i] = make_tag("li", {}, {t.content})
+   end
+
+   return make_tag(tagname, {class = "list"}, {pos})
+end
+
+function globals.item(args)
+   local pos, kw = parse_args("item", args, "0+")
+   return make_tagged("item", {content = pos})
+end
+
+function globals.devuelve(args)
+   local pos, kw = parse_args("devuelve", args, "0+")
+   return make_tag("span", {class = "returns"}, {pos})
+end
+
+macros.defparam = true
+function globals.defparam(eval, env, args)
+   local pos, kw = parse_args("defparam", args, "0+")
+   if pos[1].tag ~= "sym" then
+      error("el primer argumento de @defparam debe ser un símbolo")
+   end
+   local name = pos[1].s
+   local function ev(s)
+      return eval(s, env)
+   end
+   return make_tagged("defparam", {name = name, body = map(slice(pos, 2), ev)})
+end
+
 local function prepare_global_env(env)
    local stx_ctx = getmetatable(env).stx_ctx
 
@@ -1039,19 +1077,90 @@ local function prepare_global_env(env)
       local pos, kw = parse_args("pd", args, "0+")
       return syntax_highlight("pseudod", pos, stx_ctx)
    end
+
+   function env.modulo(args)
+      local pos, kw = parse_args("modulo", args, "0+")
+      local exports = {}
+      for i = 1, #pos do
+         local t = pos[i]
+         assert(is_tagged(t, "exporta"), "@modulo solo acepta @exporta-modulo y @exporta-ids")
+         if t.modulo then
+            exports[#exports + 1] = make_tag(
+               "li", {},
+               {"Todo lo exportado por ", syntax_highlight("pseudod", t.modulo, stx_ctx)}
+            )
+         else
+            exports[#exports + 1] = make_tag(
+               "li", {},
+               {"Los identificadores ", comma_sep(map(t.ids, function(id) return syntax_highlight("pseudod", id, stx_ctx) end))}
+            )
+         end
+      end
+      return make_tag(
+         "div", {class = "module-exports"}, {
+            make_tag("p", {class = "module-exports--label"}, {"Exporta:"}),
+            make_tag("ul", {class = "module-exports--things"}, {
+                        exports
+            }),
+      })
+   end
+
+   function env.params(args)
+      local pos, kw = parse_args("params", args, "0+")
+      local params = {}
+      for i = 1, #pos do
+         local t = pos[i]
+         assert(is_tagged(t, "defparam"), "@params solo acepta @defparam")
+         params[#params + 1] = make_tag("dt", {class = "param-name"}, {
+                                           syntax_highlight("pseudod", t.name, stx_ctx)})
+         params[#params + 1] = make_tag("dd", {class = "param-def"}, {t.body})
+      end
+      return make_tag("dl", {class = "params"}, {params})
+   end
+
+   function globals.ejemplo(args)
+      local pos, kw = parse_args("ejemplo", args, "0+")
+      return make_tag("pre", {class = "codeblock"}, {syntax_highlight("pseudod", pos, stx_ctx)})
+   end
+
+   function globals.codeblock(args)
+      local pos, kw = parse_args("ejemplo", args, "0+")
+      return make_tag("pre", {class = "codeblock"}, {syntax_highlight("none", pos, stx_ctx)})
+   end
+
+   env.param = env.pd
 end
 
 local eval_sexpr
 
+local function eval_do_seq(fn, args, env)
+   if fn.tag == "sym" then
+      local n = fn.s
+      if env.__macros and env.__macros[n] then
+         return env[n](eval_sexpr, env, args)
+      end
+   end
+
+   local f = eval_sexpr(fn, env)
+   for i = 1, #args do
+      args[i] = eval_sexpr(args[i], env)
+   end
+   if type(f) ~= "function" then
+      error("no se puede llamar a una no-función")
+   else
+      return f(args)
+   end
+end
+
 local function eval_tag(tag, env)
    assert(tag.tag == "tag")
    if tag.p or tag.i then
-      local fn = eval_sexpr(tag.name, env)
+      local fn = tag.name
       local args = {}
       if tag.p then
          assert(tag.p.tag == "list")
          for i = 1, #tag.p do
-            args[#args + 1] = eval_sexpr(tag.p[i], env)
+            args[#args + 1] = tag.p[i]
          end
       end
       if tag.i then
@@ -1059,17 +1168,13 @@ local function eval_tag(tag, env)
          for i = 1, #tag.i do
             local el = tag.i[i]
             if type(el) == "string" then
-               args[#args + 1] = el
+               args[#args + 1] = {tag = "str", s = el}
             else
-               args[#args + 1] = eval_sexpr(el, env)
+               args[#args + 1] = el
             end
          end
       end
-      if type(fn) ~= "function" then
-         error("no se puede llamar a una no-función")
-      else
-         return fn(args)
-      end
+      return eval_do_seq(fn, args, env)
    else
       return eval_sexpr(tag.name, env)
    end
@@ -1077,16 +1182,12 @@ end
 
 local function eval_list(ls, env)
    assert(ls.tag == "list")
-   local fn = eval_sexpr(ls[1], env)
+   local fn = ls[1]
    local args = {}
    for i = 2, #ls do
-      args[#args + 1] = eval_sexpr(ls[i], env)
+      args[#args + 1] = ls[i]
    end
-   if type(fn) ~= "function" then
-      error("no se puede llamar a una no-función")
-   else
-      return fn(args)
-   end
+   return eval_do_seq(fn, args, env)
 end
 
 local function eval_sym(sym, env)

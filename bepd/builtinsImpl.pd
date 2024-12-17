@@ -85,7 +85,7 @@ número 0 y de manera secuencial.
 
 @params(
 @defparam(arr){Arreglo sobre el cual se iterará.}
-@defparam(proc){Procedimiento o función que se llamará sobre cada elemento de @param{arr}}.
+@defparam(proc){Procedimiento o función que se llamará sobre cada elemento de @param{arr}.}
 )
 
 @ejemplo|{
@@ -193,7 +193,7 @@ arreglo, comenzando por el elemento número 0 y de manera secuencial.
 @params(
 @defparam(arr){Arreglo sobre el cual se iterará.}
 @defparam(proc){Procedimiento o función que se llamará sobre cada elemento de
-@param{arr} y sus índices.}.
+@param{arr} y sus índices.}
 )
 
 @ejemplo|{
@@ -264,7 +264,7 @@ finfuncion
 Dada una función o procedimiento @param{func}, un elemento base @param{base} y
 un arreglo @param{arr}, devuelve el resultado de evaluar:
 
-@pdblock|{
+@ejemplo|{
 variables acc1, acc2, acc3, ..., accN
 fijar acc1 a func: base, (arr#en: 0)
 fijar acc2 a func: acc1, (arr#en: 1)
@@ -355,7 +355,7 @@ finfuncion) = (Arreglo#crearCon: {Nada}, {Nada}, {Nada}, {Nada})
 @defparam(func){Función que se utilizará para transformar el arreglo.}
 )
 
-@devolver{Un nuevo arreglo con los resultados de aplicar @param{func} a
+@devuelve{Un nuevo arreglo con los resultados de aplicar @param{func} a
 cada elemento de @param{arr}.}
 DOCUMENTA]
 funcion Mapear: arr, func
@@ -588,7 +588,7 @@ finfuncion
 @brief{Concatena todos los arreglos pasados.}
 
 @params(
-@defvarparam(arrs){Arreglos a concatenar.}
+@defparam(arrs){Arreglos a concatenar.}
 )
 
 Por ejemplo:
@@ -1183,7 +1183,7 @@ a @pd|{__EnviarMensaje: objeto, {nombre del método}, ...argumentos}|.}
 
 Algunos ejemplos son:
 
-@ejemplos|{
+@ejemplo|{
 
 variables A, B
 fijar A a Arreglo#crearCon:
