@@ -1687,7 +1687,7 @@ local function write_html(out, doc, ind)
       out:write("<" .. doc.name)
       if next(doc.attrs) then
          for k, v in pairs(doc.attrs) do
-            out:write(" " .. k .. "=" .. escape("attr", v))
+            out:write(" " .. k .. "=\"" .. escape("attr", v) .. "\"")
          end
       end
       if #doc.body > 0 or HTML_BLOCKS[string.lower(doc.name)] then
@@ -1972,14 +1972,14 @@ local DEFAULT_TEMPLATE = [=[
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+        <link rel="stylesheet" href="$=url+attr=css_principal$" type="text/css" />
+
         $if links_css then$
         $for i = 1, #links_css do$
         $local link = links_css[i]$
         <link rel="stylesheet" href="$=url+attr=link$" type="text/css" />
         $end$
         $end$
-
-        <link rel="stylesheet" href="$=url+attr=css_principal$" type="text/css" />
 
         $local color_rx = "^#[a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9][a-fA-F0-9]$$"$
 
@@ -1998,6 +1998,8 @@ local DEFAULT_TEMPLATE = [=[
          $end$
         </style>
 
+        <script defer type="text/javascript" src="$=url+attr=js_principal$"></script>
+
         $if links_js then$
         $for i = 1, #links_js do$
         $local link = links_js[i]$
@@ -2005,13 +2007,21 @@ local DEFAULT_TEMPLATE = [=[
         $end$
         $end$
 
-        <script defer type="text/javascript" src="$=url+attr=js_principal$"></script>
-
         $=html_final_de_head$
     </head>
     <body>
-        <nav class="topnav">
+        <nav class="topnav" id="top-nav">
             <ul class="topnav--list">
+                <li class="topnav--menu">
+                    <button class="topnav--menu-opener" id="nav-opener">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" version="1.1">
+                            <rect x="0" y="4" width="32" height="5" fill="black" />
+                            <rect x="0" y="15" width="32" height="5" fill="black" />
+                            <rect x="0" y="26" width="32" height="5" fill="black" />
+                        </svg>
+                    </button>
+                </li>
+
                 $if url_pagina_principal then$
                 <li class="topnav--main-page-link">
                     <a href="$=url+attr=url_pagina_principal$">Página principal</a>
@@ -2029,14 +2039,14 @@ local DEFAULT_TEMPLATE = [=[
 
                 <li class="topnav--search">
                     <form class="search" id="search">
-                        <label for="searchbox" class="search--label">Search:</label>
+                        <label for="searchbox" class="search--label">Buscar:</label>
                         <input id="searchbox"
                                name="searchbox"
                                class="search--input"
                                type="text" />
                         <button class="search--btn"
                                 type="submit">
-                            Search
+                            Buscar
                         </button>
                     </form>
                 </li>
@@ -2065,7 +2075,7 @@ local DEFAULT_TEMPLATE = [=[
             <h2 class="header--subtitle">$=html=nombre_del_modulo$</h2>
         </header>
 
-        <nav class="nav">
+        <nav class="nav" id="main-nav">
             $if #lista_de_modulos > 0 then$
             <h2 class="nav--tree-title nav--tree-modlist">Módulos</h2>
             <ul class="nav--tree nav--tree-modlist">
@@ -2151,14 +2161,26 @@ body {
         "footer" auto;
 }
 
-@media (min-width: 756px) {
+.nav.menu:not(.open) {
+    display: none;
+}
+
+@media (min-width: 920px) {
     body {
         grid-template:
             "topnav topnav" auto
             "header header" auto
             "toc   content" 1fr
             "footer footer" auto
-            / auto 1fr auto;
+            / auto 1fr;
+    }
+
+    .topnav--menu {
+        display: none;
+    }
+
+    .nav.menu:not(.open) {
+        display: block;
     }
 }
 
@@ -2179,7 +2201,7 @@ body {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     padding: 0;
     margin: 0;
@@ -2298,13 +2320,25 @@ body {
 .syn-special {
     font-weight: bold;
 }
+
+.codeblock {
+    max-width: calc(100vw - 48px);
+    overflow-x: auto;
+}
 ]=]
 
 local DEFAULT_JS = [=[
 window.addEventListener("load", function() {
     "use strict";
 
-    const search = document.querySelector("#search");
+    const body = document.body;
+    const nav = document.querySelector("body > .nav");
+    const menuOpener = document.getElementById("nav-opener");
+    nav.classList.add("menu");
+
+    menuOpener.addEventListener("click", () => {
+        nav.classList.toggle("open");
+    });
 });
 ]=]
 
