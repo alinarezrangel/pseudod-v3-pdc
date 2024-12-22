@@ -9,7 +9,10 @@ eecho() {
 }
 
 checkprogram() {
-    find "$1" || {
+    # checkprogram exe err
+    printf "check %s " "$1"
+    find "$1" && printf "ok\n" || {
+        printf "\n"
         eecho "$2"
         notfound=1
     }
@@ -17,11 +20,32 @@ checkprogram() {
 
 notfound=0
 
-checkprogram ysh "The YSH shell is not installed, see https://www.oilshell.org/"
-checkprogram lr "The lr program is not installed, see https://git.vuxu.org/lr/about/"
-checkprogram xe "The xe program is not installed, see https://git.vuxu.org/xe/about/"
-checkprogram awk "The AWK language is not installed"
-checkprogram python3 "The Python 3 language is not installed"
+checkprogram ysh "El shell YSH no está instalado, véase https://www.oilshell.org/"
+checkprogram lr "El programa lr no está instalado, véase https://git.vuxu.org/lr/about/"
+checkprogram xe "El programa xe no está instalado, véase https://git.vuxu.org/xe/about/"
+checkprogram awk "El programa awk no está instalado"
+checkprogram lua5.4 "Lua 5.4 no está instalado, véase https://www.lua.org/"
+
+if [ "$notfound" = "1" ]; then
+    exit 1
+fi
+
+notfound=0
+
+checkluadep() {
+    # checkluadep require err
+    printf "check %s " "$1"
+    lua5.4 -l"$1" -e 'print"ok"' 2>/dev/null || {
+        printf "\n"
+        eecho "$2"
+        notfound=1
+    }
+}
+
+checkluadep lpeg "LPEG debe estar instalado, véase https://www.inf.puc-rio.br/~roberto/lpeg/"
+checkluadep re "LPEG debe estar instalado, véase https://www.inf.puc-rio.br/~roberto/lpeg/"
+checkluadep lsqlite3 "LuaSqlite3 debe estar instalado, véase http://lua.sqlite.org/index.cgi/doc/tip/doc/lsqlite3.wiki"
+checkluadep posix "Luaposix debe estar instalado, véase https://github.com/luaposix/luaposix/"
 
 if [ "$notfound" = "1" ]; then
     exit 1

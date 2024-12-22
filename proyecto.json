@@ -1,0 +1,53 @@
+{
+    "nombre": "pdc",
+    "paquetes": [
+        {
+            "nombre": "bepd",
+            "version": "1.0.0",
+            "dependencias": [],
+            "compilador": {
+                "experimentos": ["bepd"],
+                "id_modulo": "bepd"
+            },
+            "codigo": [
+                "bepd/**/*"
+            ],
+            "docs": {
+                "config": "docs/bepd-pddoc.lua",
+                "codigo": [
+                    "docs/bepd/*"
+                ]
+            }
+        },
+        {
+            "nombre": "pdc",
+            "version": "3.0.0",
+            "dependencias": ["bepd"],
+            "compilador": {
+                "id_modulo": "pdc"
+            },
+            "codigo": [
+                "pdc/**/*"
+            ],
+            "docs": {
+                "config": "docs/pdc-pddoc.lua",
+                "codigo": [
+                    "docs/pdc/*"
+                ]
+            }
+        }
+    ],
+    "paquetes_externos": [
+        {
+            "nombre": "sqlite3",
+            "fuente": "base:sqlite3",
+            "version": "1.0.0"
+        }
+    ],
+    "registros": [
+        {
+            "nombre": "base",
+            "url": "https://base.pkg.pseudod.alinarezrangel.github.io"
+        }
+    ]
+}
