@@ -1,5 +1,8 @@
 package.path = "libs/rxi-json/?.lua;" .. package.path
 
+require "fennel"
+local V = require "fennel.view"
+
 -- 4 dependencias: sqlite3, json, lpeg y luaposix
 local sqlite3 = require "lsqlite3"
 local json = require "json"
@@ -19,6 +22,296 @@ end
 local function write_file(name, content)
    local h <close> = io.open(name, "wb")
    h:write(content)
+end
+
+-- Mantén el tokenizador sincronizado con la copia en `scripts/gendoc/gen.lua`
+local WORD_CHAR = "^[a-zA-Z_0-9%+%-%*/<>=$~\xc0-\xfc\x80-\xbf']$"
+local OTHER_CHAR = "^[.,;:()%%&#]$"
+
+local function tokenize(input_stream)
+   local lineno, colno = 1, 0
+   local from_lineno, from_colno = 1, 0
+   local state = "ws" -- infer | other | ws | word | word\ | comment | string{} | string"" | string«» | string« | string»
+   local token = ""
+   local tokens = {}
+
+   local function addtk(ns)
+      if state ~= "infer" then
+         if ((state == "other" or state == "ws") and token ~= "") or (state ~= "other" and state ~= "ws") then
+            tokens[#tokens + 1] = {
+               string = token,
+               state = state,
+               from_lineno = from_lineno,
+               from_colno = from_colno,
+               to_lineno = lineno,
+               to_colno = colno
+            }
+         end
+         token = ""
+         from_lineno, from_colno = lineno, colno
+      end
+      state = ns
+   end
+
+   while true do
+      local c
+      if state == "infer" then
+         c = token
+      else
+         c = input_stream:read(1)
+         if not c then
+            addtk("quit")
+            break
+         end
+      end
+
+      local next_lineno, next_colno = lineno, colno
+      if c == "\n" then
+         next_lineno, next_colno = lineno + 1, 0
+      elseif string.byte(c) & 192 == 128 then
+         -- utf8 continuation byte
+      else
+         next_colno = colno + 1
+      end
+
+      if state == "other" or state == "ws" or state == "infer" then
+         if string.match(c, "^%s+$") then
+            if state == "ws" then
+               token = token .. c
+            else
+               addtk("ws")
+               token = c
+            end
+         elseif c == "[" then
+            addtk("comment")
+         elseif c == "{" then
+            addtk("string{}")
+         elseif c == "\xc2" then
+            addtk("string«")
+         elseif c == "\"" then
+            addtk("string\"\"")
+         elseif c == "\\" then
+            addtk("word\\")
+            token = c
+         elseif string.match(c, WORD_CHAR) then
+            addtk("word")
+            token = c
+         elseif string.match(c, OTHER_CHAR) then
+            addtk("other")
+            token = c
+         else
+            if state == "other" then
+               token = token .. c
+            else
+               addtk("ws")
+               token = c
+            end
+         end
+      elseif state == "word" then
+         if string.match(c, WORD_CHAR) then
+            token = token .. c
+         elseif c == "\\" then
+            state = "word\\"
+            token = token .. c
+         else
+            addtk("infer")
+            token = c
+         end
+      elseif state == "word\\" then
+         if c == "\\" then
+            state = "word"
+         end
+         token = token .. c
+      elseif state == "comment" then
+         if c == "]" then
+            addtk("ws")
+         else
+            token = token .. c
+         end
+      elseif state == "string{}" then
+         if c == "}" then
+            addtk("ws")
+         else
+            token = token .. c
+         end
+      elseif state == "string\"\"" then
+         if c == "\"" then
+            addtk("ws")
+         else
+            token = token .. c
+         end
+      elseif state == "string«" then
+         if c == "\xab" then
+            state = "string«»"
+         else
+            state = "word"
+            token = token .. "\xc2" .. c
+         end
+      elseif state == "string«»" then
+         if c == "\xc2" then
+            addtk("string»")
+         else
+            token = token .. c
+         end
+      elseif state == "string»" then
+         if c == "\xbb" then
+            state = "ws"
+            token = ""
+         else
+            state = "string«»"
+            local last = (tokens[#tokens] or {}).string or ""
+            tokens[#tokens] = nil
+            token = last .. token .. "\xc2" .. c
+         end
+      else
+         error("unreachable state: " .. tostring(state))
+      end
+
+      lineno, colno = next_lineno, next_colno
+   end
+
+   return tokens
+end
+
+local function u64_to_bytes(int)
+   return ((int & 0xFF00000000000000) >> 56),
+      ((int & 0xFF000000000000) >> 48),
+      ((int & 0xFF0000000000) >> 40),
+      ((int & 0xFF00000000) >> 32),
+      ((int & 0xFF000000) >> 24),
+      ((int & 0xFF0000) >> 16),
+      ((int & 0xFF00) >> 8),
+      (int & 0xFF)
+end
+
+local function bytes_to_u32(a, b, c, d)
+   return ((a or 0) << 24) | ((b or 0) << 16) | ((c or 0) << 8) | (d or 0)
+end
+
+local function left_rotate(w, bits)
+   bits = bits & (0x20 - 1)
+   w = w & 0xFFFFFFFF
+   local ones = ((1 << bits) - 1)
+   local topmask = ones << (32 - bits)
+   local top = (w & topmask) >> (32 - bits)
+   local bot = w & ~topmask
+   return (bot << bits) | top
+end
+
+local function sha1(input)
+   -- Sacado de wikipedia https://en.wikipedia.org/wiki/SHA-1#SHA-1_pseudocode
+   -- También leí el código de SHA1 de mpeterv:
+   -- https://github.com/mpeterv/sha1
+
+   local h0 = 0x67452301
+   local h1 = 0xEFCDAB89
+   local h2 = 0x98BADCFE
+   local h3 = 0x10325476
+   local h4 = 0xC3D2E1F0
+   local len = 0
+   local w = {}
+
+   local string_byte = string.byte
+   local rchunk = nil
+   local last_chunk = true
+   while true do
+      local chunk
+      if rchunk then
+         chunk = rchunk
+         rchunk = nil
+         last_chunk = false
+      elseif not last_chunk then
+         break
+      else
+         chunk = input:read(64)
+         if not chunk then
+            break
+         end
+      end
+
+      len = len + #chunk
+      if #chunk < 64 then
+         local len2 = len - #chunk
+         chunk = chunk
+            .. string.char(0x80)
+            -- len + 1 + 8 I think means: +1 for the 0x80 byte and +8 for the
+            -- trailing len.
+            .. string.rep(string.char(0), -(len + 1 + 8) % 64)
+            .. string.char(u64_to_bytes(len * 8))
+         len = len2 + #chunk
+         if #chunk > 64 then
+            assert(#chunk == 128)
+            rchunk = string.sub(chunk, 65, -1)
+            chunk = string.sub(chunk, 1, 64)
+         else
+            last_chunk = false
+         end
+         assert(#chunk == 64)
+      end
+
+      for i = 1, 16 do
+         local j = ((i - 1) * 4) + 1
+         w[i] = bytes_to_u32(string_byte(chunk, j, j + 3))
+      end
+
+      for i = 17, 80 do
+         w[i] = left_rotate(w[i - 3] ~ w[i - 8] ~ w[i - 14] ~ w[i - 16], 1)
+      end
+
+      local a = h0
+      local b = h1
+      local c = h2
+      local d = h3
+      local e = h4
+
+      for i = 1, 80 do
+         local f, k
+         if i <= 20 then
+            f = (b & c) | (((~b) & 0xFFFFFFFF) & d)
+            k = 0x5A827999
+         elseif i <= 40 then
+            f = b ~ c ~ d
+            k = 0x6ED9EBA1
+         elseif i <= 60 then
+            f = (b & c) | (b & d) | (c & d)
+            k = 0x8F1BBCDC
+         else
+            f = b ~ c ~ d
+            k = 0xCA62C1D6
+         end
+
+         local temp = (left_rotate(a, 5) + f + e + k + w[i]) & 0xFFFFFFFF
+         e = d
+         d = c
+         c = left_rotate(b, 30)
+         b = a
+         a = temp
+      end
+
+      h0 = (h0 + a) & 0xFFFFFFFF
+      h1 = (h1 + b) & 0xFFFFFFFF
+      h2 = (h2 + c) & 0xFFFFFFFF
+      h3 = (h3 + d) & 0xFFFFFFFF
+      h4 = (h4 + e) & 0xFFFFFFFF
+   end
+
+   return string.format("%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4)
+end
+
+local function sha1_string(str)
+   local inp = {}
+   local i = 1
+   local string_sub = string.sub
+   function inp:read(n)
+      if i > #str then
+         return nil
+      else
+         local r = string_sub(str, i, i + (n - 1))
+         i = i + n
+         return r
+      end
+   end
+   return sha1(inp)
 end
 
 
@@ -113,7 +406,7 @@ end
 local HASH_FILE_NOT_FOUND = 1
 local HASH_HAS_NO_FILE = 2
 
-local PREPARE_SQL = [[
+local PREPARE_SQL_BUILD_SYS = [[
 -- Verifying Traces store
 create table if not exists vt (
    id integer primary key,
@@ -124,6 +417,7 @@ create table if not exists vt (
    st_uid,
    st_gid,
    filename text not null,
+   direct_hash,
    target boolean
 );
 
@@ -143,8 +437,8 @@ create index if not exists vt_deps_by_parent on vt_deps (parent_vt_id);
 create index if not exists vt_deps_by_dep on vt_deps (dep_vt_id);
 ]]
 
-local function prepare_db(db)
-   db:exec(PREPARE_SQL)
+local function prepare_db_for_build_system(db)
+   db:exec(PREPARE_SQL_BUILD_SYS)
 end
 
 local ST_FIELDS = {
@@ -155,9 +449,9 @@ local ST_FIELDS = {
 local function schedule(rebuilder, db, tasks)
    local done = {}
    local function fetch(target)
-      local task = tasks(target)
+      local task, extra = tasks(target)
       if task and not done[target] then
-         local new_task = rebuilder(db, target, task)
+         local new_task = rebuilder(db, target, task, extra)
          new_task(fetch)
       end
    end
@@ -221,12 +515,19 @@ local function insert_hash(db, hash, parent_hash_id)
       end
    end
 
-   stmt = db:prepare "insert into vt (filename, target, st_mtime, st_ino, st_size, st_mode, st_uid, st_gid) \
-                              values (?,        ?,      ?,        ?,      ?,       ?,       ?,      ?)"
-   stmt:bind(1, hash.filename)
-   stmt:bind(2, not parent_hash_id)
-   for i = 1, #ST_FIELDS do
-      stmt:bind(i + 2, hash[ST_FIELDS[i]])
+   if hash.direct_hash then
+      stmt = db:prepare "insert into vt (filename, target, direct_hash) values (?, ?, ?)"
+      stmt:bind(1, hash.filename)
+      stmt:bind(2, not parent_hash_id)
+      stmt:bind(3, hash.direct_hash)
+   else
+      stmt = db:prepare "insert into vt (filename, target, st_mtime, st_ino, st_size, st_mode, st_uid, st_gid) \
+                                 values (?,        ?,      ?,        ?,      ?,       ?,       ?,      ?)"
+      stmt:bind(1, hash.filename)
+      stmt:bind(2, not parent_hash_id)
+      for i = 1, #ST_FIELDS do
+         stmt:bind(i + 2, hash[ST_FIELDS[i]])
+      end
    end
    for _ in stmt:nrows() do
    end
@@ -245,18 +546,26 @@ local function insert_hash(db, hash, parent_hash_id)
    return select_hash(db, inserted_id)
 end
 
-local function get_hash(db, filename)
-   local res = {
-      filename = filename,
-   }
-   local st, errmsg = stat.stat(filename)
-   if not st then
-      return select_hash(db, HASH_FILE_NOT_FOUND)
+local function get_hash(db, target)
+   if string.sub(target, 1, 1) == ":" then
+      local def = {
+         filename = target,
+         direct_hash = true,
+      }
+      return select_hash_by_filename(db, target) or def
    else
-      for i = 1, #ST_FIELDS do
-         res[ST_FIELDS[i]] = st[ST_FIELDS[i]]
+      local res = {
+         filename = target,
+      }
+      local st, errmsg = stat.stat(target)
+      if not st then
+         return select_hash(db, HASH_FILE_NOT_FOUND)
+      else
+         for i = 1, #ST_FIELDS do
+            res[ST_FIELDS[i]] = st[ST_FIELDS[i]]
+         end
+         return res
       end
-      return res
    end
 end
 
@@ -265,6 +574,7 @@ local function hash_dirty(old_hash, new_hash)
       (new_hash.id == HASH_FILE_NOT_FOUND)
       or (old_hash.id == HASH_HAS_NO_FILE)
       or (old_hash.filename ~= new_hash.filename)
+      or (old_hash.direct_hash ~= new_hash.direct_hash)
    then
       return true
    end
@@ -303,15 +613,17 @@ local function record_hash(db, target, hash, new_dep_hashes)
    for _, dep_hash in pairs(new_dep_hashes) do
       insert_hash(db, dep_hash, got.id)
    end
+
+   return got
 end
 
 -- Verifying traces rebuilder
-local function rebuilder(db, target, task)
-   local hash = get_hash(db, target)
+local function rebuilder(db, target, task, hash_cur)
+   local hash = (hash_cur or get_hash)(db, target)
    return function(fetch)
       local function get_dependency_hash(dep_target)
          fetch(dep_target)
-         return get_hash(db, dep_target)
+         return (hash_cur or get_hash)(db, dep_target)
       end
       if verify_hash(db, target, hash, get_dependency_hash) then
          -- up to date, nothing to do
@@ -319,13 +631,18 @@ local function rebuilder(db, target, task)
          local new_dep_hashes = {}
          local function tracking_fetch(dep_target)
             fetch(dep_target)
-            local dep_hash = get_hash(db, dep_target)
+            local dep_hash = (hash_cur or get_hash)(db, dep_target)
             new_dep_hashes[dep_target] = dep_hash
          end
 
-         task(tracking_fetch)
-         hash = get_hash(db, target)
-         record_hash(db, target, hash, new_dep_hashes)
+         local hashed = nil
+         local function register_hash(hash)
+            hashed = hash
+         end
+
+         task(tracking_fetch, register_hash)
+         hash = (hash_cur or get_hash)(db, target)
+         hash = record_hash(db, target, hash, new_dep_hashes) or hash
       end
    end
 end
@@ -389,20 +706,20 @@ local function find_project_root()
    return nil, nil
 end
 
+local function split_path_segments(path)
+   local segs = {}
+   for el in string.gmatch(path, "([^/]*)") do
+      segs[#segs + 1] = el
+   end
+   return segs
+end
+
 local function match_glob(glob, filepath)
    glob = normalize_path(glob)
    filepath = normalize_path(filepath)
 
-   local function split(path)
-      local segs = {}
-      for el in string.gmatch(path, "([^/]*)") do
-         segs[#segs + 1] = el
-      end
-      return segs
-   end
-
-   local globp = split(glob)
-   local pathp = split(filepath)
+   local globp = split_path_segments(glob)
+   local pathp = split_path_segments(filepath)
 
    local mglob_idx = nil
    for i = 1, #globp do
@@ -693,6 +1010,7 @@ local MANIFEST_SCHEMA = {
                      config = { type = "string" },
                      codigo = {
                         type = "array",
+                        default = function() return {} end,
                         items = { type = "string", validate = valid_src_rule },
                      },
                   },
@@ -851,6 +1169,10 @@ local function load_manifest(path)
 end
 
 local PSEUDOD_EXTENSIONS = {".pd", ".pseudod", ".pseudo", ".psd"}
+local PDDOC_EXTENSIONS = {".pd", ".pseudod", ".pseudo", ".psd",
+                          ".pddoc", ".scrbl",
+                          ".txt",
+                          ".html", ".css", ".js"}
 
 local function locate_package(manifest, pkgname)
    for i = 1, #manifest.paquetes do
@@ -878,137 +1200,23 @@ local function get_source_files_for_package(root, manifest, pkgname)
    return srcs
 end
 
+local function get_docs_files_for_package(root, manifest, pkgname)
+   local srcs = {}
+   local paq = assert(locate_package(manifest, pkgname))
+   for j = 1, #paq.docs.codigo do
+      local rule = paq.docs.codigo[j]
+      local got = glob_files(root, rule, PDDOC_EXTENSIONS)
+      table.move(got, 1, #got, #srcs + 1, srcs)
+   end
+   return srcs
+end
+
 local function get_modname(srcfile)
    local res = string.match(srcfile, "^(.-)%.[^/%.]+$")
    if not res then
       res = srcfile
    end
    return res
-end
-
-local function u64_to_bytes(int)
-   return ((int & 0xFF00000000000000) >> 56),
-      ((int & 0xFF000000000000) >> 48),
-      ((int & 0xFF0000000000) >> 40),
-      ((int & 0xFF00000000) >> 32),
-      ((int & 0xFF000000) >> 24),
-      ((int & 0xFF0000) >> 16),
-      ((int & 0xFF00) >> 8),
-      (int & 0xFF)
-end
-
-local function bytes_to_u32(a, b, c, d)
-   return ((a or 0) << 24) | ((b or 0) << 16) | ((c or 0) << 8) | (d or 0)
-end
-
-local function left_rotate(w, bits)
-   bits = bits & (0x20 - 1)
-   w = w & 0xFFFFFFFF
-   local ones = ((1 << bits) - 1)
-   local topmask = ones << (32 - bits)
-   local top = (w & topmask) >> (32 - bits)
-   local bot = w & ~topmask
-   return (bot << bits) | top
-end
-
-local function sha1(input)
-   -- Sacado de wikipedia https://en.wikipedia.org/wiki/SHA-1#SHA-1_pseudocode
-   -- También leí el código de SHA1 de mpeterv:
-   -- https://github.com/mpeterv/sha1
-
-   local h0 = 0x67452301
-   local h1 = 0xEFCDAB89
-   local h2 = 0x98BADCFE
-   local h3 = 0x10325476
-   local h4 = 0xC3D2E1F0
-   local len = 0
-   local w = {}
-
-   local string_byte = string.byte
-   local rchunk = nil
-   local last_chunk = true
-   while true do
-      local chunk
-      if rchunk then
-         chunk = rchunk
-         rchunk = nil
-         last_chunk = false
-      elseif not last_chunk then
-         break
-      else
-         chunk = input:read(64)
-         if not chunk then
-            break
-         end
-      end
-
-      len = len + #chunk
-      if #chunk < 64 then
-         local len2 = len - #chunk
-         chunk = chunk
-            .. string.char(0x80)
-            -- len + 1 + 8 I think means: +1 for the 0x80 byte and +8 for the
-            -- trailing len.
-            .. string.rep(string.char(0), -(len + 1 + 8) % 64)
-            .. string.char(u64_to_bytes(len * 8))
-         len = len2 + #chunk
-         if #chunk > 64 then
-            assert(#chunk == 128)
-            rchunk = string.sub(chunk, 65, -1)
-            chunk = string.sub(chunk, 1, 64)
-         else
-            last_chunk = false
-         end
-         assert(#chunk == 64)
-      end
-
-      for i = 1, 16 do
-         local j = ((i - 1) * 4) + 1
-         w[i] = bytes_to_u32(string_byte(chunk, j, j + 3))
-      end
-
-      for i = 17, 80 do
-         w[i] = left_rotate(w[i - 3] ~ w[i - 8] ~ w[i - 14] ~ w[i - 16], 1)
-      end
-
-      local a = h0
-      local b = h1
-      local c = h2
-      local d = h3
-      local e = h4
-
-      for i = 1, 80 do
-         local f, k
-         if i <= 20 then
-            f = (b & c) | (((~b) & 0xFFFFFFFF) & d)
-            k = 0x5A827999
-         elseif i <= 40 then
-            f = b ~ c ~ d
-            k = 0x6ED9EBA1
-         elseif i <= 60 then
-            f = (b & c) | (b & d) | (c & d)
-            k = 0x8F1BBCDC
-         else
-            f = b ~ c ~ d
-            k = 0xCA62C1D6
-         end
-
-         local temp = (left_rotate(a, 5) + f + e + k + w[i]) & 0xFFFFFFFF
-         e = d
-         d = c
-         c = left_rotate(b, 30)
-         b = a
-         a = temp
-      end
-
-      h0 = (h0 + a) & 0xFFFFFFFF
-      h1 = (h1 + b) & 0xFFFFFFFF
-      h2 = (h2 + c) & 0xFFFFFFFF
-      h3 = (h3 + d) & 0xFFFFFFFF
-      h4 = (h4 + e) & 0xFFFFFFFF
-   end
-
-   return string.format("%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4)
 end
 
 local function hash_file(file)
@@ -1023,30 +1231,199 @@ local function generate_module_id(srcfile)
    return "pdh" .. hash
 end
 
+local function components_of_modname(import)
+   local pkgname, modname = string.match(import, "^([^/]+)/(.+)$")
+   if pkgname and modname then
+      return {
+         pkgname = pkgname,
+         modname = modname,
+      }
+   else
+      return nil
+   end
+end
+
+local function get_pseudod_dependencies(filename)
+   local tokens
+   do
+      local h <close> = io.open(filename, "rb")
+      tokens = tokenize(h)
+   end
+
+   local mods = {}
+   local kw_utilizar = false
+   local tk_modname = false
+   for i = 1, #tokens do
+      local tk = tokens[i]
+      if tk.state == "word" then
+         if tk.string == "utilizar" then
+            kw_utilizar = true
+         elseif kw_utilizar then
+            local comps = components_of_modname(tk.string)
+            if not comps then
+               error("sintáxis inválida en " .. filename .. ": utilizar " .. tk.string .. ": nombre del módulo inválido")
+            end
+            mods[#mods + 1] = comps
+            kw_utilizar = false
+         end
+      elseif tk.state == "ws" or tk.state == "comment" then
+         -- skip
+      else
+         kw_utilizar = false
+      end
+   end
+
+   return mods
+end
+
 local DEFAULT_BUILD_DIR = ".pseudod-build"
 
-local function build_tasks(root, relcwd, manifest, builddir)
+local PREPARE_SQL_PSEUDOD = [[
+create table if not exists config (
+   key text primary key,
+   value text not null
+);
+]]
+
+local function prepare_db_for_pseudod(db)
+   db:exec(PREPARE_SQL_PSEUDOD)
+end
+
+local function get_config_key(db, key)
+   local stmt = db:prepare "select * from config where key = ?"
+   stmt:bind(1, key)
+   for row in stmt:nrows() do
+      stmt:finalize()
+      return row.value
+   end
+   stmt:finalize()
+   return nil
+end
+
+local function set_config_key(db, key, value)
+   local stmt = db:prepare "insert into config (key, value) values (?, ?)"
+   stmt:bind(1, key)
+   stmt:bind(2, value)
+   for _ in stmt:nrows() do
+   end
+   stmt:finalize()
+end
+
+local function fetch_config_key(db, fetch, key)
+   fetch(":[" .. key .. "]")
+   return get_config_key(db, key)
+end
+
+local function mkdir_recur(path)
+   local segs = split_path_segments(normalize_path(path))
+   for i = 1, #segs do
+      local total = {}
+      table.move(segs, 1, i, 1, total)
+      local subpath = table.concat(total, "/")
+      local ok, errmsg, errnum = stat.mkdir(subpath)
+      if not ok then
+         if errnum == errno.EEXIST then
+            -- ignore
+         else
+            error("mkdir -p " .. subpath, errmsg)
+         end
+      end
+   end
+end
+
+local function run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
+   if rule.type == "source" then
+      return function(fetch)
+         log.debug("[italic]código[none] %s", rule.src)
+      end
+   elseif rule.type == "compile-module" then
+      return function(fetch)
+         fetch(rule.src)
+         local deps = get_pseudod_dependencies(rule.src)
+         for i = 1, #deps do
+            local d = deps[i]
+            local src_dep = module_assocs[d.pkgname .. "/" .. d.modname]
+            if src_dep then
+               fetch(builddir .. "/compilado/" .. d.pkgname .. "/" .. d.modname .. ".bdm.json")
+            end
+         end
+
+         local pdc_exe = fetch_config_key(db, fetch, "PDC_EXECUTABLE")
+
+         log.info("[fg:green]compilando [bold]pdc[none] %s", rule.src)
+         local invk = {pdc_exe}
+         mkdir_recur((assert(libgen.dirname(target))))
+         local h1 <close> = io.open(target, "wb")
+         h1:write "pdc invk"
+         local h2 <close> = io.open(target:sub(1, -3) .. ".bdm.json", "wb")
+         h2:write "pdc invk bdm"
+      end
+   elseif rule.type == "alias" then
+      return function(fetch)
+         log.debug("[italic]alias[none] %s -> %s", target, rule.aliases)
+         fetch(rule.aliases)
+      end
+   elseif rule.type == "c-compile" then
+      return function(fetch)
+         fetch(rule.src)
+         log.info("[fg:green]compilando [bold]cc[none] %s", rule.src)
+         local h <close> = io.open(target, "wb")
+         h:write "cc invk"
+      end
+   else
+      error("invalid rule type: " .. rule.type)
+   end
+end
+
+local function build_tasks(db, root, relcwd, manifest, builddir)
    -- Esta tabla es innecesaria, pero me gusta como queda el código así, por
    -- separado.
    local pkgsrcs = {}
    for i = 1, #manifest.paquetes do
       local paq = manifest.paquetes[i]
       assert(not pkgsrcs[paq.nombre])
-      pkgsrcs[paq.nombre] = get_source_files_for_package(root, manifest, paq.nombre)
+      pkgsrcs[paq.nombre] = {
+         code = get_source_files_for_package(root, manifest, paq.nombre),
+         docs = get_docs_files_for_package(root, manifest, paq.nombre),
+      }
    end
 
    local rules = {}
-   for pkgname, srcs in pairs(pkgsrcs) do
+   local patt_rules = {}
+   local module_assocs = {}
+
+   for pkgname, all_srcs in pairs(pkgsrcs) do
       local pkg = assert(locate_package(manifest, pkgname))
+      local pddoc_inputs = {}
+      local srcs = all_srcs.code
+      local pddoc_srcs = all_srcs.docs
+
+      for i = 1, #pddoc_srcs do
+         local src = pddoc_srcs[i]
+         pddoc_inputs[#pddoc_inputs + 1] = {
+            src = relsrc,
+            module_name = false,
+         }
+      end
+
       for i = 1, #srcs do
          local src = srcs[i]
          local relsrc = make_relative(src.path, root)
          local modname = get_modname(make_relative(src.globbed, root))
          local outpath = normalize_path(builddir .. "/compilado/" .. pkgname .. "/" .. modname)
+
+         pddoc_inputs[#pddoc_inputs + 1] = {
+            src = relsrc,
+            module_name = pkgname .. "/" .. modname,
+         }
+
+         module_assocs[pkgname .. "/" .. modname] = relsrc
+
          rules[relsrc] = {
             type = "source",
             src = relsrc,
             abs = src.path,
+            module_name = modname,
          }
          rules[outpath .. ".c"] = {
             type = "compile-module",
@@ -1073,70 +1450,90 @@ local function build_tasks(root, relcwd, manifest, builddir)
             package_name = pkgname,
          }
       end
+
+      rules[builddir .. "/docs/" .. pkgname .. "/db.sqlite3"] = {
+         type = "pddoc",
+         srcs = pddoc_inputs,
+         config_file = pkg.docs.config,
+      }
+
+      patt_rules[builddir .. "/docs/" .. pkgname .. "/out/*"] = {
+         type = "alias",
+         aliases = builddir .. "/docs/" .. pkgname .. "/db.sqlite3",
+      }
    end
 
    return function(target)
+      local cfg_key = string.match(target, "^:%[(.*)%]$")
+      if cfg_key then
+         return function(fetch, hash)
+            local cfg_value = get_config_key(db, cfg_key)
+            hash(sha1_string(cfg_value or ""))
+         end, function(_db, target)
+            local cfg_value = get_config_key(db, cfg_key)
+            return {
+               filename = target,
+               direct_hash = sha1_string(cfg_value or ""),
+            }
+         end
+      end
+
       if rules[target] then
          local rule = rules[target]
-         if rule.type == "source" then
-            return function(fetch)
-               log.debug("[fg:green]fuente[none] %s", rule.src)
+         return run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
+      else
+         for glob, rule in pairs(patt_rules) do
+            if match_glob(glob, target) then
+               return run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
             end
-         elseif rule.type == "compile-module" then
-            return function(fetch)
-               fetch(rule.src)
-               log.debug("[fg:green]compilando [bold]PD[none] %s", rule.src)
-            end
-         elseif rule.type == "alias" then
-            return function(fetch)
-               log.debug("[fg:black]alias[none] %s", rule.aliases)
-               fetch(rule.aliases)
-            end
-         elseif rule.type == "c-compile" then
-            return function(fetch)
-               fetch(rule.src)
-               log.debug("[fg:green]compilando [bold]C[none] %s", rule.src)
-            end
-         else
-            error("invalid rule type: " .. rule.type)
          end
       end
    end
 end
 
+
+local visited = {}
 local function test_tasks(tasks, target)
+   if visited[target] then
+      return
+   end
    local t = tasks(target)
    if not t then
       error("invalid " .. target)
    end
-   t(function(target) test_tasks(tasks, target) end)
+   visited[target] = true
+   t(function(target) test_tasks(tasks, target) end, function(hashed) print("hashed", target, "to", hashed) end)
 end
 
 
+local db = sqlite3.open("outputs/build.sqlite3")
+prepare_db_for_pseudod(db)
+prepare_db_for_build_system(db)
 local root, relcwd = find_project_root()
 assert(unistd.chdir(root))
 local manifest = load_manifest(root)
-local tasks = build_tasks(root, relcwd, manifest, DEFAULT_BUILD_DIR)
-test_tasks(tasks, ".pseudod-build/compilado/bepd/builtinsImpl.o")
+local tasks = build_tasks(db, root, relcwd, manifest, DEFAULT_BUILD_DIR)
+local build = schedule(rebuilder, db, tasks)
+build(".pseudod-build/compilado/bepd/builtins.o")
+db:close()
 
 -- local db = sqlite3.open("outputs/build.sqlite3")
--- prepare_db(db)
+-- prepare_db_for_build_system(db)
 -- local function tasks(target)
---    if target == "outputs/build-test/1/calc" then
+--    if target == "outputs/build-test/2/out" then
 --       return function(fetch)
+--          fetch ":hola"
+--          fetch "outputs/build-test/2/calc"
 --          print("=========================================== RUN 1")
---          fetch "outputs/build-test/1/hola"
---          fetch "outputs/build-test/1/mundo"
---          local c1 = read_file "outputs/build-test/1/hola"
---          local c2 = read_file "outputs/build-test/1/mundo"
---          write_file("outputs/build-test/1/calc", c1 .. " " .. c2)
+--          local c = read_file "outputs/build-test/2/calc"
+--          write_file("outputs/build-test/2/out", c .. "!")
 --       end
---    elseif target == "outputs/build-test/1/calc2" then
---       return function(fetch)
---          print("=========================================== RUN 2")
---          fetch "outputs/build-test/1/calc"
---          local c = read_file "outputs/build-test/1/calc"
---          write_file("outputs/build-test/1/calc2", "«" .. c .. "»")
+--    elseif target == ":hola" then
+--       return function(fetch, hash)
+--          print("=============== RUN 2a")
+--          fetch "outputs/build-test/2/mid"
+--          hash "abc"
+--          print("=============== RUN 2b")
 --       end
 --    elseif stat.stat(target) then
 --       return function(fetch)
@@ -1144,6 +1541,7 @@ test_tasks(tasks, ".pseudod-build/compilado/bepd/builtinsImpl.o")
 --       end
 --    end
 -- end
+
 -- local build = schedule(rebuilder, db, tasks)
--- build "outputs/build-test/1/calc2"
+-- build "outputs/build-test/2/out"
 -- db:close()

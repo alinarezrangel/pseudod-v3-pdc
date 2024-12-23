@@ -21,6 +21,8 @@ local function write_file(name, content)
 end
 
 
+
+-- Mantén el tokenizador sincronizado con la copia en `scripts/build/build.lua`
 local WORD_CHAR = "^[a-zA-Z_0-9%+%-%*/<>=$~\xc0-\xfc\x80-\xbf']$"
 local OTHER_CHAR = "^[.,;:()%%&#]$"
 
