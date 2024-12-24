@@ -14,7 +14,7 @@ al momento de crear la clase y que convierten las instancias a textos.
 
 Por ejemplo:
 
-@codeblock|{
+@ejemplo|{
 variable Punto
 fijar Punto a TipoDeDatos: {Punto}, {X}, {Y}
 

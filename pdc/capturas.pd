@@ -86,7 +86,7 @@ finclase
 Llena las tablas de @pd{tablasMcAst}, una instancia de @pd{TablasDeCapturas},
 con la información de capturas del programa contenido en @pd{ast'}.
 
-@dp{tablasRnAst} debe ser una instancia de @pd{TablasDeResoluciónDeNombres} con
+@pd{tablasRnAst} debe ser una instancia de @pd{TablasDeResoluciónDeNombres} con
 las tablas de resolución de nombres del AST (@bold{no del CST}).
 
 @pd{posiblesCapturas} es un diccionario que será llenado con los bindings que

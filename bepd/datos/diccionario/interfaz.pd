@@ -183,7 +183,7 @@ clase IDiccionario
     Para cada par, @param{proc} es llamado con 3 argumentos:
 
     @itemlist(
-    @item{El @italics{acumulador}. La primera iteración este es @param{ini}.}
+    @item{El @italic{acumulador}. La primera iteración este es @param{ini}.}
     @item{La llave del par.}
     @item{El valor del par}
     )

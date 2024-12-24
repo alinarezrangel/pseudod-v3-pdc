@@ -10,7 +10,7 @@ simplemente contenedores de datos.
 Para evitarte el problema de crear una clase con varios atributos, esta función
 crea este objeto por ti. Un ejemplo de su uso sería:
 
-@codeblock|{
+@ejemplo|{
 variable obj
 fijar obj a ObjetoAdHoc: {hola}, 1, {mundo}, 2
 }|
@@ -18,7 +18,7 @@ fijar obj a ObjetoAdHoc: {hola}, 1, {mundo}, 2
 Este ejemplo crea un objeto @pd{obj} que responderá a 2 mensajes: @code{hola}
 (que devolverá @pd{1}) y @code{mundo} (que devolverá @pd{2}):
 
-@codeblock|{
+@ejemplo|{
 necesitas obj#hola = 1
 necesitas obj#mundo = 2
 }|
@@ -26,7 +26,7 @@ necesitas obj#mundo = 2
 Los atributos de los objetos ad-hoc son asignables: puedes @pd{fijar} todos los
 campos:
 
-@codeblock|{
+@ejemplo|{
 fijar obj#hola a 3
 necesitas obj#hola = 3
 necesitas obj#mundo = 2

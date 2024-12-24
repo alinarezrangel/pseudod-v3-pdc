@@ -1,12 +1,26 @@
-package.path = "libs/rxi-json/?.lua;" .. package.path
+-- Las siguientes variables son modificadas por el instalador.
+local INSTALL_PREFIX = nil
+local UNIX_INSTALL = false
 
-require "fennel"
-local V = require "fennel.view"
+do
+   local rel_path
+   if UNIX_INSTALL then
+      rel_path = "lib/pseudod/lua-libs/?.lua"
+   else
+      rel_path = "libs/rxi-json/?.lua"
+   end
+   if INSTALL_PREFIX then
+      package.path = INSTALL_PREFIX .. "/" .. rel_path .. ";" .. package.path
+   else
+      package.path = rel_path .. ";" .. package.path
+   end
+end
 
 -- 4 dependencias: sqlite3, json, lpeg y luaposix
 local sqlite3 = require "lsqlite3"
 local json = require "json"
 local stat = require "posix.sys.stat"
+local wait = require "posix.sys.wait"
 local unistd = require "posix.unistd"
 local libgen = require "posix.libgen"
 local errno = require "posix.errno"
@@ -353,8 +367,13 @@ local COLORS = {
    ["bg:white"]   = CSI .. "47m",
 }
 
-local function colorcodes(txt)
+local color_level = "auto" -- always | never | auto
+
+local function colorcodes(txt, none)
    local function esc(seq)
+      if none then
+         return ""
+      end
       for part in string.gmatch(seq, "([^,]*)") do
          return COLORS[part] or ""
       end
@@ -368,7 +387,16 @@ function log.print(level, fmt, ...)
    if LOG_LEVELS[level] < LOG_LEVELS[log_level] then
       return
    end
-   print(string.format(colorcodes(fmt), ...))
+   local colors
+   if color_level == "always" then
+      colors = true
+   elseif color_level == "never" then
+      colors = false
+   else
+      assert(color_level == "auto")
+      colors = unistd.isatty(unistd.STDIN_FILENO) == 1
+   end
+   print(string.format(colorcodes(fmt, not colors), ...))
 end
 
 function log.debug(...)
@@ -1161,11 +1189,12 @@ local function validate_manifest(manifest)
 end
 
 local function load_manifest(path)
-   local h <close> = io.open(path .. "/" .. PROJECT_MANIFEST, "rb")
+   local filename = path .. "/" .. PROJECT_MANIFEST
+   local h <close> = io.open(filename, "rb")
    local data = json.decode(h:read "a")
    assert(check_schema(MANIFEST_SCHEMA, data))
    assert(validate_manifest(data))
-   return data
+   return data, filename
 end
 
 local PSEUDOD_EXTENSIONS = {".pd", ".pseudod", ".pseudo", ".psd"}
@@ -1260,10 +1289,11 @@ local function get_pseudod_dependencies(filename)
             kw_utilizar = true
          elseif kw_utilizar then
             local comps = components_of_modname(tk.string)
-            if not comps then
-               error("sintáxis inválida en " .. filename .. ": utilizar " .. tk.string .. ": nombre del módulo inválido")
+            if comps then
+               mods[#mods + 1] = comps
+            else
+               log.warn("[fg:yellow]ADVERTENCIA[none] No se pudo detectar que archivo de está importando en %s: utilizar %s", filename, tk.string)
             end
-            mods[#mods + 1] = comps
             kw_utilizar = false
          end
       elseif tk.state == "ws" or tk.state == "comment" then
@@ -1289,6 +1319,141 @@ local function prepare_db_for_pseudod(db)
    db:exec(PREPARE_SQL_PSEUDOD)
 end
 
+local function find_in_path(path, program)
+   for seg in string.gmatch(path, "([^:]*)") do
+      if stat.stat(seg .. "/" .. program) then
+         return seg .. "/" .. program
+      end
+   end
+   return nil
+end
+
+local SHLIKE_GRAMMAR = re.compile [[
+
+args <- {| ws? (word (ws word)* ws?)? |} ! .
+ws <- %s+
+word <- {~ (lit / squot / dquot)+ ~}
+lit <- [^"'%s]+
+squot <- "'" -> '' [^']* "'" -> ''
+dquot <- '"' -> '' [^"]* '"' -> ''
+
+]]
+
+local function split_shlike_args(shlike)
+   local res = SHLIKE_GRAMMAR:match(shlike)
+   if res then
+      return res
+   else
+      return nil, "invalid syntax in value " .. shlike
+   end
+end
+
+local DEFAULT_CONFIG_VALUES = {}
+
+-- Nombre del compilador de PseudoD (el nuevo). Se buscará en el PATH
+function DEFAULT_CONFIG_VALUES.pdc_nombre(get, getenv)
+   return "pseudod-pdc"
+end
+
+-- Ruta completa del ejecutable del compilador nuevo. "" si no se encontró.
+function DEFAULT_CONFIG_VALUES.pdc_ejecutable(get, getenv)
+   local path = getenv "PATH" or "/bin"
+   local pdc_name = get "pdc_nombre"
+   local pdc_path = find_in_path(path, pdc_name)
+   if not pdc_path then
+      log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de PseudoD.")
+      log.error("      Se buscó el ejecutable %q en el PATH: %s", pdc_name, path)
+      return ""
+   else
+      return pdc_path
+   end
+end
+
+-- Argumentos adicionales para el compilador. Véase `split_shlike_args()`.
+function DEFAULT_CONFIG_VALUES.pdc_args_extra(get, getenv)
+   return ""
+end
+
+-- Nombre del compilador de C a usar. Solo se usará si no hay una variable de
+-- entorno `CC`.
+function DEFAULT_CONFIG_VALUES.cc_nombre(get, getenv)
+   return "cc"
+end
+
+-- Ruta al compilador de C a usar. "" si no se encontró ninguno.
+function DEFAULT_CONFIG_VALUES.cc_ejecutable(get, getenv)
+   local cc = getenv "CC"
+   if not cc then
+      local path = getenv "PATH" or "/bin"
+      local cc_name = get "cc_nombre"
+      local cc_path = find_in_path(path, cc_name)
+      if not cc_path then
+         log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de C.")
+         log.error("      Se buscó el ejecutable %q en el PATH: %s", cc_name, path)
+         return ""
+      else
+         return cc_path
+      end
+   else
+      if string.find(cc, "/") then
+         return cc
+      else
+         local path = getenv "PATH" or "/bin"
+         local cc_path = find_in_path(path, cc)
+         if not cc_path then
+            log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de C.")
+            log.error("      Se buscó el ejecutable %q en el PATH: %s", cc, path)
+            return ""
+         else
+            return cc_path
+         end
+      end
+   end
+end
+
+-- CFLAGS
+function DEFAULT_CONFIG_VALUES.cc_cflags(get, getenv)
+   return getenv "CFLAGS" or ""
+end
+
+-- CLIBS
+function DEFAULT_CONFIG_VALUES.cc_clibs(get, getenv)
+   return getenv "CLIBS" or ""
+end
+
+-- Nombre del ejecutable de Lua 5.4 a usar.
+function DEFAULT_CONFIG_VALUES.lua_nombre(get, getenv)
+   return "lua5.4"
+end
+
+-- Ejecutable de Lua 5.4 a usar
+function DEFAULT_CONFIG_VALUES.lua_ejecutable(get, getenv)
+   local path = getenv "PATH" or "/bin"
+   local lua_name = get "lua_nombre"
+   local lua_path = find_in_path(path, lua_name)
+   if not lua_path then
+      log.error("[fg:red][bold]error[none] no se pudo encontrar un intérprete de Lua 5.4.")
+      log.error("      Se buscó el ejecutable %q en el PATH: %s", lua_name, path)
+      return ""
+   else
+      return lua_path
+   end
+end
+
+-- Argumentos adicionales para todos los programas que usan Lua. Véase `split_shlike_args()`.
+function DEFAULT_CONFIG_VALUES.lua_args_extra(get, getenv)
+   return ""
+end
+
+-- Ruta al programa pddoc / gen.lua a usar.
+function DEFAULT_CONFIG_VALUES.pddoc_ruta(get, getenv)
+   local pd_install_path = INSTALL_PREFIX or ""
+   if pd_install_path == "" then
+      pd_install_path = "."
+   end
+   return pd_install_path .. "/scripts/gendoc/gen.lua"
+end
+
 local function get_config_key(db, key)
    local stmt = db:prepare "select * from config where key = ?"
    stmt:bind(1, key)
@@ -1301,17 +1466,71 @@ local function get_config_key(db, key)
 end
 
 local function set_config_key(db, key, value)
-   local stmt = db:prepare "insert into config (key, value) values (?, ?)"
+   local val = get_config_key(db, key)
+   if val then
+      local stmt = db:prepare "update config set value = ? where key = ?"
+      stmt:bind(1, value)
+      stmt:bind(2, key)
+      for _ in stmt:nrows() do
+      end
+      stmt:finalize()
+   else
+      local stmt = db:prepare "insert into config (key, value) values (?, ?)"
+      stmt:bind(1, key)
+      stmt:bind(2, value)
+      for _ in stmt:nrows() do
+      end
+      stmt:finalize()
+   end
+end
+
+local function remove_config_key(db, key)
+   local stmt = db:prepare "delete from config where key = ?"
    stmt:bind(1, key)
-   stmt:bind(2, value)
    for _ in stmt:nrows() do
    end
    stmt:finalize()
 end
 
+local function get_all_config_keys(db)
+   local stmt = db:prepare "select * from config"
+   local res = {}
+   for row in stmt:nrows() do
+      res[#res + 1] = row
+   end
+   stmt:finalize()
+   return res
+end
+
 local function fetch_config_key(db, fetch, key)
    fetch(":[" .. key .. "]")
    return get_config_key(db, key)
+end
+
+local function fetch_env_key(fetch, key)
+   fetch(":[@" .. key .. "]")
+   return os.getenv(key)
+end
+
+local function run_config_key(db, fetch, key)
+   local res = get_config_key(db, key)
+   if res == nil then
+      if DEFAULT_CONFIG_VALUES[key] then
+         local function get(key)
+            return fetch_config_key(db, fetch, key)
+         end
+         local function getenv(key)
+            return fetch_env_key(fetch, key)
+         end
+         res = DEFAULT_CONFIG_VALUES[key](get, getenv)
+      else
+         res = ""
+      end
+      set_config_key(db, key, res)
+      return res
+   else
+      return res
+   end
 end
 
 local function mkdir_recur(path)
@@ -1331,7 +1550,43 @@ local function mkdir_recur(path)
    end
 end
 
-local function run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
+local function flatten1(tbl)
+   local res = {}
+   for i = 1, #tbl do
+      local el = tbl[i]
+      if type(el) == "table" then
+         table.move(el, 1, #el, #res + 1, res)
+      else
+         res[#res + 1] = el
+      end
+   end
+   return res
+end
+
+local function run_cmd(db, fetch, invk)
+   assert(#invk > 0, "invk debe tener al menos un elemento")
+   fetch(invk[1])
+   local cmd = invk[1]
+   local args = {}
+   table.move(invk, 2, #invk, 1, args)
+
+   local cpid = assert(unistd.fork())
+   if cpid == 0 then
+      -- hijo
+      args[0] = cmd
+      assert(unistd.exec(cmd, args))
+   else
+      -- padre
+      local cpid, status, code = wait.wait(cpid)
+      if cpid then
+         return code
+      else
+         error(status)
+      end
+   end
+end
+
+local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
    if rule.type == "source" then
       return function(fetch)
          log.debug("[italic]código[none] %s", rule.src)
@@ -1340,23 +1595,48 @@ local function run_rule(db, root, relcwd, manifest, builddir, module_assocs, tar
       return function(fetch)
          fetch(rule.src)
          local deps = get_pseudod_dependencies(rule.src)
+         local load_dbs = {}
          for i = 1, #deps do
             local d = deps[i]
             local src_dep = module_assocs[d.pkgname .. "/" .. d.modname]
             if src_dep then
-               fetch(builddir .. "/compilado/" .. d.pkgname .. "/" .. d.modname .. ".bdm.json")
+               local dep_db_file = builddir .. "/compilado/" .. d.pkgname .. "/" .. d.modname .. ".bdm.json"
+               load_dbs[#load_dbs + 1] = "--cargar-db"
+               load_dbs[#load_dbs + 1] = dep_db_file
+               fetch(dep_db_file)
             end
          end
 
-         local pdc_exe = fetch_config_key(db, fetch, "PDC_EXECUTABLE")
+         if rule.depends_on_manifest then
+            fetch(manifest_path)
+         end
 
-         log.info("[fg:green]compilando [bold]pdc[none] %s", rule.src)
-         local invk = {pdc_exe}
          mkdir_recur((assert(libgen.dirname(target))))
-         local h1 <close> = io.open(target, "wb")
-         h1:write "pdc invk"
-         local h2 <close> = io.open(target:sub(1, -3) .. ".bdm.json", "wb")
-         h2:write "pdc invk bdm"
+
+         local pdc_exe = fetch_config_key(db, fetch, "pdc_ejecutable")
+         local pdc_extra_args = fetch_config_key(db, fetch, "pdc_args_extra")
+
+         if pdc_exe == "" then
+            log.error("[fg:red][bold]error[none] no se encontró un compilador de PseudoD (nuevo) a usar.")
+            log.error("      Véase las opciones de configuración pdc_nombre y pdc_ejecutable y el subcomando `pseudod configurar`")
+            error("no se pudo invocar al compilador de PseudoD")
+         end
+         local invk = flatten1 {
+            pdc_exe,
+            split_shlike_args(pdc_extra_args),
+            "--id-modulo", rule.module_id,
+            "--paquete", rule.package_name,
+            "--modulo", rule.module_name,
+            "-o", target,
+            "--guardar-db", rule.out_db,
+            load_dbs,
+         }
+         require "fennel"
+         local V = require "fennel.view"
+         print(V(invk))
+         error("bad")
+
+         log.info("[fg:green]compilado->c [bold]pdc[none] %s", rule.src)
       end
    elseif rule.type == "alias" then
       return function(fetch)
@@ -1370,12 +1650,75 @@ local function run_rule(db, root, relcwd, manifest, builddir, module_assocs, tar
          local h <close> = io.open(target, "wb")
          h:write "cc invk"
       end
+   elseif rule.type == "pddoc" then
+      return function(fetch)
+         local lua_exe = fetch_config_key(db, fetch, "lua_ejecutable")
+         local lua_extra_args = fetch_config_key(db, fetch, "lua_args_extra")
+         local pddoc_path = fetch_config_key(db, fetch, "pddoc_ruta")
+         local pddoc_extra_args = fetch_config_key(db, fetch, "pddoc_args_extra")
+
+         if lua_exe == "" then
+            log.error("[fg:red][bold]error[none] no se encontró un intérprete de Lua 5.4 a usar.")
+            log.error("      Véase las opciones de configuración lua_ejecutable y el subcomando `pseudod configurar`")
+            error("no se pudo invocar pddoc")
+         end
+
+         if pddoc_path == "" then
+            log.error("[fg:red][bold]error[none] no se encontró el programa pddoc / gen.lua a usar.")
+            log.error("      Véase las opciones de configuración pddoc_ruta y el subcomando `pseudod configurar`")
+            error("no se pudo invocar pddoc")
+         end
+
+         local lua_extra, errmsg = split_shlike_args(lua_extra_args)
+         if not lua_extra then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración lua_args_extra: %s", errmsg)
+            error("no se pudo invocar pddoc")
+         end
+
+         local pddoc_extra, errmsg = split_shlike_args(pddoc_extra_args)
+         if not pddoc_extra then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración pddoc_args_extra: %s", errmsg)
+            error("no se pudo invocar pddoc")
+         end
+
+         mkdir_recur((assert(libgen.dirname(target))))
+         local invk = flatten1 {
+            lua_exe,
+            lua_extra,
+            pddoc_path,
+            "-d", target,
+            "-o", rule.output_dir,
+            extra_args,
+         }
+
+         if rule.depends_on_manifest then
+            fetch(manifest_path)
+         end
+
+         if rule.config_file then
+            invk[#invk + 1] = "-c"
+            invk[#invk + 1] = rule.config_file
+         end
+
+         for i = 1, #rule.srcs do
+            local input = rule.srcs[i]
+            local arg = (input.module_name or "") .. ":" .. input.src
+            fetch(input.src)
+            invk[#invk + 1] = arg
+         end
+
+         local code = run_cmd(db, fetch, invk)
+         if code ~= 0 then
+            log.error("[fg:red][bold]error[none] error en pddoc")
+            error("error en pddoc")
+         end
+      end
    else
       error("invalid rule type: " .. rule.type)
    end
 end
 
-local function build_tasks(db, root, relcwd, manifest, builddir)
+local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
    -- Esta tabla es innecesaria, pero me gusta como queda el código así, por
    -- separado.
    local pkgsrcs = {}
@@ -1425,6 +1768,7 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
             abs = src.path,
             module_name = modname,
          }
+
          rules[outpath .. ".c"] = {
             type = "compile-module",
             src = relsrc,
@@ -1432,11 +1776,14 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
             module_name = modname,
             package_name = pkgname,
             module_id = pkg.compilador.id_modulo or generate_module_id(src.path),
+            depends_on_manifest = not not pkg.compilador.id_modulo,
+            out_db = outpath .. ".bdm.json",
          }
          rules[outpath .. ".bdm.json"] = {
             type = "alias",
             aliases = outpath .. ".c",
          }
+
          rules[outpath .. ".o"] = {
             type = "c-compile",
             src = outpath .. ".c",
@@ -1455,6 +1802,8 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
          type = "pddoc",
          srcs = pddoc_inputs,
          config_file = pkg.docs.config,
+         depends_on_manifest = not not pkg.docs.config,
+         output_dir = builddir .. "/docs/" .. pkgname .. "/out/",
       }
 
       patt_rules[builddir .. "/docs/" .. pkgname .. "/out/*"] = {
@@ -1464,10 +1813,15 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
    end
 
    return function(target)
-      local cfg_key = string.match(target, "^:%[(.*)%]$")
+      local cfg_key = string.match(target, "^:%[([a-zA-Z_][a-zA-Z_0-9]*)%]$")
       if cfg_key then
          return function(fetch, hash)
             local cfg_value = get_config_key(db, cfg_key)
+            if not cfg_value then
+               log.info("[italic]configuración[none] Usando valor predeterminado para %s", cfg_key)
+               cfg_value = run_config_key(db, fetch, cfg_key)
+               set_config_key(db, cfg_key, cfg_value)
+            end
             hash(sha1_string(cfg_value or ""))
          end, function(_db, target)
             local cfg_value = get_config_key(db, cfg_key)
@@ -1478,13 +1832,28 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
          end
       end
 
+      local env_key = string.match(target, "^:%[@([a-zA-Z_][a-zA-Z_0-9]*)%]$")
+      if env_key then
+         return function(fetch, hash)
+            local env_value = os.getenv(env_key)
+            log.debug("[italic]configuración[none] Usando variable de entorno %s", env_key)
+            hash(sha1_string(("@" .. env_value) or ""))
+         end, function(_db, target)
+            local env_value = os.getenv(env_key)
+            return {
+               filename = target,
+               direct_hash = sha1_string(("@" .. env_value) or ""),
+            }
+         end
+      end
+
       if rules[target] then
          local rule = rules[target]
-         return run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
+         return run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
       else
          for glob, rule in pairs(patt_rules) do
             if match_glob(glob, target) then
-               return run_rule(db, root, relcwd, manifest, builddir, module_assocs, target, rule)
+               return run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
             end
          end
       end
@@ -1492,56 +1861,300 @@ local function build_tasks(db, root, relcwd, manifest, builddir)
 end
 
 
-local visited = {}
-local function test_tasks(tasks, target)
-   if visited[target] then
-      return
-   end
-   local t = tasks(target)
-   if not t then
-      error("invalid " .. target)
-   end
-   visited[target] = true
-   t(function(target) test_tasks(tasks, target) end, function(hashed) print("hashed", target, "to", hashed) end)
+------------------------------------------------------------------------
+-- Interfáz del CLI.
+------------------------------------------------------------------------
+
+local ok, errmsg, errnum = stat.mkdir(DEFAULT_BUILD_DIR)
+if not ok and errnum ~= errno.EEXIST then
+   error(errmsg)
 end
-
-
-local db = sqlite3.open("outputs/build.sqlite3")
+local db = sqlite3.open(DEFAULT_BUILD_DIR .. "/db.sqlite3")
 prepare_db_for_pseudod(db)
 prepare_db_for_build_system(db)
 local root, relcwd = find_project_root()
 assert(unistd.chdir(root))
-local manifest = load_manifest(root)
-local tasks = build_tasks(db, root, relcwd, manifest, DEFAULT_BUILD_DIR)
+local manifest, abs_manifest_path = load_manifest(root)
+local manifest_path = make_relative(abs_manifest_path, root)
+local tasks = build_tasks(db, root, relcwd, manifest, manifest_path, DEFAULT_BUILD_DIR)
 local build = schedule(rebuilder, db, tasks)
-build(".pseudod-build/compilado/bepd/builtins.o")
+
+
+local GLOBAL_OPTS = {
+   log_level = {
+      long = "log-level",
+      args = 1,
+      default = "info",
+   },
+   color = {
+      long = "color",
+      args = 1,
+      default = "auto",
+   },
+   verbose = {
+      short = "V",
+      long = "verbose",
+      args = 0,
+      default = false,
+   },
+}
+
+local OPTS_FOR_SUBCOMMAND = {
+   compilar = {
+      
+   },
+
+   documentar = {
+      pkgname = {
+         short = "p",
+         long = "paquete",
+         args = 1,
+         default = false,
+      },
+   },
+
+   configurar = {
+      show_cfg = {
+         long = "mostrar",
+         args = 0,
+         default = false,
+      },
+   },
+}
+
+for _subcmd, opts in pairs(OPTS_FOR_SUBCOMMAND) do
+   for k, v in pairs(GLOBAL_OPTS) do
+      opts[k] = v
+   end
+end
+
+local function apply_global_opts(args)
+   if args.log_level then
+      log_level = args.log_level
+      if not LOG_LEVELS[log_level] then
+         log.error("[fg:red][bold]error[none] Nivel de logging inválido: %s", log_level)
+         log.error("      Debe ser 'debug', 'info', 'warn' o 'error'.")
+         error("Nivel de logging inválido")
+      end
+   end
+
+   if args.verbose then
+      log_level = "debug"
+   end
+
+   if args.color then
+      color_level = args.color
+      if color_level ~= "always" and color_level ~= "never" and color_level ~= "auto" then
+         log.error("[fg:red][bold]error[none] Uso de color inválido: %s", color_level)
+         log.error("      Debe ser 'always', 'never' o 'auto'.")
+         error("Uso de color inválido")
+      end
+   end
+end
+
+local SUBCOMMANDS = {}
+
+function SUBCOMMANDS.ayuda(args)
+   print([[Herramienta general de PseudoD.
+
+Subcomandos:
+
+  help       -- Muestra esta ayuda
+  ayuda      -- Muestra esta ayuda
+  compilar   -- Compila el proyecto actual
+  build      -- Alias de `compilar`
+  configurar -- Configura el proyecto actual
+  configure  -- Alias de `configurar`
+  documentar -- Genera la documentación del proyecto actual
+  doc        -- Alias de `documentar`
+]])
+end
+
+function SUBCOMMANDS.compilar(args)
+   --build()
+end
+
+function SUBCOMMANDS.documentar(args)
+   if args.pkgname then
+      local found = false
+      for i = 1, #manifest.paquetes do
+         local pkg = manifest.paquetes[i]
+         if pkg.nombre == args.pkgname then
+            found = true
+            break
+         end
+      end
+      if not found then
+         log.error("[fg:red][bold]error[none] El paquete %s no existe", args.pkgname)
+         error("paquete inválido")
+      else
+         build(DEFAULT_BUILD_DIR .. "/docs/" .. args.pkgname .. "/db.sqlite3")
+      end
+   else
+      for i = 1, #manifest.paquetes do
+         local pkg = manifest.paquetes[i]
+         log.info("Construyendo la documentación de %s", pkg.nombre)
+         build(DEFAULT_BUILD_DIR .. "/docs/" .. pkg.nombre .. "/db.sqlite3")
+      end
+   end
+end
+
+function SUBCOMMANDS.configurar(args)
+   for i = 1, #args do
+      local k, v = string.match(args[i], "^([a-zA-Z_][a-zA-Z_0-9]*)=(.*)$")
+      if k and v then
+         set_config_key(db, k, v)
+      end
+      k = string.match(args[i], "^predet:([a-zA-Z_][a-zA-Z_0-9]*)$")
+         or string.match(args[i], "^default:([a-zA-Z_][a-zA-Z_0-9]*)$")
+      if k then
+         remove_config_key(db, k)
+      end
+   end
+
+   if args.show_cfg then
+      local cfgs = get_all_config_keys(db)
+      for i = 1, #cfgs do
+         local pair = cfgs[i]
+         log.info("%s=%s", pair.key, json.encode(pair.value))
+      end
+   end
+end
+
+local SUBCMD_ALIASES = {
+   help = "ayuda",
+   build = "compilar",
+   configure = "configurar",
+   doc = "documentar",
+}
+for alias, aliased in pairs(SUBCMD_ALIASES) do
+   SUBCOMMANDS[alias] = SUBCOMMANDS[aliased]
+   OPTS_FOR_SUBCOMMAND[alias] = OPTS_FOR_SUBCOMMAND[aliased]
+end
+
+
+local function getopt(args, opts)
+   local shortopts, longopts = {}, {}
+   local res = {}
+
+   for var, desc in pairs(opts) do
+      desc.var = var
+      res[var] = desc.default
+      if desc.short then
+         shortopts[desc.short] = desc
+      end
+      if desc.long then
+         longopts[desc.long] = desc
+      end
+   end
+
+   local i = 1
+   while i <= #args do
+      local arg = args[i]
+      i = i + 1
+
+      if arg == "-" then
+         i = i - 1
+         break
+      elseif arg == "--" then
+         break
+      elseif string.sub(arg, 1, 2) == "--" then
+         local k, v = string.match(arg, "^%-%-([^=]+)=(.*)$")
+         if not k then
+            k = string.match(arg, "^%-%-([^=]+)$")
+            if not k then
+               return nil, "argumento inválido: " .. arg
+            end
+         end
+         local desc = longopts[k]
+         if not desc then
+            return nil, "opción desconocida: --" .. k
+         end
+         if desc.args == 0 then
+            if v then
+               return nil, "opción --" .. k .. " no acepta argumentos"
+            end
+            res[desc.var] = true
+         else
+            assert(desc.args == 1)
+            if v then
+               res[desc.var] = v
+            else
+               if i > #args then
+                  return nil, "se esperaba un valor para la opción --" .. k
+               end
+               res[desc.var] = args[i]
+               i = i + 1
+            end
+         end
+      elseif string.sub(arg, 1, 1) == "-" then
+         for i = 2, string.len(arg) do
+            local k = string.sub(arg, i, i)
+            local desc = shortopts[k]
+            if not desc then
+               return nil, "opción desconocida: -" .. k
+            end
+            if desc.args == 0 then
+               res[desc.var] = true
+            else
+               assert(desc.args == 1)
+               if i > #args then
+                  return nil, "se esperaba un valor para la opción -" .. k
+               end
+               res[desc.var] = args[i]
+               i = i + 1
+            end
+         end
+      else
+         i = i - 1
+         break
+      end
+   end
+
+   local pos = {}
+   table.move(args, i, #args, 1, pos)
+
+   return {
+      keys = res,
+      pos = pos,
+   }
+end
+
+local function run_subcmd(subcmd, cli_values)
+   apply_global_opts(cli_values)
+   assert(SUBCOMMANDS[subcmd])(cli_values)
+end
+
+local cli = {...}
+
+local res, errmsg = getopt(cli, GLOBAL_OPTS)
+if not res then
+   log.error("[fg:red][bold]error[none] %s", errmsg)
+   error(errmsg)
+end
+local subcmd = res.pos[1]
+local subcmd_cli = {}
+if subcmd then
+   table.move(res.pos, 2, #res.pos, 1, subcmd_cli)
+   local opts = OPTS_FOR_SUBCOMMAND[subcmd] or {}
+   if not SUBCOMMANDS[subcmd] then
+      log.error("[fg:red][bold]error[none] Subcomando '%s' inválido", subcmd)
+      error("subcomando " .. subcmd .. " es inválido")
+   end
+   local cli_values = res.keys
+   res, errmsg = getopt(subcmd_cli, opts)
+   if not res then
+      log.error("[fg:red][bold]error[none] %s", errmsg)
+      error(errmsg)
+   end
+
+   for k, v in pairs(res.keys) do
+      cli_values[k] = v
+   end
+   table.move(res.pos, 1, #res.pos, 1, cli_values)
+   run_subcmd(subcmd, cli_values)
+else
+   run_subcmd("help", res.keys)
+end
+
 db:close()
-
--- local db = sqlite3.open("outputs/build.sqlite3")
--- prepare_db_for_build_system(db)
--- local function tasks(target)
---    if target == "outputs/build-test/2/out" then
---       return function(fetch)
---          fetch ":hola"
---          fetch "outputs/build-test/2/calc"
---          print("=========================================== RUN 1")
---          local c = read_file "outputs/build-test/2/calc"
---          write_file("outputs/build-test/2/out", c .. "!")
---       end
---    elseif target == ":hola" then
---       return function(fetch, hash)
---          print("=============== RUN 2a")
---          fetch "outputs/build-test/2/mid"
---          hash "abc"
---          print("=============== RUN 2b")
---       end
---    elseif stat.stat(target) then
---       return function(fetch)
---          print("src", target)
---       end
---    end
--- end
-
--- local build = schedule(rebuilder, db, tasks)
--- build "outputs/build-test/2/out"
--- db:close()

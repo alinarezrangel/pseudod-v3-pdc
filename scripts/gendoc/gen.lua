@@ -1108,8 +1108,8 @@ end
 macros.defparam = true
 function globals.defparam(eval, env, args)
    local pos, kw = parse_args("defparam", args, "0+")
-   if pos[1].tag ~= "sym" then
-      error("el primer argumento de @defparam debe ser un símbolo")
+   if pos[1].tag ~= "sym" and pos[1].tag ~= "str" then
+      error("el primer argumento de @defparam debe ser un símbolo o un texto")
    end
    local name = pos[1].s
    local function ev(s)
@@ -1118,12 +1118,42 @@ function globals.defparam(eval, env, args)
    return make_tagged("defparam", {name = name, body = map(slice(pos, 2), ev)})
 end
 
+macros.defenum = true
+function globals.defenum(eval, env, args)
+   local pos, kw = parse_args("defenum", args, "0+")
+   if pos[1].tag ~= "sym" and pos[1].tag ~= "str" then
+      error("el primer argumento de @defenum debe ser un símbolo o un texto")
+   end
+   local name = pos[1].s
+   local function ev(s)
+      return eval(s, env)
+   end
+   return make_tagged("defenum", {name = name, body = map(slice(pos, 2), ev)})
+end
+
+function globals.warn(args)
+   local pos, kw = parse_args("warn", args, "0+")
+   return make_tag("div", {class = "warn"}, {pos})
+end
+
+function globals.warntitle(args)
+   local pos, kw = parse_args("warntitle", args, "0+")
+   return make_tag("h3", {class = "warn--title"}, {pos})
+end
+
+globals["dato-de-implementacion"] = function(args)
+   local pos, kw = parse_args("dato-de-implementacion", args, "0+")
+   return make_tag("div", {class = "impl-detail"}, {pos})
+end
+
 local function prepare_global_env(env)
    local stx_ctx = getmetatable(env).stx_ctx
 
    function env.pd(args)
-      local pos, kw = parse_args("pd", args, "0+")
-      return syntax_highlight("pseudod", pos, stx_ctx)
+      local pos, kw = parse_args("pd", args, "0+ #:utilizar ?")
+      local new_stx_ctx = setmetatable({}, {__index = stx_ctx})
+      -- TODO: Agrega soporte para la opción #:utilizar
+      return syntax_highlight("pseudod", pos, new_stx_ctx)
    end
 
    function env.modulo(args)
@@ -1168,14 +1198,39 @@ local function prepare_global_env(env)
                          make_tag("dl", {class = "params--body"}, {params})})
    end
 
+   function env.enum(args)
+      local pos, kw = parse_args("enum", args, "0+")
+      local params = {}
+      for i = 1, #pos do
+         local t = pos[i]
+         assert(is_tagged(t, "defenum"), "@enum solo acepta @defenum")
+         params[#params + 1] = make_tag("dt", {class = "enum-name"}, {
+                                           syntax_highlight("pseudod", t.name, stx_ctx)})
+         params[#params + 1] = make_tag("dd", {class = "enum-def"}, {t.body})
+      end
+      return make_tag("section", {class = "enum"}, {
+                         make_tag("h3", {class = "enum--title"}, {"Enumeración"}),
+                         make_tag("dl", {class = "enum--body"}, {params})})
+   end
+
    function globals.ejemplo(args)
       local pos, kw = parse_args("ejemplo", args, "0+")
+      return make_tag("pre", {class = "codeblock"}, {syntax_highlight("pseudod", pos, stx_ctx)})
+   end
+
+   function globals.pdcodeblock(args)
+      local pos, kw = parse_args("pdcodeblock", args, "0+")
       return make_tag("pre", {class = "codeblock"}, {syntax_highlight("pseudod", pos, stx_ctx)})
    end
 
    function globals.codeblock(args)
       local pos, kw = parse_args("ejemplo", args, "0+")
       return make_tag("pre", {class = "codeblock"}, {syntax_highlight("none", pos, stx_ctx)})
+   end
+
+   function globals.output(args)
+      local pos, kw = parse_args("output", args, "0+")
+      return make_tag("pre", {class = "codeblock output"}, {syntax_highlight("none", pos, stx_ctx)})
    end
 
    env.param = env.pd
@@ -1797,6 +1852,13 @@ local function new_doc(db, doc, input_file, module_name, output_file)
    end
    local id = prep:last_insert_rowid()
    prep:finalize()
+
+   prep = db:prepare("update exports set target_doc_id = ? where target_doc_id in (" .. ids .. ")")
+   prep:bind(1, id)
+   for _ in prep:nrows() do
+   end
+   prep:finalize()
+
    return id, writer:data()
 end
 
@@ -1807,7 +1869,7 @@ get_src = function(mod, name, query_mod)
          if exp.target_doc_id ~= mod.id then
             -- exported from another module
             local from = query_mod("id", exp.target_doc_id)
-            assert(from, "must have a defined target module")
+            assert(from, "must have a defined target module: " .. exp.doc_id .. "#" .. exp.name .. " -> " .. exp.target_doc_id)
             return get_src(from, exp.target_name, query_mod)
          else
             return { doc_id = mod.id, name = name, target = exp.target_link }

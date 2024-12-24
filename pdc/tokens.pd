@@ -43,7 +43,7 @@ finmetodo
 @brief{Tipo de un token.}
 
 @enum(
-@defenum(NÚMERO){Una literal numérica como @pd{-21}.}
+@defenum("NÚMERO"){Una literal numérica como @pd{-21}.}
 @defenum(TEXTO){Una literal textual como @pd{"hola"}.}
 @defenum(IDENTIFICADOR){Un nombre com @code{hola}.}
 @defenum(PALABRA_CLAVE){Una palabra clave como @pd{adquirir}.}

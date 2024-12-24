@@ -494,7 +494,7 @@ finmetodo
 @brief{Devuelve un combinador que devuelve el primero de @pd{combs} que sea
 exitoso.}
 
-Trata cada uno de los combinadores en @pd{combs) (un arreglo de combinadores)
+Trata cada uno de los combinadores en @pd{combs} (un arreglo de combinadores)
 hasta que uno tenga éxito. En especifico, si uno de los combinadores devuelve
 un error pero no avanza el punto, entonces intenta con el siguiente. Si uno de
 devuelve error y avanza el punto, este combinador devuelve el mismo error. Y

@@ -147,7 +147,7 @@ fijar NombreImportado a CrearTipoDeRegistro: {NombreImportado},
 
 Los condicionales estáticos son los condicionales de la forma:
 
-@codeblock|{
+@ejemplo|{
 si __Impl = {bootstrap}
     NoImplementado
 sino

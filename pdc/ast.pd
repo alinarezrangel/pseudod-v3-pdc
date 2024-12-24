@@ -11,14 +11,14 @@ clase Nodo
     @brief{ID del nodo.}
 
     No necesitas especificarlo al crear un nodo, ya que @pd(#:utilizar
-    pdc/tabla){EntablarÁrbol} le dará un valor apropiado.
+    "pdc/tabla"){EntablarÁrbol} le dará un valor apropiado.
     DOCUMENTA]
     atributo id
 
     [DOCUMENTA
     @brief{Área textual de este token.}
 
-    Es una instancia de @pd(#:utilizar pdc/tokens){ÁreaTextual}.
+    Es una instancia de @pd(#:utilizar "pdc/tokens"){ÁreaTextual}.
     DOCUMENTA]
     atributo áreaTextual
 finclase

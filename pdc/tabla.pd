@@ -61,7 +61,7 @@ clase Tabla
 
     Por ejemplo:
 
-    @codeblock|{
+    @ejemplo|{
     variables tabla, esquema
     fijar esquema a CrearTipoDeRegistro: {esquema},
         {nombre}, {valor},
@@ -355,7 +355,7 @@ las columnas, seguido de cero o más índices de la tabla.
 
 Por ejemplo:
 
-@codeblock|{
+@ejemplo|{
 variable Usuario
 fijar Usuario a CrearTipoDeRegistro: {Usuario},
     {nombre}, {contraseña}, {email}, {biografía}, {esPúblico},
@@ -366,7 +366,7 @@ fijar Usuario a CrearTipoDeRegistro: {Usuario},
 La clase devuelta tendrá un constructor que acepta valores para su
 inicialización:
 
-@codeblock|{
+@ejemplo|{
 variable miguel
 fijar miguel a Usuario#crear:
     {mg},
@@ -378,7 +378,7 @@ fijar miguel a Usuario#crear:
 
 Tu puedes crear tus propios métodos adicionales:
 
-@codeblock|{
+@ejemplo|{
 metodo Usuario#referencia
     devolver {@~t}#formatear: yo#nombre
 finmetodo

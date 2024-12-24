@@ -9,7 +9,7 @@ elemento, siempre poseerán una única referencia a dicho. Usa un
 @pd{Diccionario} internamente, así que puede contener valores tanto hasheables
 (para mayor rendimiento) como simplemente comparables con @pd{\operador_=\}.
 
-@codeblock|{
+@ejemplo|{
 variable c
 fijar c a Conjunto#conValores: 1, 2, 3
 fijar c a c#unión: (Conjunto#conValores: 2, 3, 4)
@@ -71,7 +71,7 @@ clase Conjunto
     La unión de varios conjuntos es un conjunto con todos sus
     elementos. Recuerda que los conjuntos nunca tienen elementos duplicados.
 
-    @codeblock|{
+    @ejemplo|{
     necesitas ((Conjuntos#conValores: 1, 2)#unión: (Conjuntos#conValores: 2, 3)) = (Conjuntos#conValores: 1, 2, 3)
     }|
     DOCUMENTA]
@@ -83,7 +83,7 @@ clase Conjunto
     Devuelve un nuevo conjunto que es igual a este pero sin los elementos de
     @pd{conjunto}. Por ejemplo:
 
-    @codeblock|{
+    @ejemplo|{
     necesitas ((Conjuntos#conValores: 1, 2, 3, 4)#sin: (Conjuntos#conValores: 3, 4)) = (Conjuntos#conValores: 1, 2)
     }|
     DOCUMENTA]

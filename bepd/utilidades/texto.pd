@@ -235,7 +235,7 @@ sea @bold{mayor o igual} a @pd{longitud}.
 
 Por ejemplo:
 
-@codeblock|{
+@ejemplo|{
 necesitas (AjustarALaIzquierda: {hola}, {0}, 5) = {0hola}
 necesitas (AjustarALaIzquierda: {hola}, {0}, 6) = {00hola}
 necesitas (AjustarALaIzquierda: {hola}, {0}, 4) = {hola}
@@ -260,7 +260,7 @@ sea @bold{mayor o igual} a @pd{longitud}.
 
 Por ejemplo:
 
-@codeblock|{
+@ejemplo|{
 necesitas (AjustarALaDerecha: {hola}, {0}, 5) = {hola0}
 necesitas (AjustarALaDerecha: {hola}, {0}, 6) = {hola00}
 necesitas (AjustarALaDerecha: {hola}, {0}, 4) = {hola}

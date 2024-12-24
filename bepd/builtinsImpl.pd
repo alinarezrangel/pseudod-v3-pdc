@@ -989,7 +989,7 @@ llamandolo: únicamente obtendríamos @pd{NULO} y romperíamos el contráto
 del método. Para prevenir que lo llamemos por accidente, implementamos
 temporalmente @code{desleerCarácter} de la siguiente manera:
 
-@codeblock|{
+@pdcodeblock|{
 metodo PuertoSimple#desleerCarácter
     NoImplementado
 finmetodo
@@ -1014,7 +1014,7 @@ es justamente indicar que algunos métodos deben ser implementados por las
 subclases. Estos "métodos abstractos" son implementados de la siguiente
 manera:
 
-@codeblock|{
+@pdcodeblock|{
 metodo MiClaseAbstracta#miMétodoAbstracto: A, B, C
     MétodoAbstracto
 finmetodo
@@ -1036,7 +1036,7 @@ lectores del programa, que es imposible llegar a ciertas rutas en el código.
 Por ejemplo, podríamos implementar nuestra propia versión de @code{necesitas}
 de la siguiente manera:
 
-@codeblock|{
+@pdcodeblock|{
 procedimiento Necesitas: condición
     si condición
         devolver NULO
@@ -1066,7 +1066,7 @@ con un valor @code{X}, dicho @code{X} será devuelto de esta llamada a
 Por ejemplo, el siguiente programa termina el @pd{ParaCadaElemento} cuando se
 encuentre un @pd{5}:
 
-@codeblock|{
+@ejemplo|{
 variables arreglo, seEncontró
 fijar arreglo a Arreglo#crearCon: 1, 2, 3, 5, 7, 11, 13, 17
 fijar seEncontró a LlamarConEC: procedimiento: escapar

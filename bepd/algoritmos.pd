@@ -132,7 +132,7 @@ finprocedimiento
 @brief{Realiza una búsqueda binaria sobre un arreglo.}
 
 Busca en @pd{arreglo} (un arreglo ordenado) el valor @pd{valor} entre los
-elementos en los índices @pd{inf} (límite inferior, inclusivo) y @pd{sup)
+elementos en los índices @pd{inf} (límite inferior, inclusivo) y @pd{sup}
 (límite superior, exclusivo).
 
 Utiliza la función @pd{menorQue} para comparar los elementos. Esta función, al

@@ -5,7 +5,7 @@ Los valores inmutables, como los números, textos o conjuntos, no permiten ser
 mutados. Pero imagina, por ejemplo, que quieres llevar cuenta de un número en
 un cálculo:
 
-@codeblock|{
+@ejemplo|{
 variable suma
 fijar suma a 0
 ParaCadaElemento: arr, procedimiento: el
@@ -16,7 +16,7 @@ finprocedimiento
 Pero, ¿Qué tal si @pd{suma}, en vez de ser una variable local, fuese un
 parámetro?
 
-@codeblock|{
+@ejemplo|{
 procedimiento Sumando: total
     devolver procedimiento: el
         fijar total a total + el
@@ -34,7 +34,7 @@ una estructura de datos sencilla llamada @italic{caja}. Una caja es un
 contenedor mutable para otro objeto, generalmente inmutable. El ejemplo
 anterior se escribiría:
 
-@codeblock|{
+@ejemplo|{
 procedimiento Sumando: total
     devolver procedimiento: el
         fijar total#valor a total#valor + el

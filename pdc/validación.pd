@@ -11,7 +11,7 @@ utilizar pdc/parser (ErrorComoTraceback)
 
 Falla con un error si en algún momento se llama a un identificador que no es
 autoejecutable en el CST dado. @pd{tablasRnCst} deben ser las @pd(#:utilizar
-pdc/nombres){TablasDeResoluciónDeNombres} del CST.
+"pdc/nombres"){TablasDeResoluciónDeNombres} del CST.
 DOCUMENTA]
 funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst
     Buscando': cst, funcion: cst

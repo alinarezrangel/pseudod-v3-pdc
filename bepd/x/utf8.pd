@@ -150,7 +150,7 @@ de dicho subtexto.
 
 Por ejemplo:
 
-@codeblock|{
+@ejemplo|{
 ParaCadaCodepoint: {hñ𐠀h}, procedimiento: subtexto, codepoint, pos
     Escribir: subtexto, codepoint, pos
 finprocedimiento

@@ -9,7 +9,7 @@ función @code{recur} que iniciará un ciclo de recursión.
 
 Por ejemplo, para calcular el décimo número de fibonacci:
 
-@codeblock|{
+@ejemplo|{
 variable res
 fijar res a Bucle: 1, 1, 10, funcion: recur, A, B, n
     si n > 0

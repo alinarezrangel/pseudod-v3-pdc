@@ -40,6 +40,12 @@ finprocedimiento
 Las opciones pueden ser cortas (como @code{-X}) o largas (como
 @code{--sin-mensajes}). Esta enumeración indica cual de estos tipos se está
 procesando.
+
+@enum(
+@defenum(CORTA){La opción es corta (@code{-opt}).}
+
+@defenum(LARGA){La opción es larga (@code{--opt}).}
+)
 DOCUMENTA]
 variable OPCIÓN_PROCESADA
 fijar OPCIÓN_PROCESADA a Enum: {OPCIÓN_PROCESADA}, {CORTA}, {LARGA}
@@ -48,7 +54,7 @@ fijar OPCIÓN_PROCESADA a Enum: {OPCIÓN_PROCESADA}, {CORTA}, {LARGA}
 @brief{Parsea las opciones de una línea de comandos.}
 
 @params(
-@defparam(númeroDeArgumentosDe){Un procedimiento que se llamará de la forma
+@defparam("númeroDeArgumentosDe"){Un procedimiento que se llamará de la forma
 @pd{númeroDeArgumentosDe: textoOpt, tipoOpt} y debe devolver el número de
 argumentos que la opción @pd{textoOpt} (un texto: la opción sin guiones, como
 @code{X} para @code{-X} o @code{ayuda} para @code{--ayuda})
