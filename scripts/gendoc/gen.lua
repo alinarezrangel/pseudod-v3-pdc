@@ -629,6 +629,10 @@ local function p_metodo(ts)
    skip_ws(ts)
    local m, cls, mth
    m = {mth = true}
+   if try_consume_word(ts, "estatico") then
+      skip_ws(ts)
+      m.static = true
+   end
    local nm1 = expect_word(ts)
    skip_ws(ts)
    if try_consume_other(ts, "#") then
@@ -644,6 +648,48 @@ local function p_metodo(ts)
    m.name = mth
 
    p_params(ts, m)
+   return m
+end
+
+local function p_atributo(ts)
+   skip_ws(ts)
+   expect_any_word(ts, {"atributo", "atributos"})
+   skip_ws(ts)
+   local m, cls, attr
+   m = {attr = true, attrs = {}}
+   if try_consume_word(ts, "estatico") then
+      skip_ws(ts)
+      m.static = true
+   end
+   local nm1 = expect_word(ts)
+   skip_ws(ts)
+   if try_consume_other(ts, "#") then
+      skip_ws(ts)
+      local nm2 = expect_word(ts)
+      cls = nm1.id
+      attr = nm2.id
+   else
+      attr = nm1.id
+   end
+   m.attrs[1] = { cls = cls, name = attr }
+
+   skip_ws(ts)
+   while try_consume_other(ts, ",") do
+      skip_ws(ts)
+      if cls then
+         local snd_cls = expect_word(ts)
+         skip_ws(ts)
+         expect_other(ts, "#")
+         skip_ws(ts)
+         local snd_attr = expect_word(ts)
+         m.attrs[#m.attrs + 1] = { cls = snd_cls.id, name = snd_attr.id }
+      else
+         local snd_attr = expect_word(ts)
+         m.attrs[#m.attrs + 1] = { name = snd_attr.id }
+      end
+      skip_ws(ts)
+   end
+
    return m
 end
 
@@ -674,6 +720,15 @@ local function p_declr(ts, cls_stack)
          mth.own_cls = cls_stack[#cls_stack]
       end
       return mth
+   elseif t.string == "atributo" or t.string == "atributos" then
+      local attr = p_atributo(ts)
+      for i = 1, #attr.attrs do
+         local at = attr.attrs[i]
+         if not at.cls and #cls_stack > 0 then
+            at.cls = cls_stack[#cls_stack]
+         end
+      end
+      return attr
    elseif t.string == "procedimiento" or t.string == "funcion" then
       return p_funcion(ts)
    else
@@ -1032,7 +1087,7 @@ function globals.para(args)
 end
 
 function globals.toplevel(args)
-   local pos, kw = parse_args("modulo", args, "0")
+   local pos, kw = parse_args("toplevel", args, "0")
    return {}
 end
 
@@ -1474,6 +1529,30 @@ local function codify_signature(tq, sig, genlink)
          })
          defs[name] = {target = "#" .. target, kind = "global"}
       end
+   elseif sig.attr then
+      if #sig.attrs > 1 then
+         inner[1] = make_tag("span", {class = "syn-kw"}, {"atributos"})
+      else
+         inner[1] = make_tag("span", {class = "syn-kw"}, {"atributo"})
+      end
+
+      inner[2] = " "
+
+      for i = 1, #sig.attrs do
+         local n = sig.attrs[i]
+         if i > 1 then
+            inner[#inner + 1] = make_tag("span", {class = "syn-special"}, {", "})
+         end
+         local cls, name = n.cls, n.name
+         local cls_name = tq[cls].string
+         local nm_name, nm_target = tq[name].string, "_" .. mangle_name(cls_name .. "#" .. tq[name].string)
+         inner[#inner + 1] = make_tag("span", {class = "syn-id"}, {cls_name})
+         inner[#inner + 1] = make_tag("span", {class = "syn-special"}, {"#"})
+         inner[#inner + 1] = make_tag("span", {class = "syn-id syn-def"}, {
+                                         make_tag("a", {href = "#" .. nm_target, id = nm_target}, {nm_name}),
+         })
+         defs[cls_name .. "#" .. nm_name] = {target = "#" .. nm_target, kind = "global"}
+      end
    elseif sig.cls then
       inner[1] = make_tag("span", {class = "syn-kw"}, {"clase"})
       inner[2] = " "
@@ -1501,10 +1580,14 @@ local function codify_signature(tq, sig, genlink)
    elseif sig.mth then
       inner[1] = make_tag("span", {class = "syn-kw"}, {"metodo"})
       inner[2] = " "
+      if sig.static then
+         inner[3] = make_tag("span", {class = "syn-kw"}, {"estatico"})
+         inner[4] = " "
+      end
       local cls_name = ""
       if sig.own_cls then
-         inner[3] = make_tag("span", {class = "syn-id"}, {tq[sig.own_cls].string})
-         inner[4] = make_tag("span", {class = "syn-special"}, {"#"})
+         inner[#inner + 1] = make_tag("span", {class = "syn-id"}, {tq[sig.own_cls].string})
+         inner[#inner + 1] = make_tag("span", {class = "syn-special"}, {"#"})
          cls_name = tq[sig.own_cls].string
       end
       local name, target = tq[sig.name].string, "m_" .. mangle_name(cls_name .. "#" .. tq[sig.name].string)

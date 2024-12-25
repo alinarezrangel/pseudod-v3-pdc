@@ -1621,9 +1621,16 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             log.error("      Véase las opciones de configuración pdc_nombre y pdc_ejecutable y el subcomando `pseudod configurar`")
             error("no se pudo invocar al compilador de PseudoD")
          end
+
+         local extra_args, errmsg = split_shlike_args(pdc_extra_args)
+         if not extra_args then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración pdc_args_extra: %s", errmsg)
+            error("no se pudo invocar al compilador de PseudoD")
+         end
+
          local invk = flatten1 {
             pdc_exe,
-            split_shlike_args(pdc_extra_args),
+            extra_args,
             "--id-modulo", rule.module_id,
             "--paquete", rule.package_name,
             "--modulo", rule.module_name,
@@ -1669,6 +1676,8 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             error("no se pudo invocar pddoc")
          end
 
+         fetch(pddoc_path)
+
          local lua_extra, errmsg = split_shlike_args(lua_extra_args)
          if not lua_extra then
             log.error("[fg:red][bold]error[none] valor inválido de la configuración lua_args_extra: %s", errmsg)
@@ -1698,6 +1707,7 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
          if rule.config_file then
             invk[#invk + 1] = "-c"
             invk[#invk + 1] = rule.config_file
+            fetch(rule.config_file)
          end
 
          for i = 1, #rule.srcs do

@@ -91,7 +91,7 @@ clase BaseDeDatosDeMódulos
 
     Construye un @pd{Módulo} con los argumentos dados.
     DOCUMENTA]
-    metodo agregarMódulo: paquete, módulo, exportaciones, compilado, archivoConElCompilado
+    metodo agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado, prefijosDeLosMódulosTransitivos
 
     [DOCUMENTA
     @brief{Intenta buscar un módulo en base a su paquete y nombre.}
