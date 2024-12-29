@@ -4,21 +4,90 @@ utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 
 utilizar pdc/ast como AST
+utilizar pdc/nombres (TablasDeResoluciónDeNombres)
+utilizar pdc/capturas (TablasDeCapturas)
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
 utilizar pdc/info (IMPL_COMPILADOR)
 
 
-clase Emisor
-    atributos cabecera, instrucciones
-    atributos idDeContinuaciónActual
-    atributos funciones, continuaciones
-    atributos idDeFunción, idDeContinuación
+[DOCUMENTA
+@brief{Emisor del IR de C.}
 
+Véase el módulo @code{pdc/backend/c/ir} para una descripción del la
+representación intermediaria.
+
+Lleva registro de las continuaciones, las funciones y las instrucciones del
+programa.
+
+El emisor actúa como un arreglo de instrucciones. Estas instrucciones pueden
+ser movidas a una función (mediante el método @code{#moverAFunción}) o a un
+nuevo programa (mediante el método @code{#moverAPrograma}).
+DOCUMENTA]
+clase Emisor
+    [DOCUMENTA
+    @brief{Crea un nuevo emisor.}
+    DOCUMENTA]
+    metodo estatico crear
+
+    [DOCUMENTA
+    @brief{Crea un nuevo subemisor.}
+
+    Los dos emisores (el devuelto y @pd{emisorPadre}) comparten continuaciones
+    y podrán ser combinados de vuelta en uno en un futuro (mediante el método
+    @code{#combinar}).
+    DOCUMENTA]
+    metodo estatico subEmisor: emisorPadre
+
+    [DOCUMENTA
+    @brief{Emite una instrucción.}
+
+    @pd{opcode} es el opcode (un @pd{Opcode}) a emitir, mientras que @pd{args}
+    son los argumentos del mismo. El tipo de @pd{args} depende del opcode dado,
+    véase la documentación del IR para más información.
+
+    Si la instrucción requiere una continuación, esta será agregada
+    automáticamente al final de los argumentos. Por ejemplo, para emitir el
+    opcode @pd(#:utilizar "pdc/backend/c/ir"){Opcode#enviarMensaje} que pide
+    tres argumentos: el mensaje, el prototipo y la continuación, tu solo llamas
+    a emitir con dos: el mensaje y el prototipo. La continuación será agregada
+    al final de forma automática.
+    DOCUMENTA]
     metodo emitir: opcode, ...args
+
+    [DOCUMENTA
+    @brief{Mueve todo el código emitido hasta ahora a una función nueva.}
+
+    Devuelve la @pd{FunciónIR} creada.
+    DOCUMENTA]
     metodo moverAFunción
+
+    [DOCUMENTA
+    @brief{Mueve todo el código, funciones y continuaciones a un programa
+    nuevo.}
+
+    Devuelve el @pd{ProgramaIR} creado.
+    DOCUMENTA]
+    metodo moverAPrograma
+
+    [DOCUMENTA
+    @brief{Mueve todas las funciones del @pd{subEmisor} al emisor actual.}
+
+    @pd{subEmisor} debe ser un subemisor del emisor actual.
+    DOCUMENTA]
     metodo combinar: subEmisor
+
+    [DOCUMENTA
+    @brief{Ajusta una etiqueta ya emitida para que apunte a la posición
+    actual.}
+
+    @pd{etiqueta} debe ser una @pd{Etiqueta} ya fue emitida.
+    DOCUMENTA]
     metodo ajustarEtiqueta: etiqueta
 finclase
+
+atributos Emisor#cabecera, Emisor#instrucciones, Emisor#idDeContinuaciónActual,
+          Emisor#funciones, Emisor#continuaciones, Emisor#idDeFunción,
+          Emisor#idDeContinuación
 
 metodo estatico Emisor#subEmisor: emisorPadre
     variable c
@@ -91,6 +160,11 @@ metodo Emisor#ajustarEtiqueta: etiqueta
 finmetodo
 
 
+[DOCUMENTA
+@brief{Escribe una representación textual del emisor.}
+
+Principalmente útil al depurar.
+DOCUMENTA]
 procedimiento EscribirEmisor: emisor
     procedimiento escribirInstrucciones: pref, instrs
         ParaCadaElemento: instrs, procedimiento: instr
@@ -109,7 +183,7 @@ procedimiento EscribirEmisor: emisor
     escribirInstrucciones: {}, emisor#cabecera
     Escribir: {.funciones}
     ParaCadaElemento: emisor#funciones, procedimiento: func
-        Escribir: {  .func}, func#id
+        Escribir: {  .func}, func#id, func#númCapturas, func#númLocales
         escribirInstrucciones: {  }, func#instrucciones
     finprocedimiento
     Escribir: {.continuaciones}
@@ -120,6 +194,13 @@ procedimiento EscribirEmisor: emisor
 finprocedimiento
 
 
+[DOCUMENTA
+@brief{Itera sobre cada elemento del arreglo al revés.}
+
+Comienza por el último elemento (@pd{arr#longitud - 1}) y llega hasta el
+primero (@pd{0}). Con cada elemento, llama a @pd{proc} con dos argumentos: el
+elemento y el índice del mismo.
+DOCUMENTA]
 procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
     ParaCadaNúmero: 0, arr#longitud, procedimiento: i
         variable j
@@ -129,9 +210,42 @@ procedimiento ParaCadaElementoEnReversaConÍndice: arr, proc
 finprocedimiento
 
 
+[DOCUMENTA
+@brief{Clase que compila un AST ya anotado y analizado a un IR.}
+DOCUMENTA]
 clase EstadoDeEmisión
-    atributos tablasRnAst, tablasMcAst, emisor, locales, capturas, bdMod
+    [DOCUMENTA
+    @brief{Crea un compilador a IR en su estado inicial.}
+
+    @params(
+    @defparam(tablasRnAst){La @pd{TablasDeResoluciónDeNombres} del AST.}
+    @defparam(tablasMcAst){La @pd{TablasDeCapturas} del AST.}
+    @defparam(emisor){El @pd{Emisor} en el que se escribirá el código.}
+    @defparam(bdMod){La @pd(#:utilizar "pdc/módulos"){BaseDeDatosDeMódulos}
+    a usar.}
+    )
+
+    @devuelve{El estado de emisión.}
+    DOCUMENTA]
+    metodo estatico inicial: tablasRnAst, tablasMcAst, emisor, bdMod
+
+    [DOCUMENTA
+    @brief{Compila un fragmento del AST.}
+
+    Para compilar un programa, debería ser un @pd{AST#NodoPrograma}.
+
+    @devuelve{Nada, el resultado estará guardado en el emisor del estado.}
+    DOCUMENTA]
+    metodo emitir: ast
 finclase
+
+atributos EstadoDeEmisión#tablasRnAst, EstadoDeEmisión#tablasMcAst,
+          EstadoDeEmisión#emisor,
+          [ Diccionario que mapea cada binding local a su índice de local. ]
+          EstadoDeEmisión#locales,
+          [ Diccionario que mapea cada binding local a su índice de captura. ]
+          EstadoDeEmisión#capturas,
+          EstadoDeEmisión#bdMod
 
 metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     devolver yo#crear: tablasRnAst, tablasMcAst, emisor, bdMod
@@ -144,6 +258,18 @@ metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor, bdMod
     fijar yo#locales a Diccionario#vacío
     fijar yo#capturas a Diccionario#vacío
     fijar yo#bdMod a bdMod
+finmetodo
+
+metodo EstadoDeEmisión#subestado: emisor, locales, capturas
+    variable sub
+    fijar sub a EstadoDeEmisión#crear
+    fijar sub#tablasRnAst a yo#tablasRnAst
+    fijar sub#tablasMcAst a yo#tablasMcAst
+    fijar sub#emisor a emisor
+    fijar sub#locales a locales
+    fijar sub#capturas a capturas
+    fijar sub#bdMod a yo#bdMod
+    devolver sub
 finmetodo
 
 metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
@@ -189,18 +315,6 @@ metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
         finsi
     finsi
     devolver reg#binding
-finmetodo
-
-metodo EstadoDeEmisión#subestado: emisor, locales, capturas
-    variable sub
-    fijar sub a EstadoDeEmisión#crear
-    fijar sub#tablasRnAst a yo#tablasRnAst
-    fijar sub#tablasMcAst a yo#tablasMcAst
-    fijar sub#emisor a emisor
-    fijar sub#locales a locales
-    fijar sub#capturas a capturas
-    fijar sub#bdMod a yo#bdMod
-    devolver sub
 finmetodo
 
 funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor

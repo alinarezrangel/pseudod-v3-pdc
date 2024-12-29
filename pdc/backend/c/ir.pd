@@ -1,7 +1,236 @@
 utilizar bepd/builtins
 utilizar bepd/x/enum (EnumConValores)
 
+[DOCUMENTA
+@title{La representación intermediaria del backend de C}
 
+La representación consiste de funciones y continuaciones. Ambas tienen una
+secuencia de instrucciones en su interior.
+
+Véase la enumeración @pd{Opcode} para una lista de todas las instrucciones.
+
+Las funciones consisten de un número de parámetros, un número de capturas y su
+nombre único. Las continuaciones @bold{no} son funciones.
+
+El IR es una mezcla de una máquina de pila (@italic{"stack machine"}) y una de
+registros: los valores intermediarios se guardan en una pila que mantiene su
+valor entre instrucciones, mientras que las variables locales son "registros"
+para la máquina. Por simplicidad, estos registros también se llaman "locales".
+
+Véase la clase @pd{FunciónIR} para más información sobre las funciones.
+
+Véase la clase @pd{ContinuaciónIR} para más información sobre las
+continuaciones.
+
+Un programa es un conjunto de funciones y continuaciones con una "función
+principal". Esta es la función que será llamada al iniciar el programa.
+
+@subtitle{Tipos de datos}
+
+Tanto la pila como las locales pueden almacenar valores de cualquier
+tipo. Estos tipos son los mismos que en PseudoD (enteros, reales, textos,
+booleanos, funciones, objetos, tablas hash, etc), pero además, existe un tipo
+"caja". Conceptualmente esta caja es igual a la clase @pd(#:utilizar
+"bepd/datos/caja"){Caja} de la BEPD, pero no tiene métodos y es un detalle de
+la implementación. Las continuaciones @bold{no son de primera clase} lo que
+significa que no hay un "tipo de continuación".
+
+Una instrucción es un arreglo cuyo primer elemento es un @pd{Opcode}. Los demás
+elementos son los "argumentos" de la instrucción.
+
+@subtitle{Estructura del código}
+
+El código generado sigue ciertos patrones importantes. Algunos de estos son:
+
+@bold{Preludio de función}: Las funciones suelen comenzar con el siguiente
+patrón:
+
+@codeblock|{
+; Una función con 3 argumentos normales y 1 variadic.
+; Corresponde con el código de PseudoD: `funcion ejemplo: A, B, C, ...D`
+función 0
+    capturas 0
+    locales 4
+    params 3, VERDADERO
+    ; Nota como los parámetros son fijados en reversa
+    variadic 3 ; índice del parámetro variadic
+    fijarLocal 3
+    fijarLocal 2
+    fijarLocal 1
+    fijarLocal 0
+    ...cuerpo...
+    devolverN 1
+finfuncion
+}|
+
+@bold{Importar y exportar}: El final de cada módulo tiene mas o menos la
+siguiente forma:
+
+@codeblock|{
+empujarEspacioDeNombres
+obtenerLocal 0 ; local a exportar
+agregarNombre {ejemplo1}, FALSO
+obtenerLocal 1
+agregarNombre {ejemplo2}, VERDADERO
+exportar
+}|
+
+Similarmente, al importar un módulo el patrón es:
+
+@codeblock|{
+importar {prefijoDelMódulo}
+extraer {ejemplo1}
+fijarLocal 0
+extraer {ejemplo2}
+fijarLocal 1
+comoEspacioDeNombres
+fijarLocal 2
+}|
+
+@toplevel()
+DOCUMENTA]
+
+
+[DOCUMENTA
+@brief{El tipo de una instrucción.}
+
+@bold{Nota}: si alguna instrucción requiere una continuación, esto @bold{no}
+será indicado. Si alguna instrucción requiere una etiqueta, el argumento debe
+ser de tipo @pd{Etiqueta}.
+
+@enum(
+
+@defenum("params"){Declara los parámetros de una función. Debe ser la primera
+instrucción de una función. Toma dos argumentos: @code{numParams} (un entero) y
+@code{tieneVariadic} (un booleano). El primero indica la cantidad de parámetros
+(sin contar el parámetro variadic, de haber alguno). El segundo indica si hay o
+no un parámetro variadic.}
+
+@defenum("csaltar"){Salta condicionalmente a una etiqueta. Saca un booleano de
+la pila, si es verdadero, salta a la etiqueta dada (el único argumento de esta
+instrucción). De lo contrario continua la ejecución.}
+
+@defenum("saltar"){Salta incondicionalmente a una etiqueta. Pide un argumento:
+la etiqueta a la que saltar.}
+
+@defenum("enviarMensaje"){Envía un mensaje a un objeto. Toma 2 argumentos, el
+mensaje a enviar (un @pd{Texto}) y el "prototipo" de la llamada.
+
+@para{El prototipo debe ser un @pd{Arreglo} de @pd{Boole}s, cada elemento
+corresponde a un argumento de la llamada. Si el elemento en el prototipo es
+@pd{VERDADERO}, entonces el argumento es variadic, si es @pd{FALSO} es un
+argumento normal.}}
+
+@defenum("etiqueta"){Marca una etiqueta. Su único argumento debe ser una
+@pd{Etiqueta}.}
+
+@defenum("variadic"){Acumula todos los argumentos no procesados de la función
+actual y los guarda en un arreglo. Este arreglo es empujado en la pila. Su
+único argumento debe ser el índice del argumento que no es variadic.}
+
+@defenum("fijarLocal"){Saca un valor de la pila y lo asigna a una variable
+local. Acepta un argumento: el índice de la local a fijar.}
+
+@defenum("fijarLocalC"){Saca un valor de la pila y lo asigna a una
+captura. Acepta un argumento: el índice de la captura a fijar.}
+
+@defenum("obtenerLocal"){Obtiene el valor de una variable local. Empuja el
+valor de la local indicada por su único argumento en la pila.}
+
+@defenum("obtenerLocalC"){Obtiene el valor de una captura. Empuja el valor de
+la captura indicada por su único argumento en la pila.}
+
+@defenum("caja"){Saca un valor de la pila, lo envuelve en una nueva caja y lo
+empuja a la pila. No acepta argumentos.}
+
+@defenum("fijarCaja"){Saca un valor de la pila y lo asigna a la caja de una
+variable local. Acepta un argumento: el índice de la local a fijar.}
+
+@defenum("fijarCajaC"){Saca un valor de la pila y lo asigna a la caja de una
+captura. Acepta un argumento: el índice de la captura a fijar.}
+
+@defenum("obtenerCaja"){Obtiene el valor de la caja de una variable
+local. Empuja el valor de la caja de la local indicada por su único argumento
+en la pila.}
+
+@defenum("obtenerCajaC"){Obtiene el valor de la caja de una captura. Empuja el
+valor de la caja de la captura indicada por su único argumento en la pila.}
+
+@defenum("prn"){Escribe el valor en la cima de la pila. Saca este valor. No
+acepta argumentos.}
+
+@defenum("prnl"){Escribe un fin de línea. No acepta argumentos.}
+
+@defenum("assert"){Saca un valor de la pila, si es verdadero no hace nada, pero
+si es falso falla con un error. No acepta argumentos.}
+
+@defenum("devolverN"){Devuelve los @italic{N} valores en la cima de la pila,
+donde @italic{N} es el único argumento dado (un entero). @bold{Nota}: Por
+ahora, @italic{N} siempre debe ser 1.}
+
+@defenum("empujarNúmero"){Acepta un único argumento, un número, que es empujado
+en la pila.}
+
+@defenum("empujarTexto"){Acepta un único argumento, un texto, que es empujado
+en la pila.}
+
+@defenum("empujarNulo"){No acepta argumentos. Empuja un @pd{NULO} en la pila.}
+
+@defenum("negar"){Saca un valor de la pila, que debe ser un booleano, lo
+invierte y lo vuelve a empujar. No acepta argumentos.}
+
+@defenum("sonIdénticos"){Determina si los dos valores en la cima de la pila son
+idénticos (ambos son sacados). Empuja un booleano. No acepta argumentos.}
+
+@defenum("obtenerObjeto"){Obtiene la clase @pd{Objeto} y la empuja en la
+pila. No acepta argumentos.}
+
+@defenum("capturas"){Declara la cantidad de capturas de la función
+actual. Acepta un único argumento entero que es el número de capturas.}
+
+@defenum("locales"){Declara la cantidad de locales de la función actual. Acepta
+un único argumento entero que es el número de locales.}
+
+@defenum("mkclz"){Crea y empuja un @italic{closure}. Acepta 2 argumentos, ambos
+enteros. El primero es el nombre de la función a usar (un entero) y el segundo
+es el número de capturas @italic{C}. Saca @italic{C} valores de la pila, que
+serán las capturas, y empuja el nuevo closure.}
+
+@defenum("continuar"){Salta a una continuación. Acepta un argumento, el nombre
+de la continuación a la que saltar (un entero).}
+
+@defenum("empujarEspacioDeNombres"){Crea un nuevo espacio de nombres y lo
+empuja en la pila. No acepta argumentos.}
+
+@defenum("agregarNombre"){Agrega un nombre a un espacio de nombres. La pila
+debe contener 2 valores: @italic{en} (debajo de la cima, el espacio de nombres)
+y @italic{val} (en la cima, el valor a exportar). Pide 2 argumentos, un texto
+(el nombre a exportar) y un booleano que indica si es autoejecutable o no.}
+
+@defenum("exportar"){Exporta el espacio de nombres que esta en la cima de la
+pila. No acepta argumentos.}
+
+@defenum("obtenerRuntime"){Obtiene el objeto "runtime". Lo empuja en la
+pila. No acepta argumentos.}
+
+@defenum("importar"){Acepta un argumento, el prefijo del módulo a importar (un
+texto). Importa el módulo y deja su valor importado en la cima de la
+pila. @bold{Nota}: Debes usar @code{comoEspacioDeNombres} para convertir el
+valor importado a un espacio de nombres.}
+
+@defenum("extraer"){Extrae un nombre de un valor importado (el resultado de
+importar un módulo). Usa el valor importado en la cima de la pila (pero no lo
+saca). Acepta un argumento, el nombre a importar (un texto). Empuja el valor
+extraído.}
+
+@defenum("sacar"){Saca el valor en la cima de la pila. No acepta argumentos.}
+
+@defenum("comoEspacioDeNombres"){Convierte un valor importado en la cima de la
+pila a un espacio de nombres. Se debe usar con el valor empujado por el opcode
+@code{importar}. No acepta argumentos. Saca el valor de la pila y empuja el
+espacio de nombres.}
+)
+DOCUMENTA]
 variable Opcode
 fijar Opcode a EnumConValores: {Opcode},
     [ Nombre del opcode,       ¿Requiere una continuación? ]
@@ -43,14 +272,48 @@ fijar Opcode a EnumConValores: {Opcode},
     {sacar},                   FALSO,
     {comoEspacioDeNombres},    FALSO
 
+[DOCUMENTA
+@brief{Determina si el opcode requiere una continuación.}
+
+Si el opcode requiere una continuación, su último argumento debe ser el nombre
+de la continuación (un entero) a la que saltar.
+
+@devuelve{@pd{VERDADERO} o @pd{FALSO}}.
+DOCUMENTA]
 metodo Opcode#requiereContinuación
     devolver yo#valor
 finmetodo
 
 
+[DOCUMENTA
+@brief{Una etiqueta a la que saltar en el IR.}
+
+Las etiquetas tienen un ID, que es un entero que las
+identifica. Específicamente: el ID de las etiquetas es el ID de la
+@italic{continuación} a la que se debe saltar para "ir" a la etiqueta.
+
+Véase el método @pd(#:utilizar "pdc/backend/c"){Emisor#ajustarEtiqueta}, que le
+asigna un ID a una etiqueta.
+DOCUMENTA]
 clase Etiqueta
+    [DOCUMENTA
+    @brief{El ID de la etiqueta.}
+
+    Puede ser @pd{NULO} si la etiqueta no ha sido ajustada.
+    DOCUMENTA]
     atributo id
+
+    [DOCUMENTA
+    @brief{Crea una nueva etiqueta vacía.}
+
+    El ID de la etiqueta es @pd{NULO}.
+    DOCUMENTA]
     metodo estatico vacía
+
+    [DOCUMENTA
+    @brief{Devuelve una representación textual de la etiqueta.}
+    DOCUMENTA]
+    metodo comoTexto
 finclase
 
 metodo estatico Etiqueta#vacía
@@ -62,8 +325,45 @@ metodo Etiqueta#comoTexto
 finmetodo
 
 
+[DOCUMENTA
+@brief{Una función en el IR.}
+
+Las funciones tienen un número de parámetros y un número de capturas. Las
+capturas son valores guardados al momento de crear el closure y son accesibles
+en cada ejecución de la función. Además, las funciones estan identificadas por
+un ID, un número entero que es su nombre.
+DOCUMENTA]
 clase FunciónIR
-    atributos id, instrucciones, númLocales, númCapturas
+    [DOCUMENTA
+    @brief{ID (nombre) de la función.}
+
+    Un entero.
+    DOCUMENTA]
+    atributo id
+
+    [DOCUMENTA
+    @brief{@pd{Arreglo} con las instrucciones de la función.}
+    DOCUMENTA]
+    atributo instrucciones
+
+    [DOCUMENTA
+    @brief{Número de locales.}
+    DOCUMENTA]
+    atributo númLocales
+
+    [DOCUMENTA
+    @brief{Número de capturas.}
+    DOCUMENTA]
+    atributo númCapturas
+
+    [DOCUMENTA
+    @brief{Crea y devuelve una nueva función.}
+
+    @pd{instrucciones} es el arreglo con las instrucciones. El número de
+    capturas y locales son extraídos de las instrucciones @code{locales} y
+    @code{capturas}.
+    DOCUMENTA]
+    metodo estatico crear: instrucciones
 finclase
 
 metodo FunciónIR#inicializar: instrucciones
@@ -82,8 +382,23 @@ metodo FunciónIR#inicializar: instrucciones
     finprocedimiento
 finmetodo
 
+
+[DOCUMENTA
+@brief{Una continuación del IR.}
+
+LAs continuaciones solo poseen un ID (un entero) que las identifica y un
+arreglo de instrucciones.
+DOCUMENTA]
 clase ContinuaciónIR
-    atributos id, instrucciones
+    [DOCUMENTA
+    @brief{ID de la continuación.}
+    DOCUMENTA]
+    atributo id
+
+    [DOCUMENTA
+    @brief{@pd{Arreglo} con las instrucciones.}
+    DOCUMENTA]
+    atributo instrucciones
 finclase
 
 metodo ContinuaciónIR#inicializar: instrucciones
@@ -91,9 +406,33 @@ metodo ContinuaciónIR#inicializar: instrucciones
 finmetodo
 
 
+[DOCUMENTA
+@brief{}
+DOCUMENTA]
 clase ProgramaIR
+    [DOCUMENTA
+    @brief{Entero con el ID de la función principal.}
+
+    La función principal es la que se debe ejecutar al importar el módulo.
+    DOCUMENTA]
     atributo idDeLaFunciónPrincipal
-    atributos funciones, continuaciones
+
+    [DOCUMENTA
+    @brief{Arreglo con todas las funciones.}
+    DOCUMENTA]
+    atributo funciones
+
+    [DOCUMENTA
+    @brief{Arreglo con todas las continuaciones.}
+    DOCUMENTA]
+    atributo continuaciones
+
+    [DOCUMENTA
+    @brief{Crea y devuelve un nuevo programa.}
+
+    Véase los atributos de los mismos nombres de los argumentos.
+    DOCUMENTA]
+    metodo estatico crear: idDeLaFunciónPrincipal, funciones, continuaciones
 finclase
 
 metodo ProgramaIR#inicializar: idDeLaFunciónPrincipal, funciones, continuaciones
@@ -102,6 +441,11 @@ metodo ProgramaIR#inicializar: idDeLaFunciónPrincipal, funciones, continuacione
     fijar yo#continuaciones a continuaciones
 finmetodo
 
+[DOCUMENTA
+@brief{Escribe una representación textual del programa.}
+
+Principalmente útil al depurar.
+DOCUMENTA]
 procedimiento EscribirPrograma: programa
     procedimiento escribirInstrucciones: pref, instrs
         ParaCadaElemento: instrs, procedimiento: instr

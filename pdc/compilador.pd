@@ -463,15 +463,3 @@ procedimiento EjecutarCompilador: cli
 finprocedimiento
 
 EjecutarCompilador: __Argv
-
-[ variables T, A, S, salida, C, moddb ]
-[ fijar A a __Argv#en: 0 ]
-[ fijar S a __Argv#en: 1 ]
-[ fijar T a LeerArchivo: A ]
-[ fijar salida a PuertoDeArchivoDeEscritura#abrir: S ]
-[ fijar moddb a BaseDeDatosDeMódulos#enMemoria ]
-[ moddb#agregarMódulo: {pdc}, {pdc/ejemplo}, (Arreglo#crearCon: (Exportación#crear: {hola}, FALSO), (Exportación#crear: {mundo}, VERDADERO)), {pdc_ejemplo}, NULO, {pdc/ejemplo.pd} ]
-[ fijar C a Compilar: {pdc}, {prueba}, {PDC}, moddb, T, A, VERDADERO, salida ]
-[ moddb#agregarMódulo: {pdc}, {prueba}, C#exportaciones, C#prefijoDelMódulo, C#compilado, S ]
-[ EscribirTabla: moddb#tablaMódulos ]
-[ salida#cerrar ]

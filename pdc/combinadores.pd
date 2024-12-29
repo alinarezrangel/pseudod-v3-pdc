@@ -678,11 +678,11 @@ ejemplo:
 @ejemplo|{
 variables Valor, Paréntesis
 fijar Valor a Componer:
-    (Intenta: NumeroLiteral),
-    (Intenta: TextoLiteral),
+    (Intentar: NumeroLiteral),
+    (Intentar: TextoLiteral),
     (Recursivo: funcion devolver Paréntesis finfuncion)
 fijar Paréntesis a Componer:
-    (Intenta: (PalabraClave: {(})),
+    (Intentar: (PalabraClave: {(})),
     Valor,
     (PalabraClave: {)})
 }|

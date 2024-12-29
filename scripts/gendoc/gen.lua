@@ -1201,6 +1201,28 @@ globals["dato-de-implementacion"] = function(args)
    return make_tag("div", {class = "impl-detail"}, {pos})
 end
 
+function globals.title(args)
+   local pos, kw = parse_args("title", args, "0+ #:target ?")
+   local inner
+   if kw.target then
+      inner = make_tag("a", {id = kw.target}, {pos})
+   else
+      inner = pos
+   end
+   return make_tag("h2", {class = "title"}, {inner})
+end
+
+function globals.subtitle(args)
+   local pos, kw = parse_args("subtitle", args, "0+ #:target ?")
+   local inner
+   if kw.target then
+      inner = make_tag("a", {id = kw.target}, {pos})
+   else
+      inner = pos
+   end
+   return make_tag("h3", {class = "subtitle"}, {inner})
+end
+
 local function prepare_global_env(env)
    local stx_ctx = getmetatable(env).stx_ctx
 

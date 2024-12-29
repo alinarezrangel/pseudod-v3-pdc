@@ -1,8 +1,28 @@
 utilizar bepd/builtins
+utilizar bepd/x/puerto (PuertoDeEscritura)
 
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
 
 
+[DOCUMENTA
+@brief{Compila un programa (IR) y lo guarda en un puerto de escritura.}
+
+@params(
+@defparam("puertoDeEscritura"){@pd{PuertoDeEscritura} en el cual se escribirá
+el código compilado.}
+
+@defparam("identificadorDelMódulo"){Prefijo de compilación del módulo. Un
+@pd{Texto}.}
+
+@defparam("identificadoresDeDependencias"){@pd{Arreglo} de @pd{Texto}s con los
+prefijos de compilación de todas las dependencias (incluyendo dependencias
+transitivas) de este módulo.}
+
+@defparam("programa"){El @pd{ProgramaIR} a compilar.}
+)
+
+@devuelve{Nada.}
+DOCUMENTA]
 procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, identificadoresDeDependencias, programa
     EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
     EmitirLínea: puertoDeEscritura, {#include "pdcrt.h"}

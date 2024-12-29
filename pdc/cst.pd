@@ -2,7 +2,7 @@ utilizar bepd/builtins
 utilizar bepd/x/enum
 
 [DOCUMENTA
-@brief{Un nodo del AST.}
+@brief{Un nodo del CST.}
 DOCUMENTA]
 clase Nodo
     [DOCUMENTA
@@ -577,7 +577,7 @@ finmetodo
 [DOCUMENTA
 @brief{Llama un procedimiento o función.}
 
-El AST no tiene una representación para llamar a un procedimiento sin
+El CST no tiene una representación para llamar a un procedimiento sin
 argumentos. Esto se determina al momento de resolver los nombres.
 
 La sintáxis @pd{A: B, C, D} corresponde con este nodo.
