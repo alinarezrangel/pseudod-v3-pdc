@@ -1753,9 +1753,11 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
 
       for i = 1, #pddoc_srcs do
          local src = pddoc_srcs[i]
+         local relsrc = make_relative(src.path, root)
+         local modname = get_modname(make_relative(src.globbed, root))
          pddoc_inputs[#pddoc_inputs + 1] = {
             src = relsrc,
-            module_name = false,
+            module_name = pkgname .. "/" .. modname .. ".pddoc",
          }
       end
 

@@ -1,0 +1,453 @@
+[DOCUMENTA
+@title{Notas sobre este módulo}
+
+Este módulo debe ser compilado con el experimento @code{NoRuntime}, ya que este
+módulo @bold{es} el runtime.
+
+@toplevel()
+DOCUMENTA]
+
+
+[ Las constantes básicas de PseudoD. ]
+variables VERDADERO, FALSO, NULO
+fijar VERDADERO a 1 = 1
+fijar FALSO a no VERDADERO
+fijar NULO a %(funcion finfuncion)
+
+
+[ Crea un arreglo con los valores dados.
+
+  Devuelve El arreglo creado. ]
+funcion __CrearArreglo: ...valores
+    devolver valores
+finfuncion
+
+
+
+[ Clase base de todas las clases. ]
+variable Objeto
+
+[ Tabla hash con los métodos de la clase objeto (los métodos estáticos, no los
+  de instancia) ]
+variable metodosObjeto
+
+[ Las clases tienen 5 atributos:
+
+  1. Nombre de la clase
+  2. Número de atributos de la instancia
+  3. Tabla hash con los métodos de instancia
+  4. Tabla hash con los métodos estáticos
+  5. Clase base o NULO ]
+variables OBJETO_ATR_NOMBRE,
+          OBJETO_ATR_INST_NÚM_ATRIBUTOS,
+          OBJETO_ATR_INST_METODOS,
+          OBJETO_ATR_EST_METODOS,
+          OBJETO_ATR_CLASE_BASE,
+          OBJETO_NÚM_ATR
+fijar OBJETO_ATR_NOMBRE a 0
+fijar OBJETO_ATR_INST_NÚM_ATRIBUTOS a 1
+fijar OBJETO_ATR_INST_METODOS a 2
+fijar OBJETO_ATR_EST_METODOS a 3
+fijar OBJETO_ATR_CLASE_BASE a 4
+fijar OBJETO_NÚM_ATR a 5
+
+fijar metodosObjeto a __RT#crearTabla: 17
+
+metodosObjeto#fijarEn: {comoTexto}, metodo
+    devolver {Clase ~t}#formatear: (__RT#obtenerAtributo: yo, OBJETO_ATR_NOMBRE)
+finmetodo
+
+metodosObjeto#fijarEn: {igualA}, metodo: otro
+    devolver son identicos yo y otro
+finmetodo
+
+metodosObjeto#fijarEn: {operador_=}, metodo: otro
+    devolver yo#igualA: otro
+finmetodo
+
+metodosObjeto#fijarEn: {distíntoDe}, metodo: otro
+    devolver no yo#igualA: otro
+finmetodo
+
+metodosObjeto#fijarEn: {operador_no=}, metodo: otro
+    devolver yo#distíntoDe: otro
+finmetodo
+
+metodosObjeto#fijarEn: {clonar}, metodo
+    devolver yo
+finmetodo
+
+metodosObjeto#fijarEn: {fijar_nombre}, metodo: nombre
+    __RT#fijarAtributo: yo, OBJETO_ATR_NOMBRE, nombre
+finmetodo
+
+metodosObjeto#fijarEn: {nombre}, metodo
+    devolver __RT#obtenerAtributo: yo, OBJETO_ATR_NOMBRE
+finmetodo
+
+metodosObjeto#fijarEn: {fijar_claseBase}, metodo: claseBase
+    __RT#fijarAtributo: yo, OBJETO_ATR_CLASE_BASE, claseBase
+finmetodo
+
+metodosObjeto#fijarEn: {claseBase}, metodo
+    devolver __RT#obtenerAtributo: yo, OBJETO_ATR_CLASE_BASE
+finmetodo
+
+metodosObjeto#fijarEn: {agregarAtributo}, metodo: nombre
+    variables núm, mets
+    fijar núm a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_NÚM_ATRIBUTOS
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    __RT#fijarAtributo: yo, OBJETO_ATR_INST_NÚM_ATRIBUTOS, (núm + 1)
+    mets#fijarEn: nombre, metodo
+        devolver __RT#obtenerAtributo: yo, núm
+    finmetodo
+    mets#fijarEn: ({fijar_}#concatenar: nombre), metodo: valor
+        __RT#fijarAtributo: yo, núm, valor
+    finmetodo
+finmetodo
+
+metodosObjeto#fijarEn: {agregarMetodo}, metodo: nombre, proc
+    variable mets
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    mets#fijarEn: nombre, proc
+finmetodo
+
+metodosObjeto#fijarEn: {agregarMetodoEstatico}, metodo: nombre, proc
+    variable mets
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_EST_METODOS
+    mets#fijarEn: nombre, proc
+finmetodo
+
+metodosObjeto#fijarEn: {_crearConYo}, metodo: inst
+    [ necesitas EsInstancia: inst, yo ]
+    variables instFalsa, mets, metsFalsos
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    fijar metsFalsos a __RT#crearTabla: mets#longitud
+    mets#paraCadaPar: procedimiento: llave, valor
+        metsFalsos#fijarEn: llave, metodo: ...params
+            devolver %valor: inst, ...params
+        finmetodo
+    finprocedimiento
+    fijar instFalsa a __RT#crearInstancia: 0, mets, VERDADERO
+    devolver instFalsa
+finmetodo
+
+metodosObjeto#fijarEn: {_crear}, metodo
+    variables inst, mets, numAtrs
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    fijar numAtrs a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_NÚM_ATRIBUTOS
+    fijar inst a __RT#crearInstancia: numAtrs, mets, VERDADERO
+    devolver inst
+finmetodo
+
+metodosObjeto#fijarEn: {crear}, metodo: ...params
+    variable inst
+    fijar inst a yo#_crear
+    inst#inicializar: ...params
+    devolver inst
+finmetodo
+
+procedimiento recvClase: yo, mensaje, ...params
+    variable mets
+    fijar mets a __RT#obtenerMétodos: yo
+    si mets#contiene: {metodoNoEncontrado}
+        variable m
+        fijar m a mets#en: {metodoNoEncontrado}
+        devolver %m: yo, mensaje, params
+    sino
+        variable metsEst
+        fijar metsEst a __RT#obtenerAtributo: cls, OBJETO_ATR_EST_METODOS
+        si metsEst#contiene: mensaje
+            variable m
+            fijar m a metsEst#en: mensaje
+            devolver %m: yo, ...params
+        finsi
+        si metsEst#contiene: {metodoNoEncontrado}
+            variable m
+            fijar m a metsEst#en: {metodoNoEncontrado}
+            devolver %m: yo, mensaje, params
+        sino
+            __FallarConMensaje: ({Método no encontrado en la clase ~t: ~t}#formatear: yo#nombre, mensaje)
+        finsi
+    finsi
+finprocedimiento
+
+funcion CrearClase
+    variable cls
+    fijar cls a __RT#crearInstancia: 6, metodosObjeto, &recvClase
+    __RT#fijarAtributo: cls, OBJETO_ATR_NOMBRE, {<clase anónima>}
+    __RT#fijarAtributo: cls, OBJETO_ATR_INST_NÚM_ATRIBUTOS, 0
+    __RT#fijarAtributo: cls, OBJETO_ATR_INST_METODOS, (__RT#crearTabla: 0)
+    __RT#fijarAtributo: cls, OBJETO_ATR_EST_METODOS, (__RT#crearTabla: 0)
+    __RT#fijarAtributo: cls, OBJETO_ATR_CLASE_BASE, NULO
+    devolver cls
+finfuncion
+
+metodosObjeto#fijarEn: {subclase}, metodo
+    variables sub, mets, subMets, numAtrs
+    fijar sub a CrearClase
+    fijar sub#claseBase a yo
+
+    fijar numAtrs a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_NÚM_ATRIBUTOS
+    __RT#fijarAtributo: sub, OBJETO_ATR_INST_NÚM_ATRIBUTOS, numAtrs
+
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    fijar subMets a __RT#obtenerAtributo: sub, OBJETO_ATR_INST_METODOS
+    mets#paraCadaPar: procedimiento: llave, valor
+        subMets#fijarEn: llave, valor
+    finprocedimiento
+
+    sub#agregarMetodo: {__tipo}, metodo
+        devolver sub
+    finmetodo
+
+    devolver sub
+finmetodo
+
+
+fijar Objeto a CrearClase
+fijar Objeto#nombre a {Objeto}
+Objeto#agregarMetodo: {__tipo}, metodo
+    devolver Objeto
+finmetodo
+
+metodo Objeto#\clonar\
+    devolver __ClonarObjeto: yo
+finmetodo
+
+metodo Objeto#igualA: otro
+    devolver __CompararObjeto: yo, otro
+finmetodo
+
+metodo Objeto#\operador_=\: otro
+    devolver __CompararObjeto: yo, otro
+finmetodo
+
+metodo Objeto#distíntoDe: otro
+    devolver no __CompararObjeto: yo, otro
+finmetodo
+
+metodo Objeto#\operador_no=\: otro
+    devolver no __CompararObjeto: yo, otro
+finmetodo
+
+clase Arreglo hereda Objeto
+    metodo estatico crear
+    metodo estatico vacío
+    metodo estatico vacio
+    metodo estatico crearCon: ...valores
+finclase
+
+metodo estatico Arreglo#crear
+    devolver __CrearArreglo
+finmetodo
+
+metodo estatico Arreglo#vacío
+    devolver __CrearArreglo
+finmetodo
+
+metodo estatico Arreglo#vacio
+    devolver __CrearArreglo
+finmetodo
+
+metodo estatico Arreglo#crearCon: ...valores
+    devolver valores
+finmetodo
+
+clase EspacioDeNombres hereda Objeto
+    metodo estatico crear
+    metodo estatico vacío
+    metodo estatico vacio
+finclase
+
+metodo estatico EspacioDeNombres#crear
+    __FallarConMensaje: {No se puede crear un espacio de nombres}
+finmetodo
+
+metodo estatico EspacioDeNombres#vacío
+    __FallarConMensaje: {No se puede crear un espacio de nombres}
+finmetodo
+
+metodo estatico EspacioDeNombres#vacio
+    __FallarConMensaje: {No se puede crear un espacio de nombres}
+finmetodo
+
+clase Boole hereda Objeto
+    metodo estatico crear
+    metodo estatico verdadero
+    metodo estatico falso
+finclase
+
+metodo estatico Boole#crear
+    devolver FALSO
+finmetodo
+
+metodo estatico Boole#verdadero
+    devolver VERDADERO
+finmetodo
+
+metodo estatico Boole#falso
+    devolver FALSO
+finmetodo
+
+clase Numero hereda Objeto
+    metodo estatico crear
+finclase
+
+metodo estatico Numero#crear
+    devolver 0
+finmetodo
+
+clase Procedimiento hereda Objeto
+    metodo estatico crear
+finclase
+
+metodo estatico Procedimiento#crear
+    __FallarConMensaje: {No se puede crear un procedimiento con #crear}
+finmetodo
+
+clase TipoNulo hereda Objeto
+    metodo estatico crear
+finclase
+
+metodo estatico TipoNulo#crear
+    devolver NULO
+finmetodo
+
+clase Referencia hereda Objeto
+    metodo estatico crear
+finclase
+
+metodo estatico Referencia#crear
+    __FallarConMensaje: {No se puede crear una referencia con #crear}
+finmetodo
+
+clase Texto hereda Objeto
+    metodo estatico vacio
+    metodo estatico vacío
+    metodo estatico crear
+finclase
+
+metodo estatico Texto#vacio
+    devolver {}
+finmetodo
+
+metodo estatico Texto#vacío
+    devolver {}
+finmetodo
+
+metodo estatico Texto#crear
+    devolver {}
+finmetodo
+
+funcion __Lua: código
+    __FallarConMensaje: {__Lua: inalcanzable}
+finfuncion
+
+funcion Aplicar: proc, args
+    devolver proc#\llamar\: ...args
+finfuncion
+
+funcion ProcedimientoVarargs: n, proc
+    devolver funcion: ...args
+        necesitas args#longitud > n
+        variables pos, var, i
+        fijar pos a __CrearArreglo
+        fijar var a __CrearArreglo
+        fijar i a 0
+        mientras i < args#longitud
+            si i < n
+                pos#agregarAlFinal: (args#en: i)
+            sino
+                var#agregarAlFinal: (args#en: i)
+            finsi
+            fijar i a i + 1
+        finmientras
+        pos#agregarAlFinal: var
+        devolver %proc: ...pos
+    finfuncion
+finfuncion
+
+funcion TipoDe: obj
+    devolver obj#__tipo
+finfuncion
+
+funcion __EnviarMensaje: obj, mensaje, args
+    devolver __RT#enviarMensaje: obj, mensaje, ...args
+finfuncion
+
+funcion __FallarConMensaje: mensaje
+    __RT#fallarConMensaje: mensaje
+finfuncion
+
+funcion __ClonarObjeto: obj
+    si no __RT#esInstancia: obj
+        devolver obj#\clonar\
+    finsi
+    variables num, mets, res, i
+    fijar num a __RT#atributosDeInstancia: obj
+    fijar mets a __RT#obtenerMétodos: obj
+    fijar res a __RT#crearInstancia: num, mets, VERDADERO
+    fijar i a 0
+    mientras i < num
+        __RT#fijarAtributo: res, i, (__RT#obtenerAtributo: obj, i)#\clonar\
+        fijar i a i + 1
+    finmientras
+    devolver res
+finfuncion
+
+funcion __CompararObjeto: lhs, rhs
+    si (no __RT#esInstancia: lhs) || (no __RT#esInstancia: rhs)
+        devolver lhs = rhs
+    finsi
+
+    variables numL, numR, metsL, metsR, i
+    fijar numL a __RT#atributosDeInstancia: lhs
+    fijar metsL a __RT#obtenerMétodos: lhs
+    fijar numR a __RT#atributosDeInstancia: rhs
+    fijar metsR a __RT#obtenerMétodos: rhs
+
+    si no numL = numR
+        devolver FALSO
+    finsi
+
+    fijar i a 0
+    mientras i < num
+        si no (__RT#obtenerAtributo: lhs, i) = (__RT#obtenerAtributo: rhs, i)
+            devolver FALSO
+        finsi
+        fijar i a i + 1
+    finmientras
+
+    devolver VERDADERO
+finfuncion
+
+funcion __ByteATexto: byte
+    devolver byte#byteComoTexto
+finfuncion
+
+funcion __TextoAByte: texto
+    devolver texto#byteEn: 0
+finfuncion
+
+funcion __ByteEof
+    devolver -1
+finfuncion
+
+funcion __AbrirArchivo: ruta, modo
+    devolver __RT#abrirArchivo: ruta, modo
+finfuncion
+
+funcion __Capturar: proc
+    variable coro
+    fijar coro a __RT#crearCorrutina: procedimiento: generar, _
+        %proc: procedimiento
+            %generar: NULO
+        finprocedimiento
+    finprocedimiento
+    coro#avanzar
+finfuncion
+
+procedimiento __LeerCaracter
+    devolver __RT#leerCarácter
+finprocedimiento

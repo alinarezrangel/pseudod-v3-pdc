@@ -394,7 +394,13 @@ metodo EstadoDeEmisión#emitir: ast
                 finprocedimiento
             finsi
         finprocedimiento
-        ParaCadaElemento: ast#cuerpo, &(yo#emitir)
+
+        ParaCadaElemento: ast#cuerpo, procedimiento: ast
+            yo#emitir: ast
+            si ast#esExpresión
+                yo#emisor#emitir: Opcode#sacar
+            finsi
+        finprocedimiento
         devolver NULO
     finsi
 

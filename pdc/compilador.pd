@@ -339,9 +339,9 @@ funcion ProcesarCLIDelCompilador: argumentosDelCLI
         (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
 
         [ ===== Compilación ===== ]
-        (Opción#crear: NULO, {id-modulo},           1, FALSO,     (Fijar: {identificadorDelMódulo})),
-        (Opción#crear: NULO, {paquete},             1, FALSO,     (Fijar: {nombreDelPaquete})),
-        (Opción#crear: NULO, {modulo},              1, FALSO,     (Fijar: {nombreDelMódulo}))
+        (Opción#crear: NULO, {id-modulo},            1, FALSO,     (Fijar: {identificadorDelMódulo})),
+        (Opción#crear: NULO, {paquete},              1, FALSO,     (Fijar: {nombreDelPaquete})),
+        (Opción#crear: NULO, {modulo},               1, FALSO,     (Fijar: {nombreDelMódulo}))
 
     devolver LlamarConEC: procedimiento: salir
         variables opcs, pos
@@ -441,13 +441,16 @@ procedimiento EjecutarCompilador: cli
         bdMod#cargarDesdeArchivo: (__AbrirArchivo: archivo, 10)
     finprocedimiento
 
+    variable agregarBuiltins
+    fijar agregarBuiltins a no Contiene: opciones#experimentos, {NoBuiltins}
+
     fijar res a Compilar: opciones#nombreDelPaquete,
                           opciones#nombreDelMódulo,
                           opciones#identificadorDelMódulo,
                           bdMod,
                           código,
                           archivo,
-                          VERDADERO,
+                          agregarBuiltins,
                           salida
     bdMod#agregarMódulo: opciones#nombreDelPaquete,
                          opciones#nombreDelMódulo,

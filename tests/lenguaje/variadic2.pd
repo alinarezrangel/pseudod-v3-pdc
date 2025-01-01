@@ -1,0 +1,29 @@
+funcion Hola: A, B, ...C
+    escribir A#comoTexto
+    nl
+    escribir B#comoTexto
+    nl
+    escribir C#comoTexto
+    nl
+finfuncion
+
+funcion CrearArreglo: ...xs
+    devolver xs
+finfuncion
+
+Hola: 1, 2
+Hola: 1, 2, 3
+Hola: 1, 2, 3, 4, 5
+Hola: ...(CrearArreglo: 1, 2)
+Hola: ...(CrearArreglo: 1, 2, 3)
+Hola: ...(CrearArreglo: 1, 2, 3, 4, 5)
+Hola: 1, ...(CrearArreglo: 2)
+Hola: 1, ...(CrearArreglo: 2, 3)
+Hola: 1, ...(CrearArreglo: 2, 3, 4, 5)
+Hola: 1, ...(CrearArreglo), 2
+Hola: 1, ...(CrearArreglo: 2), 3
+Hola: 1, ...(CrearArreglo: 2, 3), 4, 5
+Hola: 1, ...(CrearArreglo), 2
+Hola: ...(CrearArreglo: 1), 2
+Hola: ...(CrearArreglo: 1, 2), 3, 4
+Hola: 1, ...(CrearArreglo: 2, 3), 4, ...(CrearArreglo: 5, 6), 7

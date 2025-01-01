@@ -21,7 +21,19 @@ clase Nodo
     Es una instancia de @pd(#:utilizar "pdc/tokens"){ÁreaTextual}.
     DOCUMENTA]
     atributo áreaTextual
+
+    [DOCUMENTA
+    @brief{Determina si el nodo es una expresión, es decir, produce un
+    resultado.}
+
+    Equivalente a @pd{(TipoDe: yo)#esExpresión}.
+    DOCUMENTA]
+    metodo esExpresión
 finclase
+
+metodo Nodo#esExpresión
+    devolver FALSO
+finmetodo
 
 [DOCUMENTA
 @brief{Un bloque de instrucciones.}
@@ -101,6 +113,10 @@ finmetodo
 
 metodo NodoIdentificador#comoTexto
     devolver {(NodoIdentificador ~t)}#formatear: yo#nombre
+finmetodo
+
+metodo NodoIdentificador#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -219,6 +235,10 @@ finmetodo
 
 metodo NodoParámetro#comoTexto
     devolver {(NodoParámetro ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#identificador
+finmetodo
+
+metodo NodoParámetro#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -439,6 +459,10 @@ metodo NodoLiteralNumérica#comoTexto
     devolver {(NodoLiteralNumérica ~t)}#formatear: yo#valor
 finmetodo
 
+metodo NodoLiteralNumérica#esExpresión
+    devolver VERDADERO
+finmetodo
+
 [DOCUMENTA
 @brief{Literal textual.}
 DOCUMENTA]
@@ -457,8 +481,12 @@ finmetodo
 metodo NodoLiteralTextual#recursivo: f
 finmetodo
 
-metodo Nodo#comoTexto
+metodo NodoLiteralTextual#comoTexto
     devolver {(NodoLiteralTextual ~t)}#formatear: yo#valor
+finmetodo
+
+metodo NodoLiteralTextual#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -490,6 +518,10 @@ finmetodo
 
 metodo NodoArgumento#comoTexto
     devolver {(NodoArgumento ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#expresión
+finmetodo
+
+metodo NodoArgumento#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -528,6 +560,10 @@ metodo NodoEnviarMensaje#comoTexto
     devolver {(NodoEnviarMensaje ~t # ~t : ~t)}#formatear: yo#objeto, yo#mensaje, yo#argumentos
 finmetodo
 
+metodo NodoEnviarMensaje#esExpresión
+    devolver VERDADERO
+finmetodo
+
 [DOCUMENTA
 @brief{Una función anónima o lambda.}
 DOCUMENTA]
@@ -558,6 +594,10 @@ metodo NodoFunciónAnónima#comoTexto
     devolver {(NodoFunciónAnónima ~t ~t)}#formatear: yo#parámetros, yo#cuerpo
 finmetodo
 
+metodo NodoFunciónAnónima#esExpresión
+    devolver VERDADERO
+finmetodo
+
 [DOCUMENTA
 @brief{Niega el valor booleano de una expresión.}
 DOCUMENTA]
@@ -579,6 +619,10 @@ finmetodo
 
 metodo NodoNo#comoTexto
     devolver {(NodoNo ~t)}#formatear: yo#expresión
+finmetodo
+
+metodo NodoNo#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -603,6 +647,10 @@ finmetodo
 
 metodo NodoSonIdénticos#comoTexto
     devolver {(NodoSonIdénticos ~t y ~t)}#formatear: yo#lhs, yo#rhs
+finmetodo
+
+metodo NodoSonIdénticos#esExpresión
+    devolver VERDADERO
 finmetodo
 
 [DOCUMENTA
@@ -637,4 +685,8 @@ finmetodo
 
 metodo NodoBuiltin#comoTexto
     devolver {(NodoBuiltin ~t: ~t)}#formatear: yo#nombre, yo#argumentos
+finmetodo
+
+metodo NodoBuiltin#esExpresión
+    devolver VERDADERO
 finmetodo

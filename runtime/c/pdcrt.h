@@ -102,6 +102,7 @@ typedef enum pdcrt_tipo_obj_gc
     PDCRT_TGC_TABLA,
     PDCRT_TGC_VALOP,
     PDCRT_TGC_CORO,
+    PDCRT_TGC_INSTANCIA,
 } pdcrt_tipo_obj_gc;
 
 typedef enum pdcrt_gc_tipo_grupo
@@ -156,6 +157,9 @@ typedef struct pdcrt_valop pdcrt_valop;
 struct pdcrt_corrutina;
 typedef struct pdcrt_corrutina pdcrt_corrutina;
 
+struct pdcrt_instancia;
+typedef struct pdcrt_instancia pdcrt_instancia;
+
 typedef struct pdcrt_obj
 {
     pdcrt_f recv;
@@ -173,6 +177,7 @@ typedef struct pdcrt_obj
         void *pval;
         pdcrt_valop *valop;
         pdcrt_corrutina *coro;
+        pdcrt_instancia *inst;
         pdcrt_cabecera_gc *gc;
     };
 } pdcrt_obj;
@@ -246,6 +251,15 @@ struct pdcrt_corrutina
     };
 };
 
+struct pdcrt_instancia
+{
+    pdcrt_cabecera_gc gc;
+    pdcrt_obj metodos;
+    pdcrt_obj metodo_no_encontrado;
+    size_t num_atributos;
+    pdcrt_obj atributos[];
+};
+
 typedef enum pdcrt_tipo
 {
     PDCRT_TOBJ_ENTERO,
@@ -263,6 +277,7 @@ typedef enum pdcrt_tipo
     PDCRT_TOBJ_VALOP,
     PDCRT_TOBJ_ESPACIO_DE_NOMBRES,
     PDCRT_TOBJ_CORRUTINA,
+    PDCRT_TOBJ_INSTANCIA,
 } pdcrt_tipo;
 
 
@@ -331,6 +346,16 @@ struct pdcrt_marco
     X(contiene, "contiene")                                             \
     X(eliminar, "eliminar")                                             \
     X(paraCadaPar, "paraCadaPar")                                       \
+    X(crear_instancia, "crearInstancia")                                \
+    X(atributos_de_instancia, "atributosDeInstancia")                   \
+    X(obtener_metodos, u8"obtenerMétodos")                              \
+    X(obtener_atributo, "obtenerAtributo")                              \
+    X(fijar_atributo, "fijarAtributo")                                  \
+    X(es_instancia, "esInstancia")                                      \
+    X(metodo_no_encontrado, "metodoNoEncontrado")                       \
+    X(enviar_mensaje, "enviarMensaje")                                  \
+    X(fallar_con_mensaje, "fallarConMensaje")                           \
+    X(leer_caracter, u8"leerCarácter")                                  \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
     X(finalizada, "finalizada")                                         \
@@ -401,6 +426,7 @@ void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx, pdcrt_marco *m);
 void* pdcrt_empujar_valop(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_bytes);
 void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, pdcrt_marco *m, void* ptr);
 void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp f);
+void pdcrt_empujar_instancia(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp metodos, pdcrt_stp metodo_no_encontrado, size_t num_atrs);
 
 
 pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
@@ -420,6 +446,7 @@ void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp i);
 void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i);
 void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos);
+void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp pos, size_t num_els);
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
@@ -433,6 +460,8 @@ pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj valor);
 pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
 pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_bytes);
 pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp f_idx);
+pdcrt_instancia* pdcrt_crear_instancia(pdcrt_ctx *ctx, pdcrt_marco *m,
+                                       pdcrt_stp metodos, pdcrt_stp metodo_no_encontrado, size_t num_atrs);
 
 //#define PDCRT_EMP_INTR
 
@@ -482,6 +511,9 @@ pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
                              const char* msj, size_t tam_msj,
                              const int* proto, size_t nproto,
                              pdcrt_kf kf);
+pdcrt_k pdcrt_enviar_mensaje_obj(pdcrt_ctx *ctx, pdcrt_marco *m,
+                                 const int* proto, size_t nproto,
+                                 pdcrt_kf kf);
 pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
 void pdcrt_prnl(pdcrt_ctx *ctx);
 pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);

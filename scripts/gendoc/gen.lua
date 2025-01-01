@@ -1223,6 +1223,17 @@ function globals.subtitle(args)
    return make_tag("h3", {class = "subtitle"}, {inner})
 end
 
+function globals.subsubtitle(args)
+   local pos, kw = parse_args("subsubtitle", args, "0+ #:target ?")
+   local inner
+   if kw.target then
+      inner = make_tag("a", {id = kw.target}, {pos})
+   else
+      inner = pos
+   end
+   return make_tag("h4", {class = "subsubtitle"}, {inner})
+end
+
 local function prepare_global_env(env)
    local stx_ctx = getmetatable(env).stx_ctx
 

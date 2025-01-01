@@ -6,7 +6,6 @@
             "version": "1.0.0",
             "dependencias": [],
             "compilador": {
-                "experimentos": ["bepd"],
                 "id_modulo": "bepd"
             },
             "codigo": [

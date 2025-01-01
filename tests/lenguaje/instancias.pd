@@ -1,0 +1,89 @@
+variable métodos
+fijar métodos a __RT#crearTabla: 10
+
+métodos#fijarEn: {hola}, metodo: ...args
+    escribir (__RT#atributosDeInstancia: yo)#comoTexto
+    escribir {: }
+    escribir (__RT#obtenerAtributo: yo, 0)#comoTexto
+    escribir { }
+    escribir (__RT#obtenerAtributo: yo, 1)#comoTexto
+    escribir { }
+    escribir (__RT#obtenerAtributo: yo, 2)#comoTexto
+    escribir { -> }
+    escribir args#comoTexto
+    nl
+finmetodo
+
+métodos#fijarEn: {metodoNoEncontrado}, metodo: msj, ...params
+    escribir {no encontrado (método) }
+    escribir (__RT#atributosDeInstancia: yo)#comoTexto
+    escribir {: }
+    escribir (__RT#obtenerAtributo: yo, 0)#comoTexto
+    escribir { }
+    escribir (__RT#obtenerAtributo: yo, 1)#comoTexto
+    escribir { }
+    escribir (__RT#obtenerAtributo: yo, 2)#comoTexto
+    escribir { ## }
+    escribir msj#comoTexto
+    escribir { -> }
+    escribir params#comoTexto
+    nl
+finmetodo
+
+funcion CrearInstanciaNormal: A, B, C
+    variable res
+    fijar res a __RT#crearInstancia: 3, métodos, (0 = 1)
+    __RT#fijarAtributo: res, 0, A
+    __RT#fijarAtributo: res, 1, B
+    __RT#fijarAtributo: res, 2, C
+    devolver res
+finfuncion
+
+funcion CrearInstanciaFallback: A, B, C
+    variable res
+    fijar res a __RT#crearInstancia: 3, métodos, (1 = 1)
+    __RT#fijarAtributo: res, 0, A
+    __RT#fijarAtributo: res, 1, B
+    __RT#fijarAtributo: res, 2, C
+    devolver res
+finfuncion
+
+funcion CrearInstanciaCB: A, B, C
+    variable res
+    fijar res a __RT#crearInstancia: 3, métodos, metodo: msj, ...params
+        escribir {no encontrado (callback): }
+        escribir (__RT#atributosDeInstancia: yo)#comoTexto
+        escribir {: }
+        escribir (__RT#obtenerAtributo: yo, 0)#comoTexto
+        escribir { }
+        escribir (__RT#obtenerAtributo: yo, 1)#comoTexto
+        escribir { }
+        escribir (__RT#obtenerAtributo: yo, 2)#comoTexto
+        escribir { ## }
+        escribir msj#comoTexto
+        escribir { -> }
+        escribir params#comoTexto
+        nl
+    finmetodo
+    __RT#fijarAtributo: res, 0, A
+    __RT#fijarAtributo: res, 1, B
+    __RT#fijarAtributo: res, 2, C
+    devolver res
+finfuncion
+
+variable X, Y, Z
+fijar X a CrearInstanciaNormal: {X}, 1, (0 = 1)
+fijar Y a CrearInstanciaFallback: {Y}, 2, (1 = 1)
+fijar Z a CrearInstanciaCB: {Z}, 3, %(funcion finfuncion)
+
+X#hola
+X#hola: 1, 2
+Y#hola
+Y#hola: 1, 2
+Z#hola
+Z#hola: 1, 2
+Y#adios
+Y#adios: 1, 2
+Z#adios
+Z#adios: 1, 2
+X#adios
