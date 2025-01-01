@@ -1,0 +1,4 @@
+escribir __RT#enviarMensaje: 1, {comoTexto}
+nl
+escribir __RT#enviarMensaje: (__RT#enviarMensaje: 1, {operador_+}, 2), {comoTexto}
+nl

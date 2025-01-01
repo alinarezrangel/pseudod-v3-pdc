@@ -3154,7 +3154,7 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Runtime: enviarMensaje necesita al menos 2 argumentos");
         pdcrt_eliminar_elementos(ctx, inic, 2); // Saca yo y msj, deja solo los argumentos
         // [obj, msj, ...args]
-        return pdcrt_enviar_mensaje_obj(ctx, k.marco, NULL, args, k.kf);
+        return pdcrt_enviar_mensaje_obj(ctx, k.marco, NULL, args - 2, k.kf);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fallar_con_mensaje))
     {
