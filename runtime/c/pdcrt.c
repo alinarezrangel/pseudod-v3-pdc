@@ -348,6 +348,7 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_gc_marcar_obj(ctx, ctx->funcion_hash);
     pdcrt_gc_marcar_obj(ctx, ctx->registro_de_espacios_de_nombres);
     pdcrt_gc_marcar_obj(ctx, ctx->registro_de_modulos);
+    pdcrt_gc_marcar_obj(ctx, ctx->espacio_de_nombres_runtime);
 
     if(ctx->continuacion_actual.marco)
     {
@@ -3129,9 +3130,9 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
         bool ok = false;
         pdcrt_entero atr = pdcrt_obtener_entero(ctx, -2, &ok);
         if(!ok)
-            pdcrt_error(ctx, "Runtime: obtenerAtributo: el atributo debe ser un entero");
+            pdcrt_error(ctx, "Runtime: fijarAtributo: el atributo debe ser un entero");
         if(atr < 0 || atr >= inst.inst->num_atributos)
-            pdcrt_error(ctx, u8"Runtime: obtenerAtributo: índice de atributo inválido");
+            pdcrt_error(ctx, u8"Runtime: fijarAtributo: índice de atributo inválido");
         inst.inst->atributos[atr] = ctx->pila[argp + 2];
         pdcrt_empujar_nulo(ctx, k.marco);
         PDCRT_SACAR_PRELUDIO();
@@ -3910,6 +3911,7 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->registro_de_espacios_de_nombres = pdcrt_objeto_nulo();
     ctx->registro_de_modulos = pdcrt_objeto_nulo();
+    ctx->espacio_de_nombres_runtime = pdcrt_objeto_nulo();
 
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
@@ -4731,6 +4733,28 @@ void pdcrt_assert(pdcrt_ctx *ctx)
     }
 }
 
+void pdcrt_son_identicos(pdcrt_ctx *ctx)
+{
+    pdcrt_obj a = pdcrt_sacar(ctx);
+    pdcrt_obj b = pdcrt_sacar(ctx);
+    if(pdcrt_tipo_de_obj(a) != pdcrt_tipo_de_obj(b))
+    {
+        pdcrt_empujar(ctx, pdcrt_objeto_booleano(false));
+    }
+    else
+    {
+        // HACK: Debería haber una forma de comparar los "datos" de dos
+        // objetos, pero como no hay comparamos en cambio sus enteros.
+        pdcrt_empujar(ctx, pdcrt_objeto_booleano(a.ival == b.ival));
+    }
+}
+
+void pdcrt_obtener_espacio_de_nombres_del_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_extender_pila(ctx, m, 1);
+    pdcrt_empujar(ctx, ctx->espacio_de_nombres_runtime);
+}
+
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  pdcrt_marco *m,
                                  pdcrt_arreglo *arr,
@@ -4828,9 +4852,28 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f)
     return pdcrt_ejecutar_opt(ctx, args, f, true);
 }
 
+static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
+    return pdcrt_importar(ctx, m, "pdcrt_N95_runtime", 17, &pdcrt_preparar_registro_de_modulos_importar_k1);
+}
+
+static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_convertir_a_espacio_de_nombres(ctx, m);
+    ctx->espacio_de_nombres_runtime = pdcrt_sacar(ctx);
+    pdcrt_empujar_nulo(ctx, m);
+    return pdcrt_devolver(ctx, m, 1);
+}
+
 void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods)
 {
-    pdcrt_preparar_registros(ctx, num_mods);
+    pdcrt_preparar_registros(ctx, num_mods + 1);
+    pdcrt_cargar_dependencia(ctx, &pdc_instalar_pdcrt_N95_runtime, "pdcrt_N95_runtime", 17);
+    pdcrt_ejecutar(ctx, 0, &pdcrt_preparar_registro_de_modulos_importar);
+    pdcrt_sacar(ctx);
 }
 
 static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m);

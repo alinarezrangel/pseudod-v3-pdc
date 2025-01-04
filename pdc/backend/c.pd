@@ -318,12 +318,14 @@ metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
 finmetodo
 
 funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor
-    variables reg, locales, capturas, sub
+    variables reg, locales, capturas, sub, ordenDeCapturas
 
     fijar reg a tablasMcAst#tablaCapturas#buscarÚnico: {idNodo}, nodoConCapturas#id
     fijar capturas a Diccionario#vacío
+    fijar ordenDeCapturas a Arreglo#vacio
     ParaCadaElementoConÍndice: reg#bindingsCapturados, procedimiento: binding, i
         capturas#fijarEn: binding, i
+        ordenDeCapturas#agregarAlFinal: binding
     finprocedimiento
     emisor#emitir: Opcode#capturas, reg#bindingsCapturados#longitud
 
@@ -335,7 +337,8 @@ funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor
     emisor#emitir: Opcode#locales, reg#bindingsLocales#longitud
 
     devolver ObjetoAdHoc: {locales}, locales,
-                          {capturas}, capturas
+                          {capturas}, capturas,
+                          {ordenDeCapturas}, ordenDeCapturas
 finfuncion
 
 metodo EstadoDeEmisión#inicializarVariable: nodoIdentificador
@@ -561,7 +564,7 @@ metodo EstadoDeEmisión#emitir: ast
 
         fijar func a sub#emisor#moverAFunción
         yo#emisor#combinar: sub#emisor
-        caps#capturas#paraCadaLlave: procedimiento: binding
+        ParaCadaElemento: caps#ordenDeCapturas, procedimiento: binding
             si yo#capturas#contiene: binding
                 yo#emisor#emitir: Opcode#obtenerLocalC, (yo#capturas#en: binding)
             sino
@@ -610,6 +613,21 @@ metodo EstadoDeEmisión#emitir: ast
             yo#emisor#emitir: Opcode#empujarTexto, IMPL_COMPILADOR
             devolver NULO
         finsi
+        si (ast#nombre#subTexto: 0, 3) = {rt:}
+            variable nombre
+            fijar nombre a ast#nombre#parteDelTexto: 3, ast#nombre#longitud
+            yo#emisor#emitir: Opcode#obtenerEspacioDeNombresDelRuntime
+            ParaCadaElemento: ast#argumentos, procedimiento: arg
+                yo#emitir: arg#expresión
+            finprocedimiento
+            variable proto
+            fijar proto a Mapear: ast#argumentos, funcion: arg
+                devolver arg#esVariadic
+            finfuncion
+            yo#emisor#emitir: Opcode#enviarMensaje, nombre, proto
+            devolver NULO
+        finsi
+
         Escribir: {Builtin}, ast#nombre
         NoImplementado
     finsi

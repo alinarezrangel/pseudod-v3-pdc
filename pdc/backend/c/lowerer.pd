@@ -307,4 +307,8 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     si opcode = Opcode#sacar
         EmitirLínea: puerto, {pdcrt_sacar(ctx);}
     finsi
+
+    si opcode = Opcode#obtenerEspacioDeNombresDelRuntime
+        EmitirLínea: puerto, {pdcrt_obtener_espacio_de_nombres_del_runtime(ctx, m);}
+    finsi
 finprocedimiento

@@ -413,7 +413,7 @@ fijar grParámetrosDeFunción a
             fijar params a Arreglo#vacio
             si res#longitud > 0
                 fijar params a res#en: 1
-                ParaCadaElementoConÍndice: params, funcion: param, i
+                ParaCadaElementoConÍndice: params, procedimiento: param, i
                     si EsInstancia: param, CST#NodoVariadic
                         fijar param#interno#esDefinición a VERDADERO
                         fijar param#interno#esDefiniciónAutoejecutable a FALSO
@@ -425,7 +425,7 @@ fijar grParámetrosDeFunción a
                     si (EsInstancia: param, CST#NodoVariadic) && no (i = (params#longitud - 1))
                         __FallarConMensaje: {Variadic solo puede estar al final de la lista de parámetros}
                     finsi
-                finfuncion
+                finprocedimiento
             finsi
             devolver params
         finfuncion,
@@ -721,6 +721,7 @@ fijar grMétodoClase a
             fijar nombre a res#en: 2
             fijar nombre#esLiteral a VERDADERO
             fijar params a res#en: 3
+
             devolver clonar CST#NodoDeclaraciónDeMétodoEnClase#crear con
                 áreaTextual: AreaTotal: (res#en: 0), (res#en: 0)
                 esEstático: esEstático

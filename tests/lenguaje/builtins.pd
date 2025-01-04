@@ -1,0 +1,9 @@
+escribir VERDADERO#comoTexto
+nl
+escribir FALSO#comoTexto
+nl
+escribir NULO#comoTexto
+nl
+
+escribir __EnviarMensaje: 123, {comoTexto}, Arreglo#vacio
+nl

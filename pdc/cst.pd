@@ -205,9 +205,12 @@ finmetodo
 @pd{parámetros} es un arreglo de @pd{NodoIdentificador}, opcionalmente, el
 último elemento puede ser un parámetro variadic (un @pd{NodoVariadic} que
 contiene un @pd{NodoIdentificador}).
+
+@pd{ámbito} será llenado por el pase de resolución de nombres con el ámbito de
+esta función.
 DOCUMENTA]
 clase NodoDeclaraciónDeMétodoEnClase hereda NodoInstrucción
-    atributos esEstático, nombre, parámetros
+    atributos esEstático, nombre, parámetros, ámbito
 
     metodo comoTexto
 finclase

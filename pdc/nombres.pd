@@ -496,6 +496,7 @@ funcion ResolverNombres: cst, tablas, bdMod, ámbito, paraElFinDelÁmbito
               || (EsInstancia: nodo, CST#NodoFunciónAnónima)
               || (EsInstancia: nodo, CST#NodoUtilizar)
               || (EsInstancia: nodo, CST#NodoSi)
+              || (EsInstancia: nodo, CST#NodoDeclaraciónDeMétodoEnClase)
     finfuncion, funcion: nodo
         si EsInstancia: nodo, CST#NodoSi
             ResolverNombres: nodo#condicional, tablas, bdMod, ámbito, paraElFinDelÁmbito
@@ -592,11 +593,13 @@ funcion ResolverNombres: cst, tablas, bdMod, ámbito, paraElFinDelÁmbito
         si (EsInstancia: nodo, CST#NodoFunciónAnónima)
             || (EsInstancia: nodo, CST#NodoFunción)
             || (EsInstancia: nodo, CST#NodoMétodo)
+            || (EsInstancia: nodo, CST#NodoDeclaraciónDeMétodoEnClase)
             variable tieneYo
             si EsInstancia: nodo, CST#NodoFunciónAnónima
                 fijar tieneYo a nodo#esMétodo
             sino
-                fijar tieneYo a EsInstancia: nodo, CST#NodoMétodo
+                fijar tieneYo a (EsInstancia: nodo, CST#NodoMétodo)
+                                || (EsInstancia: nodo, CST#NodoDeclaraciónDeMétodoEnClase)
             finsi
 
             si EsInstancia: nodo, CST#NodoMétodo
@@ -619,7 +622,9 @@ funcion ResolverNombres: cst, tablas, bdMod, ámbito, paraElFinDelÁmbito
                 ParaCadaElemento: nodo#parámetros, procedimiento: param
                     devolver ResolverNombres: param, tablas, bdMod, nodo#ámbito, fin
                 finprocedimiento
-                ResolverNombres: nodo#cuerpo, tablas, bdMod, nodo#ámbito, fin
+                si no EsInstancia: nodo, CST#NodoDeclaraciónDeMétodoEnClase
+                    ResolverNombres: nodo#cuerpo, tablas, bdMod, nodo#ámbito, fin
+                finsi
                 ParaCadaElemento: fin, (MétodoComoFunción: {llamar})
             finprocedimiento
             devolver NULO

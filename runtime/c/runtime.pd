@@ -31,25 +31,22 @@ variable Objeto
   de instancia) ]
 variable metodosObjeto
 
-[ Las clases tienen 5 atributos:
+[ Las clases tienen 4 atributos:
 
   1. Nombre de la clase
   2. Número de atributos de la instancia
   3. Tabla hash con los métodos de instancia
-  4. Tabla hash con los métodos estáticos
   5. Clase base o NULO ]
 variables OBJETO_ATR_NOMBRE,
           OBJETO_ATR_INST_NÚM_ATRIBUTOS,
           OBJETO_ATR_INST_METODOS,
-          OBJETO_ATR_EST_METODOS,
           OBJETO_ATR_CLASE_BASE,
           OBJETO_NÚM_ATR
 fijar OBJETO_ATR_NOMBRE a 0
 fijar OBJETO_ATR_INST_NÚM_ATRIBUTOS a 1
 fijar OBJETO_ATR_INST_METODOS a 2
-fijar OBJETO_ATR_EST_METODOS a 3
-fijar OBJETO_ATR_CLASE_BASE a 4
-fijar OBJETO_NÚM_ATR a 5
+fijar OBJETO_ATR_CLASE_BASE a 3
+fijar OBJETO_NÚM_ATR a 4
 
 fijar metodosObjeto a __RT#crearTabla: 17
 
@@ -114,7 +111,7 @@ finmetodo
 
 metodosObjeto#fijarEn: {agregarMetodoEstatico}, metodo: nombre, proc
     variable mets
-    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_EST_METODOS
+    fijar mets a __RT#obtenerMétodos: yo
     mets#fijarEn: nombre, proc
 finmetodo
 
@@ -147,46 +144,28 @@ metodosObjeto#fijarEn: {crear}, metodo: ...params
     devolver inst
 finmetodo
 
-procedimiento recvClase: yo, mensaje, ...params
-    variable mets
-    fijar mets a __RT#obtenerMétodos: yo
-    si mets#contiene: {metodoNoEncontrado}
-        variable m
-        fijar m a mets#en: {metodoNoEncontrado}
-        devolver %m: yo, mensaje, params
-    sino
-        variable metsEst
-        fijar metsEst a __RT#obtenerAtributo: cls, OBJETO_ATR_EST_METODOS
-        si metsEst#contiene: mensaje
-            variable m
-            fijar m a metsEst#en: mensaje
-            devolver %m: yo, ...params
-        finsi
-        si metsEst#contiene: {metodoNoEncontrado}
-            variable m
-            fijar m a metsEst#en: {metodoNoEncontrado}
-            devolver %m: yo, mensaje, params
-        sino
-            __FallarConMensaje: ({Método no encontrado en la clase ~t: ~t}#formatear: yo#nombre, mensaje)
-        finsi
-    finsi
-finprocedimiento
-
 funcion CrearClase
-    variable cls
-    fijar cls a __RT#crearInstancia: 6, metodosObjeto, &recvClase
+    variables cls, metsEst
+    fijar metsEst a __RT#crearTabla: metodosObjeto#longitud
+    metodosObjeto#paraCadaPar: procedimiento: llave, valor
+        metsEst#fijarEn: llave, valor
+    finprocedimiento
+    fijar cls a __RT#crearInstancia: 6, metsEst, VERDADERO
     __RT#fijarAtributo: cls, OBJETO_ATR_NOMBRE, {<clase anónima>}
     __RT#fijarAtributo: cls, OBJETO_ATR_INST_NÚM_ATRIBUTOS, 0
     __RT#fijarAtributo: cls, OBJETO_ATR_INST_METODOS, (__RT#crearTabla: 0)
-    __RT#fijarAtributo: cls, OBJETO_ATR_EST_METODOS, (__RT#crearTabla: 0)
     __RT#fijarAtributo: cls, OBJETO_ATR_CLASE_BASE, NULO
     devolver cls
 finfuncion
 
 metodosObjeto#fijarEn: {subclase}, metodo
-    variables sub, mets, subMets, numAtrs
+    variables sub, mets, subMets, numAtrs, metsEst
     fijar sub a CrearClase
     fijar sub#claseBase a yo
+    fijar metsEst a __RT#obtenerMétodos: sub
+    (__RT#obtenerMétodos: yo)#paraCadaPar: procedimiento: llave, valor
+        metsEst#fijarEn: llave, valor
+    finprocedimiento
 
     fijar numAtrs a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_NÚM_ATRIBUTOS
     __RT#fijarAtributo: sub, OBJETO_ATR_INST_NÚM_ATRIBUTOS, numAtrs
@@ -412,7 +391,7 @@ funcion __CompararObjeto: lhs, rhs
     finsi
 
     fijar i a 0
-    mientras i < num
+    mientras i < numL
         si no (__RT#obtenerAtributo: lhs, i) = (__RT#obtenerAtributo: rhs, i)
             devolver FALSO
         finsi

@@ -96,6 +96,40 @@ funcion PrefijoDelMódulo: idDelMódulo
     devolver res
 finfuncion
 
+variable RegistrarBuiltin
+fijar RegistrarBuiltin a TipoDeDatos: {RegistrarBuiltin}, {nombre}, {builtin}, {esAutoejecutable}
+
+variable BUILTINS
+fijar BUILTINS a Arreglo#crearCon:
+    (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO),
+    (RegistrarBuiltin#crear: {__Impl}, {__Impl}, FALSO),
+    (RegistrarBuiltin#crear: {VERDADERO}, {rt:VERDADERO}, FALSO),
+    (RegistrarBuiltin#crear: {FALSO}, {rt:FALSO}, FALSO),
+    (RegistrarBuiltin#crear: {NULO}, {rt:NULO}, FALSO),
+    (RegistrarBuiltin#crear: {Objeto}, {rt:Objeto}, FALSO),
+    (RegistrarBuiltin#crear: {Arreglo}, {rt:Arreglo}, FALSO),
+    (RegistrarBuiltin#crear: {EspacioDeNombres}, {}, FALSO),
+    (RegistrarBuiltin#crear: {Boole}, {rt:Boole}, FALSO),
+    (RegistrarBuiltin#crear: {Numero}, {rt:Numero}, FALSO),
+    (RegistrarBuiltin#crear: {Procedimiento}, {rt:Procedimiento}, FALSO),
+    (RegistrarBuiltin#crear: {TipoNulo}, {rt:TipoNulo}, FALSO),
+    (RegistrarBuiltin#crear: {Referencia}, {rt:Referencia}, FALSO),
+    (RegistrarBuiltin#crear: {Texto}, {rt:Texto}, FALSO),
+    (RegistrarBuiltin#crear: {__Lua}, {rt:__Lua}, VERDADERO),
+    (RegistrarBuiltin#crear: {Aplicar}, {rt:Aplicar}, VERDADERO),
+    (RegistrarBuiltin#crear: {ProcedimientoVarargs}, {rt:ProcedimientoVarargs}, VERDADERO),
+    (RegistrarBuiltin#crear: {TipoDe}, {rt:TipoDe}, VERDADERO),
+    (RegistrarBuiltin#crear: {__EnviarMensaje}, {rt:__EnviarMensaje}, VERDADERO),
+    (RegistrarBuiltin#crear: {__FallarConMensaje}, {rt:__FallarConMensaje}, VERDADERO),
+    (RegistrarBuiltin#crear: {__ClonarObjeto}, {rt:__ClonarObjeto}, VERDADERO),
+    (RegistrarBuiltin#crear: {__CompararObjeto}, {rt:__CompararObjeto}, VERDADERO),
+    (RegistrarBuiltin#crear: {__ByteATexto}, {rt:__ByteATexto}, VERDADERO),
+    (RegistrarBuiltin#crear: {__TextoAByte}, {rt:__TextoAByte}, VERDADERO),
+    (RegistrarBuiltin#crear: {__ByteEof}, {rt:__ByteEof}, VERDADERO),
+    (RegistrarBuiltin#crear: {__AbrirArchivo}, {rt:__AbrirArchivo}, VERDADERO),
+    (RegistrarBuiltin#crear: {__Capturar}, {rt:__Capturar}, VERDADERO),
+    (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO)
+
 procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, agregarBuiltins, salidaCompilado
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
               tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
@@ -132,12 +166,11 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
 
     si agregarBuiltins
-        variables btObjetoRuntime
-        fijar btObjetoRuntime a (ámbito#crear: {__RT}, FALSO)#binding
-        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btObjetoRuntime, {obtenerRuntime})
-        variables btImpl
-        fijar btImpl a (ámbito#crear: {__Impl}, FALSO)#binding
-        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: btImpl, {__Impl})
+        ParaCadaElemento: BUILTINS, procedimiento: builtin
+            variables binding
+            fijar binding a (ámbito#crear: builtin#nombre, builtin#esAutoejecutable)#binding
+            tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: binding, builtin#builtin)
+        finprocedimiento
     finsi
 
     ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres

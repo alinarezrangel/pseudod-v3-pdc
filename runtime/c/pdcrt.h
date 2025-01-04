@@ -394,6 +394,7 @@ struct pdcrt_ctx
 
     pdcrt_obj registro_de_espacios_de_nombres;
     pdcrt_obj registro_de_modulos;
+    pdcrt_obj espacio_de_nombres_runtime;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;
@@ -527,6 +528,10 @@ void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_f f, size_t num
 
 void pdcrt_assert(pdcrt_ctx *ctx);
 
+void pdcrt_son_identicos(pdcrt_ctx *ctx);
+
+void pdcrt_obtener_espacio_de_nombres_del_runtime(pdcrt_ctx *ctx, pdcrt_marco *m);
+
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  pdcrt_marco *m,
                                  pdcrt_arreglo *arr,
@@ -543,6 +548,8 @@ void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods);
 void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, size_t tam_nombre);
 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f);
+
+pdcrt_k pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define PDCRT_DECLARAR_ENTRYPOINT(mod, fmain)                       \
     pdcrt_k pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k) \
