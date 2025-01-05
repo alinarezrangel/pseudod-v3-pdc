@@ -35,18 +35,5 @@
                 ]
             }
         }
-    ],
-    "paquetes_externos": [
-        {
-            "nombre": "sqlite3",
-            "fuente": "base:sqlite3",
-            "version": "1.0.0"
-        }
-    ],
-    "registros": [
-        {
-            "nombre": "base",
-            "url": "https://base.pkg.pseudod.alinarezrangel.github.io"
-        }
     ]
 }

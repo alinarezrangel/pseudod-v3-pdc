@@ -1357,8 +1357,15 @@ end
 
 -- Ruta completa del ejecutable del compilador nuevo. "" si no se encontró.
 function DEFAULT_CONFIG_VALUES.pdc_ejecutable(get, getenv)
+   local pdc_name = getenv "PDC"
+   if not pdc_name then
+      pdc_name = get "pdc_nombre"
+   end
+
+   if string.find(pdc_name, "/") then
+      return pdc_name
+   end
    local path = getenv "PATH" or "/bin"
-   local pdc_name = get "pdc_nombre"
    local pdc_path = find_in_path(path, pdc_name)
    if not pdc_path then
       log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de PseudoD.")
@@ -1382,32 +1389,22 @@ end
 
 -- Ruta al compilador de C a usar. "" si no se encontró ninguno.
 function DEFAULT_CONFIG_VALUES.cc_ejecutable(get, getenv)
-   local cc = getenv "CC"
-   if not cc then
-      local path = getenv "PATH" or "/bin"
-      local cc_name = get "cc_nombre"
-      local cc_path = find_in_path(path, cc_name)
-      if not cc_path then
-         log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de C.")
-         log.error("      Se buscó el ejecutable %q en el PATH: %s", cc_name, path)
-         return ""
-      else
-         return cc_path
-      end
+   local cc_name = getenv "CC"
+   if not cc_name then
+      cc_name = get "cc_nombre"
+   end
+
+   if string.find(cc_name, "/") then
+      return cc_name
+   end
+   local path = getenv "PATH" or "/bin"
+   local cc_path = find_in_path(path, cc_name)
+   if not cc_path then
+      log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de C.")
+      log.error("      Se buscó el ejecutable %q en el PATH: %s", cc_name, path)
+      return ""
    else
-      if string.find(cc, "/") then
-         return cc
-      else
-         local path = getenv "PATH" or "/bin"
-         local cc_path = find_in_path(path, cc)
-         if not cc_path then
-            log.error("[fg:red][bold]error[none] no se pudo encontrar un compilador de C.")
-            log.error("      Se buscó el ejecutable %q en el PATH: %s", cc, path)
-            return ""
-         else
-            return cc_path
-         end
-      end
+      return cc_path
    end
 end
 
@@ -1428,8 +1425,15 @@ end
 
 -- Ejecutable de Lua 5.4 a usar
 function DEFAULT_CONFIG_VALUES.lua_ejecutable(get, getenv)
+   local lua_name = getenv "LUA5_4" or getenv "LUA54"
+   if not lua_name then
+      lua_name = get "lua_nombre"
+   end
+
+   if string.find(lua_name, "/") then
+      return lua_name
+   end
    local path = getenv "PATH" or "/bin"
-   local lua_name = get "lua_nombre"
    local lua_path = find_in_path(path, lua_name)
    if not lua_path then
       log.error("[fg:red][bold]error[none] no se pudo encontrar un intérprete de Lua 5.4.")
@@ -1586,6 +1590,161 @@ local function run_cmd(db, fetch, invk)
    end
 end
 
+local MANIFEST_PATH_GRAMMAR = re.compile [[
+
+path <- {| ('/' segment)* / '/' |} ! .
+segment <- func / lit
+func <- {| {:target: id :} {:args: {| '(' (expr (',' expr)*)? ')' |} :} |}
+lit <- id ! '('
+id <- {| {:id: normalid / str :} |}
+normalid <- { [a-zA-Z_] [a-zA-Z_0-9]* }
+str <- '"' {~ ([^\"] / '\"' -> '"' / '\\' -> '\')* ~} '"'
+expr <- num / {| {:str: str :} |} ! '('
+num <- {| {:num: { [0-9]+ ('.' [0-9]+)? } :} |}
+
+]]
+
+local PATH_FUNCTIONS = {}
+
+-- acepta: lista
+function PATH_FUNCTIONS.en(v, i)
+   assert(type(i) == "number", "se esperaba entero para /en() pero se obtuvo un " .. type(i))
+   return v[i]
+end
+
+-- acepta: lista de paquetes
+function PATH_FUNCTIONS.paquetes(v)
+   local res = {}
+   for i = 1, #v do
+      res[#res + 1] = v[i].nombre
+   end
+   return res
+end
+
+-- acepta: lista de paquetes
+function PATH_FUNCTIONS.paquete(v, name)
+   for i = 1, #v do
+      local p = v[i]
+      if p.nombre == name then
+         return p
+      end
+   end
+   return nil
+end
+
+-- acepta: lista de paquetes externos
+function PATH_FUNCTIONS.paqexterno(v, name)
+   for i = 1, #v do
+      local p = v[i]
+      if p.nombre == name then
+         return p
+      end
+   end
+   return nil
+end
+
+-- acepta: lista de registros
+function PATH_FUNCTIONS.registro(v, name)
+   for i = 1, #v do
+      local p = v[i]
+      if p.nombre == name then
+         return p
+      end
+   end
+   return nil
+end
+
+local function find_in_manifest(manifest, path)
+   local parsed = MANIFEST_PATH_GRAMMAR:match(path)
+   if not parsed then
+      error("ruta del manifest inválida: " .. path)
+   end
+   local obj = manifest
+   for i = 1, #parsed do
+      local el = parsed[i]
+      if el.id then
+         obj = obj[el.id]
+      else
+         assert(el.target)
+         local args = {}
+         for i = 1, #el.args do
+            local arg = el.args[i]
+            if arg.str then
+               args[i] = arg.str
+            else
+               args[i] = tonumber(arg.num)
+            end
+         end
+         local f = assert(PATH_FUNCTIONS[el.target.id], "función de path no existe: " .. el.target.id)
+         obj = f(obj, table.unpack(args))
+      end
+
+      if obj == nil and i ~= #parsed then
+         return nil, false
+      end
+   end
+
+   return obj, true
+end
+
+local function normalize_json_datum(datum, out)
+   local had_out = not not out
+   out = out or {}
+
+   local ty = type(datum)
+   if ty == "string" or ty == "number" or ty == "nil" or ty == "boolean" then
+      out[#out + 1] = json.encode(datum)
+   else
+      assert(ty == "table")
+      if datum[1] ~= nil or next(datum) == nil then
+         out[#out + 1] = json.encode(datum)
+      else
+         local keys = {}
+         for k in pairs(datum) do
+            keys[#keys + 1] = k
+         end
+         table.sort(keys)
+         out[#out + 1] = "{"
+         for i = 1, #keys do
+            local k = keys[i]
+            local v = datum[k]
+            if i > 1 then
+               out[#out + 1] = ","
+            end
+            out[#out + 1] = json.encode(k)
+            out[#out + 1] = ":"
+            normalize_json_datum(v, out)
+         end
+         out[#out + 1] = "}"
+      end
+   end
+
+   if not had_out then
+      return table.concat(out)
+   end
+end
+
+local function format_manifest_path(fmt, ...)
+   local i, args = 0, {...}
+   local function escape(ty, i)
+      local val = args[i]
+      if ty == "s" or ty == "i" then
+         return '"' .. (string.gsub(val, "([\"\\])", function(c) return "\\" .. c end)) .. '"'
+      else
+         assert(ty == "n")
+         return tostring(val)
+      end
+   end
+   return (string.gsub(fmt, "%%([sni])", function(t) i = i + 1; return escape(t, i) end))
+end
+
+local function fetch_manifest_key(manifest, fetch, path, ret)
+   fetch(":[!" .. path .. "]")
+   if ret then
+      return find_in_manifest(manifest, path)
+   end
+end
+
 local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
    if rule.type == "source" then
       return function(fetch)
@@ -1608,7 +1767,7 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
          end
 
          if rule.depends_on_manifest then
-            fetch(manifest_path)
+            fetch_manifest_key(manifest, fetch, rule.manifest_path, false)
          end
 
          mkdir_recur((assert(libgen.dirname(target))))
@@ -1643,7 +1802,7 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
          print(V(invk))
          error("bad")
 
-         log.info("[fg:green]compilado->c [bold]pdc[none] %s", rule.src)
+         log.info("[fg:green]compilando->c [bold]pdc[none] %s", rule.src)
       end
    elseif rule.type == "alias" then
       return function(fetch)
@@ -1700,9 +1859,11 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             extra_args,
          }
 
-         if rule.depends_on_manifest then
-            fetch(manifest_path)
+         if rule.config_depends_on_manifest then
+            fetch_manifest_key(manifest, fetch, rule.config_manifest_path, false)
          end
+
+         fetch_manifest_key(manifest, fetch, rule.srcs_manifest_path, false)
 
          if rule.config_file then
             invk[#invk + 1] = "-c"
@@ -1789,6 +1950,7 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
             package_name = pkgname,
             module_id = pkg.compilador.id_modulo or generate_module_id(src.path),
             depends_on_manifest = not not pkg.compilador.id_modulo,
+            manifest_path = format_manifest_path("/paquetes/paquete(%s)/compilador/id_modulo", pkgname),
             out_db = outpath .. ".bdm.json",
          }
          rules[outpath .. ".bdm.json"] = {
@@ -1814,7 +1976,9 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
          type = "pddoc",
          srcs = pddoc_inputs,
          config_file = pkg.docs.config,
-         depends_on_manifest = not not pkg.docs.config,
+         config_depends_on_manifest = not not pkg.docs.config,
+         config_manifest_path = format_manifest_path("/paquetes/paquete(%s)/docs/config", pkgname),
+         srcs_manifest_path = format_manifest_path("/paquetes/paquete(%s)/docs/codigo", pkgname),
          output_dir = builddir .. "/docs/" .. pkgname .. "/out/",
       }
 
@@ -1855,6 +2019,32 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
             return {
                filename = target,
                direct_hash = sha1_string(("@" .. env_value) or ""),
+            }
+         end
+      end
+
+      local manifest_key = string.match(target, "^:%[!(.-)%]$")
+      if manifest_key then
+         -- sha1_string(normalize_json_datum())
+         return function(fetch, hash)
+            log.debug("[italic]configuración[none] Usando parte del manifest %s", manifest_key)
+            local datum, found = find_in_manifest(manifest, manifest_key)
+            if found then
+               hash(sha1_string("@" .. normalize_json_datum(datum)))
+            else
+               hash(sha1_string(""))
+            end
+         end, function(_db, target)
+            local datum, found = find_in_manifest(manifest, manifest_key)
+            local h
+            if found then
+               h = sha1_string("@" .. normalize_json_datum(datum))
+            else
+               h = sha1_string("")
+            end
+            return {
+               filename = target,
+               direct_hash = h,
             }
          end
       end
