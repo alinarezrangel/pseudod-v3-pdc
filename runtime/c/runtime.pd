@@ -430,3 +430,6 @@ finfuncion
 procedimiento __LeerCaracter
     devolver __RT#leerCarácter
 finprocedimiento
+
+variable __Argv
+fijar __Argv a __RT#obtenerArgv

@@ -349,6 +349,8 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_gc_marcar_obj(ctx, ctx->registro_de_espacios_de_nombres);
     pdcrt_gc_marcar_obj(ctx, ctx->registro_de_modulos);
     pdcrt_gc_marcar_obj(ctx, ctx->espacio_de_nombres_runtime);
+    pdcrt_gc_marcar_obj(ctx, ctx->nombre_del_programa);
+    pdcrt_gc_marcar_obj(ctx, ctx->argv);
 
     if(ctx->continuacion_actual.marco)
     {
@@ -3179,6 +3181,24 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.obtener_argv))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, u8"Runtime: obtenerArgv no necesita argumentos");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar(ctx, ctx->argv);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.obtener_programa))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, u8"Runtime: obtenerPrograma no necesita argumentos");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar(ctx, ctx->nombre_del_programa);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -3913,6 +3933,9 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
     ctx->registro_de_modulos = pdcrt_objeto_nulo();
     ctx->espacio_de_nombres_runtime = pdcrt_objeto_nulo();
 
+    ctx->argv = pdcrt_objeto_nulo();
+    ctx->nombre_del_programa = pdcrt_objeto_nulo();
+
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
 
@@ -3942,6 +3965,25 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
     ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, 0));
 
     return ctx;
+}
+
+void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
+{
+    pdcrt_extender_pila(ctx, NULL, 1);
+    if(argc > 0)
+    {
+        pdcrt_obj nm = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, NULL, argv[0], strlen(argv[0])));
+        ctx->nombre_del_programa = nm;
+    }
+    pdcrt_empujar_arreglo_vacio(ctx, NULL, argc - 1);
+    pdcrt_obj arr = pdcrt_cima(ctx);
+    for(int i = 1; i < argc; i++)
+    {
+        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, NULL, argv[i], strlen(argv[i])));
+        arr.arreglo->valores[arr.arreglo->longitud++] = txt;
+    }
+    ctx->argv = arr;
+    pdcrt_sacar(ctx);
 }
 
 void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -4906,6 +4948,7 @@ int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt
     (void) argc;
     (void) argv;
     pdcrt_ctx *ctx = pdcrt_crear_contexto();
+    pdcrt_fijar_argv(ctx, argc, argv);
     cargar_deps(ctx);
     pdcrt_ejecutar(ctx, 0, f);
     pdcrt_cerrar_contexto(ctx);

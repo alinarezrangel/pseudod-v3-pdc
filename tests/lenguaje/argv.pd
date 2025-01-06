@@ -1,0 +1,4 @@
+escribir __RT#obtenerPrograma#comoTexto
+nl
+escribir __Argv#comoTexto
+nl

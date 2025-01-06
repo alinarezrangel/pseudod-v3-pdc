@@ -356,6 +356,8 @@ struct pdcrt_marco
     X(enviar_mensaje, "enviarMensaje")                                  \
     X(fallar_con_mensaje, "fallarConMensaje")                           \
     X(leer_caracter, u8"leerCarácter")                                  \
+    X(obtener_argv, u8"obtenerArgv")                                    \
+    X(obtener_programa, u8"obtenerPrograma")                            \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
     X(finalizada, "finalizada")                                         \
@@ -396,6 +398,9 @@ struct pdcrt_ctx
     pdcrt_obj registro_de_modulos;
     pdcrt_obj espacio_de_nombres_runtime;
 
+    pdcrt_obj argv;
+    pdcrt_obj nombre_del_programa;
+
     uintptr_t inicio_del_stack;
     size_t tam_stack;
 
@@ -407,6 +412,7 @@ struct pdcrt_ctx
 };
 
 pdcrt_ctx *pdcrt_crear_contexto(void);
+void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
 void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem);

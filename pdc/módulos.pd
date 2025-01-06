@@ -87,6 +87,14 @@ clase BaseDeDatosDeMódulos
     metodo guardarEnArchivo: archivo
 
     [DOCUMENTA
+    @brief{Guarda los módulos seleccionados en un archivo.}
+
+    Similar a @code{#guardarEnArchivo} pero solo guarda los módulos @code{m}
+    para los que @pd{%filtro: m} devuelva @pd{VERDADERO}.
+    DOCUMENTA]
+    metodo guardarSeleccionadosEnArchivo: archivo, filtro
+
+    [DOCUMENTA
     @brief{Agrega un nuevo módulo a la base de datos.}
 
     Construye un @pd{Módulo} con los argumentos dados.
@@ -160,10 +168,17 @@ metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: json
 finmetodo
 
 metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
+    yo#guardarSeleccionadosEnArchivo: archivo, funcion: m devolver VERDADERO finfuncion
+finmetodo
+
+metodo BaseDeDatosDeMódulos#guardarSeleccionadosEnArchivo: archivo, filtro
     variables puerto, mods, res
     fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
     fijar mods a Arreglo#vacio
     yo#tablaMódulos#escaneoLineal: procedimiento: mod
+        si no %filtro: mod
+            devolver NULO
+        finsi
         mods#agregarAlFinal: (Diccionario#desdePares:
             {paquete}, mod#paquete,
             {módulo}, mod#módulo,

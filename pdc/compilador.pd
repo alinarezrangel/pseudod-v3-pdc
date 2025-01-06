@@ -128,7 +128,8 @@ fijar BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__ByteEof}, {rt:__ByteEof}, VERDADERO),
     (RegistrarBuiltin#crear: {__AbrirArchivo}, {rt:__AbrirArchivo}, VERDADERO),
     (RegistrarBuiltin#crear: {__Capturar}, {rt:__Capturar}, VERDADERO),
-    (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO)
+    (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO),
+    (RegistrarBuiltin#crear: {__Argv}, {rt:__Argv}, FALSO)
 
 procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, agregarBuiltins, salidaCompilado
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
@@ -250,6 +251,7 @@ fijar OpcionesDeCompilación a TipoDeDatos: {OpcionesDeCompilación},
     {salida}, [ SalidaAArchivo | SALIDA_A_SALIDA | IGNORAR_SALIDA ]
     {entrada}, [ (EntradaDesdeArchivo | EntradaDesdeTexto | ENTRADA_DESDE_ENTRADA) o NULO si no se especificó ]
     {guardarBaseDeDatos}, [ Texto o NULO ]
+    {guardarMódulo}, [ Boole ]
     {cargarBasesDeDatos}, [ Arreglo de Textos ]
     {nombreDelPaquete}, [ Texto ]
     {nombreDelMódulo}, [ Texto ]
@@ -264,6 +266,7 @@ metodo estatico OpcionesDeCompilación#predeterminado
         IGNORAR_SALIDA,
         NULO,
         NULO,
+        FALSO,
         Arreglo#vacio,
         {demo},
         {ejemplo},
@@ -369,6 +372,7 @@ funcion ProcesarCLIDelCompilador: argumentosDelCLI
 
         [ ===== Base de datos de módulos ===== ]
         (Opción#crear: NULO, {guardar-db},           1, FALSO,     (Fijar: {guardarBaseDeDatos})),
+        (Opción#crear: NULO, {guardar-solo-modulo},  0, FALSO,     (Almacenar: {guardarMódulo}, VERDADERO)),
         (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
 
         [ ===== Compilación ===== ]
@@ -494,7 +498,17 @@ procedimiento EjecutarCompilador: cli
                          res#compilado#prefijosTransitivos
 
     si no EsNulo: opciones#guardarBaseDeDatos
-        bdMod#guardarEnArchivo: (__AbrirArchivo: opciones#guardarBaseDeDatos, 11)
+        variable archivo
+        fijar archivo a __AbrirArchivo: opciones#guardarBaseDeDatos, 11
+        si opciones#guardarMódulo
+            bdMod#guardarEnArchivo: archivo
+        sino
+            bdMod#guardarSeleccionadosEnArchivo: archivo, funcion: mod
+                devolver (mod#prefijoDelMódulo = opciones#identificadorDelMódulo)
+                      && (mod#paquete = opciones#nombreDelPaquete)
+                      && (mod#módulo = opciones#nombreDelMódulo)
+            finfuncion
+        finsi
     finsi
 finprocedimiento
 
