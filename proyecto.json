@@ -5,9 +5,6 @@
             "nombre": "bepd",
             "version": "1.0.0",
             "dependencias": [],
-            "compilador": {
-                "id_modulo": "bepd"
-            },
             "codigo": [
                 "bepd/**/*"
             ],
@@ -22,9 +19,6 @@
             "nombre": "pdc",
             "version": "3.0.0",
             "dependencias": ["bepd"],
-            "compilador": {
-                "id_modulo": "pdc"
-            },
             "codigo": [
                 "pdc/**/*"
             ],

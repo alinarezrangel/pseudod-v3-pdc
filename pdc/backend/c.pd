@@ -628,7 +628,7 @@ metodo EstadoDeEmisión#emitir: ast
             devolver NULO
         finsi
 
-        Escribir: {Builtin}, ast#nombre
+        Escribir: {Builtin}, ast, ast#áreaTextual
         NoImplementado
     finsi
 

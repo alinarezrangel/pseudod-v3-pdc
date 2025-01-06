@@ -13,10 +13,25 @@ Falla con un error si en algún momento se llama a un identificador que no es
 autoejecutable en el CST dado. @pd{tablasRnCst} deben ser las @pd(#:utilizar
 "pdc/nombres"){TablasDeResoluciónDeNombres} del CST.
 DOCUMENTA]
-funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst
+funcion ValidaLlamadasAutoejecutables: cst, tablasRnCst, tablaCst
     Buscando': cst, funcion: cst
-        devolver EsInstancia: cst, CST#NodoLlamarProcedimiento
+        devolver (EsInstancia: cst, CST#NodoLlamarProcedimiento)
+              || (EsInstancia: cst, CST#NodoSi)
     finfuncion, funcion: cst, continuar
+        si EsInstancia: cst, CST#NodoSi
+            variable est
+            fijar est a tablasRnCst#tablaCondicionalEstático#intentaBuscarÚnico: {idNodo}, cst#id
+            si EsNulo: est
+                [ Condicional normal ]
+                devolver %continuar
+            sino
+                variable bloque
+                fijar bloque a tablaCst#buscarÚnico: {id}, est#idBloque
+                ValidaLlamadasAutoejecutables: bloque#nodo, tablasRnCst, tablaCst
+                devolver NULO
+            finsi
+        finsi
+
         variables reg, binding
         fijar reg a tablasRnCst#tablaUsos#buscarÚnico: {idNodo}, cst#proc#id
         fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding

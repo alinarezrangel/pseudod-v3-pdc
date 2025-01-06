@@ -42,6 +42,36 @@ fijar InformaciónDeMódulo a CrearTipoDeRegistro: {InformaciónDeMódulo},
 
 
 [DOCUMENTA
+@brief{Obtiene el paquete de un nombre importado.}
+
+@pd{ruta} debe ser un @pd{Texto} de la forma @code{paquete/más/módulos}. En
+este caso devolvería @code{paquete}.
+DOCUMENTA]
+funcion PaqueteDeUtilizar: ruta
+    variable i
+    fijar i a ruta#buscar: 0, {/}
+    si EsNulo: i
+        __FallarConMensaje: ({No se pudo separar los componentes de ~t}#formatear: ruta)
+    finsi
+    devolver ruta#parteDelTexto: 0, i
+finfuncion
+
+[DOCUMENTA
+@brief{Obtiene el módulo de un nombre importado.}
+
+@pd{ruta} debe ser un @pd{Texto} de la forma @code{paquete/más/módulos}. En
+este caso devolvería @code{más/módulos}.
+DOCUMENTA]
+funcion MóduloDeUtilizar: ruta
+    variable i
+    fijar i a ruta#buscar: 0, {/}
+    si EsNulo: i
+        __FallarConMensaje: ({No se pudo separar los componentes de ~t}#formatear: ruta)
+    finsi
+    devolver ruta#parteDelTexto: (i + 1), ruta#longitud
+finfuncion
+
+[DOCUMENTA
 @brief{Obtiene y anota las dependencias del nodo.}
 
 Anota cada @pd{CST#NodoUtilizar} con un @pd{InformaciónDeMódulo} acerca de que
@@ -56,15 +86,19 @@ procedimiento DependenciasDelNodo: nodoCst, tablaInf, paquete, nombreDelMódulo
     Buscando: nodoCst, funcion: nodo
         devolver EsInstancia: nodo, CST#NodoUtilizar
     finfuncion, procedimiento: nodo
-        variables porImportar, módulo
+        variables porImportar, módulo, paq
         fijar porImportar a nodo#módulo
         si EsInstancia: nodo#módulo, CST#NodoIdentificador
-            fijar módulo a nodo#módulo#nombre
+            variable ruta
+            fijar ruta a nodo#módulo#nombre
+            fijar paq a PaqueteDeUtilizar: ruta
+            fijar módulo a MóduloDeUtilizar: ruta
         sino
+            fijar paq a paquete
             fijar módulo a ResolverRutaRelativa: nombreDelMódulo, nodo#módulo#valor
         finsi
-        dependencias#agregarAlFinal: (ReferenciaAMódulo#crear: paquete, módulo)
-        tablaInf#agregar: (InformaciónDeMódulo#crear: nodo#id, paquete, módulo)
+        dependencias#agregarAlFinal: (ReferenciaAMódulo#crear: paq, módulo)
+        tablaInf#agregar: (InformaciónDeMódulo#crear: nodo#id, paq, módulo)
     finprocedimiento
     devolver dependencias
 finprocedimiento

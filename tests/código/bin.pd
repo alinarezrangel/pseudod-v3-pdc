@@ -1,0 +1,7 @@
+utilizar bepd/builtins
+
+utilizar bepd/algoritmos (BúsquedaBinaria)
+
+variable arr
+fijar arr a Arreglo#crearCon: 0, 1
+Escribir: (BúsquedaBinaria: arr, 0, arr#longitud, 0)

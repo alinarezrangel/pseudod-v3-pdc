@@ -148,32 +148,29 @@ Si hay múltiples elementos con el mismo valor, devuelve el índice de cualquier
 de estos.
 DOCUMENTA]
 funcion BúsquedaBinariaConComparación: arreglo, inf, sup, valor, menorQue
-    variables índice, encontrado
-    fijar índice a inf
-    fijar encontrado a FALSO
+    variables origInf, origSup, últimoÍndice
+    fijar origInf a inf
+    fijar origSup a sup
     mientras inf < sup
         variable i
         fijar i a ((sup - inf) / 2)#piso + inf
         si %menorQue: valor, (arreglo#en: i)
-            fijar sup a i - 1
-            fijar índice a Max: inf, sup
+            fijar sup a i
+            fijar últimoÍndice a i
         sino
             si %menorQue: (arreglo#en: i), valor
                 fijar inf a i + 1
-                fijar índice a Min: inf, sup
+                fijar últimoÍndice a i + 1
             sino
-                fijar encontrado a VERDADERO
-                fijar inf a i
-                fijar sup a i
-                fijar índice a i
+                devolver Resultado#ok: i
             finsi
         finsi
     finmientras
 
-    si encontrado
-        devolver Resultado#ok: índice
+    si EsNulo: últimoÍndice
+        devolver Resultado#error: origInf
     sino
-        devolver Resultado#error: índice
+        devolver Resultado#error: últimoÍndice
     finsi
 finfuncion
 

@@ -108,7 +108,7 @@ fijar BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {NULO}, {rt:NULO}, FALSO),
     (RegistrarBuiltin#crear: {Objeto}, {rt:Objeto}, FALSO),
     (RegistrarBuiltin#crear: {Arreglo}, {rt:Arreglo}, FALSO),
-    (RegistrarBuiltin#crear: {EspacioDeNombres}, {}, FALSO),
+    (RegistrarBuiltin#crear: {EspacioDeNombres}, {rt:EspacioDeNombres}, FALSO),
     (RegistrarBuiltin#crear: {Boole}, {rt:Boole}, FALSO),
     (RegistrarBuiltin#crear: {Numero}, {rt:Numero}, FALSO),
     (RegistrarBuiltin#crear: {Procedimiento}, {rt:Procedimiento}, FALSO),
@@ -176,7 +176,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
 
     ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
     ParaCadaElemento: parchesNombres, (MétodoComoFunción: {llamar})
-    ValidaLlamadasAutoejecutables: cst, tablasRnCst
+    ValidaLlamadasAutoejecutables: cst, tablasRnCst, tablaCst
 
     fijar parchesAbstraer a Arreglo#vacio
     fijar ast a Abstraer: cst, tablaCst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
@@ -500,7 +500,7 @@ procedimiento EjecutarCompilador: cli
     si no EsNulo: opciones#guardarBaseDeDatos
         variable archivo
         fijar archivo a __AbrirArchivo: opciones#guardarBaseDeDatos, 11
-        si opciones#guardarMódulo
+        si no opciones#guardarMódulo
             bdMod#guardarEnArchivo: archivo
         sino
             bdMod#guardarSeleccionadosEnArchivo: archivo, funcion: mod
