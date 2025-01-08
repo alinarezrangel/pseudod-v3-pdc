@@ -361,6 +361,12 @@ struct pdcrt_marco
     X(obtener_argv, u8"obtenerArgv")                                    \
     X(obtener_programa, u8"obtenerPrograma")                            \
     X(fijar_clase_objeto, u8"fijarClaseObjeto")                         \
+    X(fijar_clase_arreglo, u8"fijarClaseArreglo")                       \
+    X(fijar_clase_boole, u8"fijarClaseBoole")                           \
+    X(fijar_clase_numero, u8"fijarClaseNumero")                         \
+    X(fijar_clase_procedimiento, u8"fijarClaseProcedimiento")           \
+    X(fijar_clase_tipo_nulo, u8"fijarClaseTipoNulo")                    \
+    X(fijar_clase_texto, u8"fijarClaseTexto")                           \
     X(obtener_clase_objeto, u8"obtenerClaseObjeto")                     \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
@@ -405,6 +411,12 @@ struct pdcrt_ctx
     pdcrt_obj argv;
     pdcrt_obj nombre_del_programa;
     pdcrt_obj clase_objeto;
+    pdcrt_obj clase_arreglo;
+    pdcrt_obj clase_boole;
+    pdcrt_obj clase_numero;
+    pdcrt_obj clase_procedimiento;
+    pdcrt_obj clase_tipo_nulo;
+    pdcrt_obj clase_texto;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;

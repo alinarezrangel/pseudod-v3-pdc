@@ -1,0 +1,17 @@
+metodo Texto#inventado: A
+    devolver {~t + ~t}#formatear: yo, A
+finmetodo
+
+escribir ({A}#inventado: {B})
+nl
+
+metodo Numero#sucesor
+    devolver yo + 1
+finmetodo
+
+escribir 1#sucesor#comoTexto
+nl
+escribir 2#sucesor#comoTexto
+nl
+
+1#noExíste

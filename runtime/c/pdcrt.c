@@ -351,7 +351,14 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_gc_marcar_obj(ctx, ctx->espacio_de_nombres_runtime);
     pdcrt_gc_marcar_obj(ctx, ctx->nombre_del_programa);
     pdcrt_gc_marcar_obj(ctx, ctx->argv);
+
     pdcrt_gc_marcar_obj(ctx, ctx->clase_objeto);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_numero);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_arreglo);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_boole);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_procedimiento);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_texto);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_tipo_nulo);
 
     if(ctx->continuacion_actual.marco)
     {
@@ -777,6 +784,96 @@ static bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pd
 // 2 elementos: yo + el mensaje.
 #define PDCRT_SACAR_PRELUDIO() pdcrt_eliminar_elementos(ctx, inic, 2 + args);
 
+typedef enum pdcrt_clase
+{
+    PDCRT_CLASE_NUMERO,
+    PDCRT_CLASE_ARREGLO,
+    PDCRT_CLASE_BOOLE,
+    PDCRT_CLASE_PROCEDIMIENTO,
+    PDCRT_CLASE_TIPO_NULO,
+    PDCRT_CLASE_TEXTO,
+} pdcrt_clase;
+
+static pdcrt_k pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+
+static pdcrt_k pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k, pdcrt_clase clase)
+{
+    size_t inic = PDCRT_CALC_INICIO();
+    size_t argp = inic + 2;
+    pdcrt_obj yo = ctx->pila[inic];
+    pdcrt_obj msj = ctx->pila[inic + 1];
+
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 5, 0, args, k);
+    pdcrt_fijar_local(ctx, m, 0, pdcrt_objeto_entero(clase));
+    pdcrt_fijar_local(ctx, m, 1, yo);
+    pdcrt_fijar_local(ctx, m, 2, msj);
+    pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(inic));
+    pdcrt_fijar_local(ctx, m, 4, pdcrt_objeto_entero(argp));
+
+    pdcrt_extender_pila(ctx, m, 2);
+
+    switch(clase)
+    {
+    case PDCRT_CLASE_NUMERO:
+        pdcrt_empujar(ctx, ctx->clase_numero);
+        break;
+    case PDCRT_CLASE_ARREGLO:
+        pdcrt_empujar(ctx, ctx->clase_arreglo);
+        break;
+    case PDCRT_CLASE_BOOLE:
+        pdcrt_empujar(ctx, ctx->clase_boole);
+        break;
+    case PDCRT_CLASE_PROCEDIMIENTO:
+        pdcrt_empujar(ctx, ctx->clase_procedimiento);
+        break;
+    case PDCRT_CLASE_TIPO_NULO:
+        pdcrt_empujar(ctx, ctx->clase_tipo_nulo);
+        break;
+    case PDCRT_CLASE_TEXTO:
+        pdcrt_empujar(ctx, ctx->clase_texto);
+        break;
+    }
+    pdcrt_obj obj_clase = pdcrt_cima(ctx);
+    if(pdcrt_tipo_de_obj(obj_clase) == PDCRT_TOBJ_NULO)
+    {
+        pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+        pdcrt_inspeccionar_texto(msj.texto);
+        pdcrt_error(ctx, "Método no encontrado");
+    }
+
+    pdcrt_empujar(ctx, msj);
+
+    static const int proto[] = {0};
+    return pdcrt_enviar_mensaje(ctx, m, u8"_obtenerMétodoDeInstancia", 26, proto, 1,
+        &pdcrt_recv_fallback_a_clase_k1);
+}
+
+static pdcrt_k pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_entero clase = pdcrt_obtener_local(ctx, m, 0).ival;
+    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 1);
+    pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 2);
+    pdcrt_entero inic = pdcrt_obtener_local(ctx, m, 3).ival;
+    pdcrt_entero argp = pdcrt_obtener_local(ctx, m, 4).ival;
+
+    // [yo, msj, args..., metodo o nulo]
+    pdcrt_obj metodo = pdcrt_cima(ctx);
+    if(pdcrt_tipo_de_obj(metodo) == PDCRT_TOBJ_NULO)
+    {
+        pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+        pdcrt_inspeccionar_texto(msj.texto);
+        pdcrt_error(ctx, "Método no encontrado");
+    }
+    else
+    {
+        pdcrt_eliminar_elemento(ctx, inic + 1);
+        // [yo, args..., metodo o nulo]
+        pdcrt_insertar(ctx, inic);
+        // [metodo o nulo, yo, args...]
+        return pdcrt_enviar_mensaje(ctx, m->k.marco, "llamar", 6, NULL, m->args + 1, m->k.kf);
+    }
+}
+
 static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     // [yo, msj, ...#args]
@@ -979,7 +1076,7 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_continuar(ctx, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_NUMERO);
 }
 
 static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -1183,7 +1280,7 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_continuar(ctx, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_NUMERO);
 }
 
 static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -1291,7 +1388,7 @@ static pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_continuar(ctx, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_BOOLE);
 }
 
 static pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -1832,7 +1929,7 @@ static pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_texto_formatear_k1(ctx, m);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_TEXTO);
 }
 
 static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -1876,7 +1973,7 @@ static pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_continuar(ctx, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_TIPO_NULO);
 }
 
 static pdcrt_k pdcrt_arreglo_igual_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
@@ -2241,7 +2338,7 @@ static pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return pdcrt_continuar(ctx, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_ARREGLO);
 }
 
 static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -2319,7 +2416,7 @@ static pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
         return (*yo.closure->f)(ctx, args, k);
     }
 
-    assert(0 && "sin implementar");
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_PROCEDIMIENTO);
 }
 
 static pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -3259,6 +3356,60 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_arreglo))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseArreglo necesita 1 argumento");
+        ctx->clase_arreglo = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_boole))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseBoole necesita 1 argumento");
+        ctx->clase_boole = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_numero))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseNumero necesita 1 argumento");
+        ctx->clase_numero = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_procedimiento))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseProcedimieto necesita 1 argumento");
+        ctx->clase_procedimiento = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_tipo_nulo))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseTipoNulo necesita 1 argumento");
+        ctx->clase_tipo_nulo = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_texto))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseTexto necesita 1 argumento");
+        ctx->clase_texto = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -4000,7 +4151,14 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->argv = pdcrt_objeto_nulo();
     ctx->nombre_del_programa = pdcrt_objeto_nulo();
+
     ctx->clase_objeto = pdcrt_objeto_nulo();
+    ctx->clase_arreglo = pdcrt_objeto_nulo();
+    ctx->clase_numero = pdcrt_objeto_nulo();
+    ctx->clase_boole = pdcrt_objeto_nulo();
+    ctx->clase_procedimiento = pdcrt_objeto_nulo();
+    ctx->clase_tipo_nulo = pdcrt_objeto_nulo();
+    ctx->clase_texto = pdcrt_objeto_nulo();
 
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;

@@ -31,24 +31,37 @@ variable Objeto
   de instancia) ]
 variable metodosObjeto
 
-[ Las clases tienen 4 atributos:
+[ Las clases tienen 5 atributos:
 
   1. Nombre de la clase
   2. Número de atributos de la instancia
   3. Tabla hash con los métodos de instancia
-  5. Clase base o NULO ]
+  5. Clase base o NULO
+  6. Arreglo con las subclases ]
 variables OBJETO_ATR_NOMBRE,
           OBJETO_ATR_INST_NÚM_ATRIBUTOS,
           OBJETO_ATR_INST_METODOS,
           OBJETO_ATR_CLASE_BASE,
+          OBJETO_ATR_SUBCLASES,
           OBJETO_NÚM_ATR
 fijar OBJETO_ATR_NOMBRE a 0
 fijar OBJETO_ATR_INST_NÚM_ATRIBUTOS a 1
 fijar OBJETO_ATR_INST_METODOS a 2
 fijar OBJETO_ATR_CLASE_BASE a 3
-fijar OBJETO_NÚM_ATR a 4
+fijar OBJETO_ATR_SUBCLASES a 4
+fijar OBJETO_NÚM_ATR a 5
 
-fijar metodosObjeto a __RT#crearTabla: 17
+fijar metodosObjeto a __RT#crearTabla: 19
+
+metodosObjeto#fijarEn: {_obtenerMétodoDeInstancia}, metodo: nombre
+    variable mets
+    fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
+    si mets#contiene: nombre
+        devolver mets#en: nombre
+    sino
+        devolver NULO
+    finsi
+finmetodo
 
 metodosObjeto#fijarEn: {comoTexto}, metodo
     devolver {Clase ~t}#formatear: (__RT#obtenerAtributo: yo, OBJETO_ATR_NOMBRE)
@@ -107,6 +120,28 @@ metodosObjeto#fijarEn: {agregarMetodo}, metodo: nombre, proc
     variable mets
     fijar mets a __RT#obtenerAtributo: yo, OBJETO_ATR_INST_METODOS
     mets#fijarEn: nombre, proc
+
+    [ Propaga el método a las subclases ]
+    procedimiento fijarMétodo: subclase
+        variable mets
+        fijar mets a __RT#obtenerAtributo: subclase, OBJETO_ATR_INST_METODOS
+        si no mets#contiene: nombre
+            mets#fijarEn: nombre, proc
+            propagar: subclase
+        finsi
+    finprocedimiento
+
+    procedimiento propagar: subclase
+        variables i, subs
+        fijar i a 0
+        fijar subs a subclase#subclases
+        mientras i < subs#longitud
+            fijarMétodo: (subs#en: i)
+            fijar i a i + 1
+        finmientras
+    finprocedimiento
+
+    propagar: yo
 finmetodo
 
 metodosObjeto#fijarEn: {agregarMetodoEstatico}, metodo: nombre, proc
@@ -144,6 +179,10 @@ metodosObjeto#fijarEn: {crear}, metodo: ...params
     devolver inst
 finmetodo
 
+metodosObjeto#fijarEn: {subclases}, metodo
+    devolver __RT#obtenerAtributo: yo, OBJETO_ATR_SUBCLASES
+finmetodo
+
 funcion CrearClase
     variables cls, metsEst
     fijar metsEst a __RT#crearTabla: metodosObjeto#longitud
@@ -155,6 +194,7 @@ funcion CrearClase
     __RT#fijarAtributo: cls, OBJETO_ATR_INST_NÚM_ATRIBUTOS, 0
     __RT#fijarAtributo: cls, OBJETO_ATR_INST_METODOS, (__RT#crearTabla: 0)
     __RT#fijarAtributo: cls, OBJETO_ATR_CLASE_BASE, NULO
+    __RT#fijarAtributo: cls, OBJETO_ATR_SUBCLASES, __CrearArreglo
     devolver cls
 finfuncion
 
@@ -180,13 +220,16 @@ metodosObjeto#fijarEn: {subclase}, metodo
         devolver sub
     finmetodo
 
+    yo#subclases#agregarAlFinal: sub
+
     devolver sub
 finmetodo
 
 
 fijar Objeto a CrearClase
 fijar Objeto#nombre a {Objeto}
-Objeto#agregarMetodo: {__tipo}, metodo
+
+metodo Objeto#__tipo
     devolver Objeto
 finmetodo
 
@@ -238,6 +281,8 @@ metodo estatico Arreglo#crearCon: ...valores
     devolver valores
 finmetodo
 
+__RT#fijarClaseArreglo: Arreglo
+
 clase EspacioDeNombres hereda Objeto
     metodo estatico crear
     metodo estatico vacío
@@ -274,6 +319,8 @@ metodo estatico Boole#falso
     devolver FALSO
 finmetodo
 
+__RT#fijarClaseBoole: Boole
+
 clase Numero hereda Objeto
     metodo estatico crear
 finclase
@@ -281,6 +328,8 @@ finclase
 metodo estatico Numero#crear
     devolver 0
 finmetodo
+
+__RT#fijarClaseNumero: Numero
 
 clase Procedimiento hereda Objeto
     metodo estatico crear
@@ -290,6 +339,8 @@ metodo estatico Procedimiento#crear
     __FallarConMensaje: {No se puede crear un procedimiento con #crear}
 finmetodo
 
+__RT#fijarClaseProcedimiento: Procedimiento
+
 clase TipoNulo hereda Objeto
     metodo estatico crear
 finclase
@@ -297,6 +348,8 @@ finclase
 metodo estatico TipoNulo#crear
     devolver NULO
 finmetodo
+
+__RT#fijarClaseTipoNulo: TipoNulo
 
 clase Referencia hereda Objeto
     metodo estatico crear
@@ -323,6 +376,8 @@ finmetodo
 metodo estatico Texto#crear
     devolver {}
 finmetodo
+
+__RT#fijarClaseTexto: Texto
 
 funcion __Lua: código
     __FallarConMensaje: {__Lua: inalcanzable}

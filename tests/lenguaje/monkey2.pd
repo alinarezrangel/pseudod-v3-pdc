@@ -1,0 +1,28 @@
+metodo Objeto#inventado: A
+    devolver {~t + ~t}#formatear: yo, A
+finmetodo
+
+escribir ({A}#inventado: {B})
+nl
+escribir (1#inventado: 2)
+nl
+
+metodo Objeto#miTipo
+    devolver TipoDe: yo
+finmetodo
+
+clase Foo
+finclase
+
+clase Bar hereda Foo
+finclase
+
+clase Baz hereda Foo
+finclase
+
+escribir Bar#crear#miTipo#comoTexto
+nl
+escribir Baz#crear#miTipo#comoTexto
+nl
+escribir 12#miTipo#comoTexto
+nl
