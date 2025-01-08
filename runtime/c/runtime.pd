@@ -190,6 +190,9 @@ Objeto#agregarMetodo: {__tipo}, metodo
     devolver Objeto
 finmetodo
 
+metodo Objeto#inicializar
+finmetodo
+
 metodo Objeto#\clonar\
     devolver __ClonarObjeto: yo
 finmetodo
@@ -209,6 +212,8 @@ finmetodo
 metodo Objeto#\operador_no=\: otro
     devolver no __CompararObjeto: yo, otro
 finmetodo
+
+__RT#fijarClaseObjeto: Objeto
 
 clase Arreglo hereda Objeto
     metodo estatico crear

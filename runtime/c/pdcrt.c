@@ -127,7 +127,7 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
-    if(ctx->recolector_de_basura_activo && (ctx->cnt++ % 2 == 0))
+    if(ctx->recolector_de_basura_activo && (ctx->cnt++ % 1000000 == 0))
     {
         pdcrt_recolectar_basura_simple(ctx, m);
     }
@@ -351,6 +351,7 @@ static void pdcrt_gc_marcar_todo(pdcrt_ctx *ctx, pdcrt_marco *m)
     pdcrt_gc_marcar_obj(ctx, ctx->espacio_de_nombres_runtime);
     pdcrt_gc_marcar_obj(ctx, ctx->nombre_del_programa);
     pdcrt_gc_marcar_obj(ctx, ctx->argv);
+    pdcrt_gc_marcar_obj(ctx, ctx->clase_objeto);
 
     if(ctx->continuacion_actual.marco)
     {
@@ -967,6 +968,16 @@ static pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.byte_como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (entero): byteComoTexto no acepta argumentos");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        char c = yo.ival;
+        pdcrt_empujar_texto(ctx, k.marco, &c, 1);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -1158,6 +1169,16 @@ static pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Numero (float): truncar no acepta argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
         pdcrt_empujar_float(ctx, k.marco, PDCRT_FLOAT_TRUNC(yo.fval));
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.byte_como_texto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Numero (float): byteComoTexto no acepta argumentos");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        char c = (char) yo.fval;
+        pdcrt_empujar_texto(ctx, k.marco, &c, 1);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
@@ -2200,6 +2221,25 @@ static pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.agregar_al_final))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Arreglo: agregarAlFinal necesita 1 argumento");
+        pdcrt_obj arg = ctx->pila[argp];
+        if(yo.arreglo->longitud >= yo.arreglo->capacidad)
+        {
+            size_t ncap = yo.arreglo->capacidad == 0 ? 1 : (yo.arreglo->capacidad * 2);
+            pdcrt_obj *nvals = realloc(yo.arreglo->valores, ncap * sizeof(pdcrt_obj));
+            if(!nvals)
+                pdcrt_enomem(ctx);
+            yo.arreglo->valores = nvals;
+            yo.arreglo->capacidad = ncap;
+        }
+        yo.arreglo->valores[yo.arreglo->longitud++] = arg;
+        pdcrt_empujar_nulo(ctx, k.marco);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
 
     assert(0 && "sin implementar");
 }
@@ -2878,6 +2918,7 @@ static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_tabla_eliminar_k1);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
     pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
@@ -2910,6 +2951,7 @@ static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_tabla_eliminar_k2);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
     pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
@@ -3196,6 +3238,24 @@ static pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, u8"Runtime: obtenerPrograma no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
         pdcrt_empujar(ctx, ctx->nombre_del_programa);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.obtener_clase_objeto))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, u8"Runtime: obtenerClaseObjeto no necesita argumentos");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar(ctx, ctx->clase_objeto);
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k);
+    }
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.fijar_clase_objeto))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: fijarClaseObjeto necesita 1 argumento");
+        ctx->clase_objeto = ctx->pila[argp];
+        pdcrt_empujar_nulo(ctx, k.marco);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
@@ -3490,6 +3550,7 @@ static pdcrt_k pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k)
 
 static pdcrt_k pdcrt_recv_corrutina_avanzar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_recv_corrutina_avanzar_k1);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     if(yo.coro->estado != PDCRT_CORO_EJECUTANDOSE)
     {
@@ -3529,6 +3590,7 @@ static pdcrt_k pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k)
 
 static pdcrt_k pdcrt_instancia_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_instancia_k1);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
 
@@ -3583,6 +3645,7 @@ static pdcrt_k pdcrt_instancia_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static pdcrt_k pdcrt_instancia_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_instancia_k2);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
     // [...#args, método]
@@ -3594,6 +3657,7 @@ static pdcrt_k pdcrt_instancia_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static pdcrt_k pdcrt_instancia_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_instancia_k3);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
     // [...#args, contiene?]
@@ -3619,6 +3683,7 @@ static pdcrt_k pdcrt_instancia_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static pdcrt_k pdcrt_instancia_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_instancia_k4);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 1);
     // [...#args, método]
@@ -3935,6 +4000,7 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
 
     ctx->argv = pdcrt_objeto_nulo();
     ctx->nombre_del_programa = pdcrt_objeto_nulo();
+    ctx->clase_objeto = pdcrt_objeto_nulo();
 
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
@@ -4660,6 +4726,7 @@ pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_
 
 pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_extraerv_k1);
     // [mod, valop, arr]
     pdcrt_empujar_entero(ctx, m, 0);
     // [mod, valop, arr, 0]
@@ -4669,6 +4736,7 @@ pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_extraerv_k2);
     // [mod, valop, val]
     pdcrt_extraer(ctx, -2);
     // [mod, val, valop]
@@ -4752,6 +4820,12 @@ static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     PDCRT_K(pdcrt_exportar_k1)
     // [NULO]
     return pdcrt_devolver(ctx, m, 1);
+}
+
+void pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    pdcrt_extender_pila(ctx, m, 1);
+    pdcrt_empujar(ctx, ctx->clase_objeto);
 }
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_f f, size_t num_caps)
@@ -4904,6 +4978,7 @@ static pdcrt_k pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int a
 
 static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_preparar_registro_de_modulos_importar_k1);
     pdcrt_convertir_a_espacio_de_nombres(ctx, m);
     ctx->espacio_de_nombres_runtime = pdcrt_sacar(ctx);
     pdcrt_empujar_nulo(ctx, m);
@@ -4929,6 +5004,7 @@ static pdcrt_k pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_
 
 static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    PDCRT_K(pdcrt_cargar_dependencia_fijarEn_k1);
     pdcrt_empujar_nulo(ctx, m);
     return pdcrt_devolver(ctx, m, 1);
 }

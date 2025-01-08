@@ -321,6 +321,7 @@ struct pdcrt_marco
     X(truncar, "truncar")                                               \
     X(como_numero_entero, "comoNumeroEntero")                           \
     X(como_numero_real, "comoNumeroReal")                               \
+    X(byte_como_texto, "byteComoTexto")                                 \
     X(longitud, "longitud")                                             \
     X(en, "en")                                                         \
     X(subtexto, "subTexto")                                             \
@@ -346,6 +347,7 @@ struct pdcrt_marco
     X(contiene, "contiene")                                             \
     X(eliminar, "eliminar")                                             \
     X(paraCadaPar, "paraCadaPar")                                       \
+    X(agregar_al_final, "agregarAlFinal")                               \
     X(crear_instancia, "crearInstancia")                                \
     X(atributos_de_instancia, "atributosDeInstancia")                   \
     X(obtener_metodos, u8"obtenerMétodos")                              \
@@ -358,6 +360,8 @@ struct pdcrt_marco
     X(leer_caracter, u8"leerCarácter")                                  \
     X(obtener_argv, u8"obtenerArgv")                                    \
     X(obtener_programa, u8"obtenerPrograma")                            \
+    X(fijar_clase_objeto, u8"fijarClaseObjeto")                         \
+    X(obtener_clase_objeto, u8"obtenerClaseObjeto")                     \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
     X(finalizada, "finalizada")                                         \
@@ -400,6 +404,7 @@ struct pdcrt_ctx
 
     pdcrt_obj argv;
     pdcrt_obj nombre_del_programa;
+    pdcrt_obj clase_objeto;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;
@@ -529,6 +534,8 @@ pdcrt_k pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_
 pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf);
 pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, bool autoejec, pdcrt_kf kf);
 pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo);
+
+void pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_f f, size_t num_caps);
 

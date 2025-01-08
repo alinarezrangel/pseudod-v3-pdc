@@ -265,7 +265,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerObjeto
-        EmitirLínea: puerto, {pdcrt_obtener_clase_objeto(ctx);}
+        EmitirLínea: puerto, {pdcrt_obtener_clase_objeto(ctx, m);}
     finsi
 
     si opcode = Opcode#mkclz

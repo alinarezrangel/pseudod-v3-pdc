@@ -1,6 +1,7 @@
 utilizar bepd/builtins
 utilizar bepd/datos/caja (Caja)
 utilizar bepd/datos/resultado (Resultado)
+utilizar bepd/datos/diccionario (Diccionario)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (LeerTodo, EntradaEstándar, SalidaEstándar)
 utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
@@ -135,7 +136,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
               tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
               parchesAbstraer, ámbito, builtins, exportaciones, dependencias,
-              prefijoDelMódulo, bdComp, prefijosTransitivos
+              prefijoDelMódulo, bdComp, prefijosTransitivos, prefijosTransitivos'
 
     fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
 
@@ -203,15 +204,20 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar programa a estado#emisor#moverAPrograma
 
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
-    fijar prefijosTransitivos a Arreglo#vacio
+    fijar prefijosTransitivos' a Diccionario#vacío
     ParaCadaElemento: dependencias, funcion: dep
         variable mod
         fijar mod a bdMod#buscarMódulo: dep#paquete, dep#módulo
-        prefijosTransitivos#agregarAlFinal: mod#prefijoDelMódulo
+        prefijosTransitivos'#fijarEn: mod#prefijoDelMódulo
         ParaCadaElemento: mod#prefijosDeLosMódulosTransitivos, procedimiento: t
-            prefijosTransitivos#agregarAlFinal: t
+            prefijosTransitivos'#fijarEn: t, VERDADERO
         finprocedimiento
     finfuncion
+
+    fijar prefijosTransitivos a Arreglo#vacio
+    prefijosTransitivos'#paraCadaLlave: procedimiento: prefijo
+        prefijosTransitivos#agregarAlFinal: prefijo
+    finprocedimiento
 
     CompilarPrograma: salidaCompilado, prefijoDelMódulo, prefijosTransitivos, programa
 

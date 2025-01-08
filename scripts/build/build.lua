@@ -384,9 +384,9 @@ local function colorcodes(txt, none)
 end
 
 function log.print(level, fmt, ...)
-   if LOG_LEVELS[level] < LOG_LEVELS[log_level] then
-      return
-   end
+   -- if LOG_LEVELS[level] < LOG_LEVELS[log_level] then
+   --    return
+   -- end
    local colors
    if color_level == "always" then
       colors = true
@@ -481,6 +481,7 @@ local function schedule(rebuilder, db, tasks)
       if task and not done[target] then
          local new_task = rebuilder(db, target, task, extra)
          new_task(fetch)
+         done[target] = true
       end
    end
    return function(target)
@@ -1288,12 +1289,7 @@ local function get_pseudod_dependencies(filename)
          if tk.string == "utilizar" then
             kw_utilizar = true
          elseif kw_utilizar then
-            local comps = components_of_modname(tk.string)
-            if comps then
-               mods[#mods + 1] = comps
-            else
-               log.warn("[fg:yellow]ADVERTENCIA[none] No se pudo detectar que archivo de está importando en %s: utilizar %s", filename, tk.string)
-            end
+            mods[tk.string] = true
             kw_utilizar = false
          end
       elseif tk.state == "ws" or tk.state == "comment" then
@@ -1303,7 +1299,16 @@ local function get_pseudod_dependencies(filename)
       end
    end
 
-   return mods
+   local ls = {}
+   for path in pairs(mods) do
+      local comps = components_of_modname(path)
+      if comps then
+         ls[#ls + 1] = comps
+      else
+         log.warn("[fg:yellow][bold]advertencia[none] No se pudo detectar que archivo de está importando en %s: utilizar %s", filename, path)
+      end
+   end
+   return ls
 end
 
 local DEFAULT_BUILD_DIR = ".pseudod-build"
@@ -1745,6 +1750,21 @@ local function fetch_manifest_key(manifest, fetch, path, ret)
    end
 end
 
+local function load_objects_file(file, objs)
+   local h <close> = io.open(file, "rb")
+   for line in h:lines "l" do
+      objs[line] = true
+   end
+end
+
+local function write_objects_file(file, objs)
+   local h <close> = io.open(file, "wb")
+   for line in pairs(objs) do
+      h:write(line)
+      h:write "\n"
+   end
+end
+
 local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
    if rule.type == "source" then
       return function(fetch)
@@ -1753,7 +1773,12 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
    elseif rule.type == "compile-module" then
       return function(fetch)
          fetch(rule.src)
+         mkdir_recur((assert(libgen.dirname(target))))
+
+         log.debug("[bold]en[none] %s", rule.src)
+
          local deps = get_pseudod_dependencies(rule.src)
+         local dep_objs = {}
          local load_dbs = {}
          for i = 1, #deps do
             local d = deps[i]
@@ -1763,14 +1788,22 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
                load_dbs[#load_dbs + 1] = "--cargar-db"
                load_dbs[#load_dbs + 1] = dep_db_file
                fetch(dep_db_file)
+               local objs_file = builddir .. "/compilado/" .. d.pkgname .. "/" .. d.modname .. ".objs"
+               fetch(objs_file)
+               load_objects_file(objs_file, dep_objs)
+               log.debug("[italic]dependencia[none] %s/%s", d.pkgname, d.modname)
             end
          end
+
+         log.debug("[bold]en[none] %s", rule.src)
+
+         dep_objs["obj:" .. rule.package_name .. "/" .. rule.module_name] = true
+         write_objects_file(rule.objs_file, dep_objs)
+         log.debug("objs %s", rule.objs_file)
 
          if rule.depends_on_manifest then
             fetch_manifest_key(manifest, fetch, rule.manifest_path, false)
          end
-
-         mkdir_recur((assert(libgen.dirname(target))))
 
          local pdc_exe = fetch_config_key(db, fetch, "pdc_ejecutable")
          local pdc_extra_args = fetch_config_key(db, fetch, "pdc_args_extra")
@@ -1795,12 +1828,19 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             "--modulo", rule.module_name,
             "-o", target,
             "--guardar-db", rule.out_db,
+            "--guardar-solo-modulo",
             load_dbs,
+            rule.src,
          }
-         require "fennel"
-         local V = require "fennel.view"
-         print(V(invk))
-         error("bad")
+
+         log.info("[italic]compilando[none] %s", rule.package_name .. "/" .. rule.module_name .. ":" .. rule.src)
+         log.info("[bold]ejecutando[none] %s", table.concat(invk, " "))
+
+         local code = run_cmd(db, fetch, invk)
+         if code ~= 0 then
+            log.error("[fg:red][bold]error[none] error en pdc")
+            error("error en pdc")
+         end
 
          log.info("[fg:green]compilando->c [bold]pdc[none] %s", rule.src)
       end
@@ -1813,8 +1853,117 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
       return function(fetch)
          fetch(rule.src)
          log.info("[fg:green]compilando [bold]cc[none] %s", rule.src)
-         local h <close> = io.open(target, "wb")
-         h:write "cc invk"
+
+         mkdir_recur((assert(libgen.dirname(target))))
+
+         local cc_exe = fetch_config_key(db, fetch, "cc_ejecutable")
+         local cc_cflags = fetch_config_key(db, fetch, "cc_cflags")
+
+         if cc_exe == "" then
+            log.error("[fg:red][bold]error[none] no se encontró un compilador de C a usar.")
+            log.error("      Véase las opciones de configuración cc_nombre y cc_ejecutable y el subcomando `pseudod configurar`")
+            error("no se pudo invocar al compilador de C")
+         end
+
+         local cflags, errmsg = split_shlike_args(cc_cflags)
+         if not cflags then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración cc_cflags: %s", errmsg)
+            error("no se pudo invocar al compilador de C")
+         end
+
+         local main = {}
+         if rule.main then
+            main[1] = "-DPDCRT_MAIN"
+         end
+
+         local invk = flatten1 {
+            cc_exe,
+            cflags,
+            main,
+            "-c",
+            rule.src,
+            "-o",
+            target,
+         }
+
+         log.info("[italic]compilando[none] %s -> c", rule.package_name .. "/" .. rule.module_name)
+         log.info("[bold]ejecutando[none] %s", table.concat(invk, " "))
+
+         local code = run_cmd(db, fetch, invk)
+         if code ~= 0 then
+            log.error("[fg:red][bold]error[none] error en cc")
+            error("error en cc")
+         end
+
+         log.info("[fg:green]compilando->obj [bold]cc[none] %s", rule.package_name .. "/" .. rule.module_name)
+      end
+   elseif rule.type == "link" then
+      return function(fetch)
+         fetch(rule.src)
+         log.info("[fg:green]enlazando [bold]cc[none] %s", rule.src)
+
+         mkdir_recur((assert(libgen.dirname(target))))
+
+         local cc_exe = fetch_config_key(db, fetch, "cc_ejecutable")
+         local cc_cflags = fetch_config_key(db, fetch, "cc_cflags")
+         local cc_clibs = fetch_config_key(db, fetch, "cc_clibs")
+
+         if cc_exe == "" then
+            log.error("[fg:red][bold]error[none] no se encontró un compilador de C a usar.")
+            log.error("      Véase las opciones de configuración cc_nombre y cc_ejecutable y el subcomando `pseudod configurar`")
+            error("no se pudo invocar al compilador de C")
+         end
+
+         local cflags, errmsg = split_shlike_args(cc_cflags)
+         if not cflags then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración cc_cflags: %s", errmsg)
+            error("no se pudo invocar al compilador de C")
+         end
+
+         local clibs, errmsg = split_shlike_args(cc_clibs)
+         if not clibs then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración cc_clibs: %s", errmsg)
+            error("no se pudo invocar al compilador de C")
+         end
+
+         local objs = {}
+         fetch(rule.objs_file)
+         load_objects_file(rule.objs_file, objs)
+
+         local to_link = {rule.src}
+         for line in pairs(objs) do
+            if string.sub(line, 1, 4) == "obj:" then
+               local path = string.sub(line, 5)
+               if path ~= rule.package_name .. "/" .. rule.module_name then
+                  local obj_file = builddir .. "/compilado/" .. path .. ".o"
+                  fetch(obj_file)
+                  to_link[#to_link + 1] = obj_file
+               end
+            else
+               log.error("[fg:red][bold]error[none] No se pudo enlazar el objeto %q", line)
+               error("No se pudo enlazar con el objeto")
+            end
+         end
+
+         local invk = flatten1 {
+            cc_exe,
+            cflags,
+            to_link,
+            "-o",
+            target,
+            clibs,
+         }
+
+         log.info("[italic]enlazando[none] %s", rule.package_name .. "/" .. rule.module_name)
+         log.info("[bold]ejecutando[none] %s", table.concat(invk, " "))
+
+         local code = run_cmd(db, fetch, invk)
+         if code ~= 0 then
+            log.error("[fg:red][bold]error[none] error en cc")
+            error("error en cc")
+         end
+
+         log.info("[fg:green]enlazando [bold]cc[none] %s", rule.package_name .. "/" .. rule.module_name)
       end
    elseif rule.type == "pddoc" then
       return function(fetch)
@@ -1952,8 +2101,13 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
             depends_on_manifest = not not pkg.compilador.id_modulo,
             manifest_path = format_manifest_path("/paquetes/paquete(%s)/compilador/id_modulo", pkgname),
             out_db = outpath .. ".bdm.json",
+            objs_file = outpath .. ".objs",
          }
          rules[outpath .. ".bdm.json"] = {
+            type = "alias",
+            aliases = outpath .. ".c",
+         }
+         rules[outpath .. ".objs"] = {
             type = "alias",
             aliases = outpath .. ".c",
          }
@@ -1962,13 +2116,22 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
             type = "c-compile",
             src = outpath .. ".c",
             main = false,
+            module_name = modname,
             package_name = pkgname,
          }
          rules[outpath .. ".main.o"] = {
             type = "c-compile",
             src = outpath .. ".c",
             main = true,
+            module_name = modname,
             package_name = pkgname,
+         }
+         rules[outpath .. ".exe"] = {
+            type = "link",
+            src = outpath .. ".main.o",
+            module_name = modname,
+            package_name = pkgname,
+            objs_file = outpath .. ".objs",
          }
       end
 
@@ -1998,12 +2161,12 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
                cfg_value = run_config_key(db, fetch, cfg_key)
                set_config_key(db, cfg_key, cfg_value)
             end
-            hash(sha1_string(cfg_value or ""))
+            hash(cfg_value or "")
          end, function(_db, target)
             local cfg_value = get_config_key(db, cfg_key)
             return {
                filename = target,
-               direct_hash = sha1_string(cfg_value or ""),
+               direct_hash = cfg_value or "",
             }
          end
       end
@@ -2013,12 +2176,22 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
          return function(fetch, hash)
             local env_value = os.getenv(env_key)
             log.debug("[italic]configuración[none] Usando variable de entorno %s", env_key)
-            hash(sha1_string(("@" .. env_value) or ""))
+            if env_value then
+               hash("@" .. env_value)
+            else
+               hash("")
+            end
          end, function(_db, target)
             local env_value = os.getenv(env_key)
+            local h
+            if env_value then
+               h = "@" .. env_value
+            else
+               h = ""
+            end
             return {
                filename = target,
-               direct_hash = sha1_string(("@" .. env_value) or ""),
+               direct_hash = h,
             }
          end
       end
@@ -2030,17 +2203,17 @@ local function build_tasks(db, root, relcwd, manifest, manifest_path, builddir)
             log.debug("[italic]configuración[none] Usando parte del manifest %s", manifest_key)
             local datum, found = find_in_manifest(manifest, manifest_key)
             if found then
-               hash(sha1_string("@" .. normalize_json_datum(datum)))
+               hash("@" .. normalize_json_datum(datum))
             else
-               hash(sha1_string(""))
+               hash("")
             end
          end, function(_db, target)
             local datum, found = find_in_manifest(manifest, manifest_key)
             local h
             if found then
-               h = sha1_string("@" .. normalize_json_datum(datum))
+               h = "@" .. normalize_json_datum(datum)
             else
-               h = sha1_string("")
+               h = ""
             end
             return {
                filename = target,
@@ -2103,7 +2276,12 @@ local GLOBAL_OPTS = {
 
 local OPTS_FOR_SUBCOMMAND = {
    compilar = {
-      
+      main = {
+         short = "i",
+         long = "inicio",
+         args = 1,
+         default = "inicio",
+      },
    },
 
    documentar = {
@@ -2173,7 +2351,15 @@ Subcomandos:
 end
 
 function SUBCOMMANDS.compilar(args)
-   --build()
+   local pkgname = args[1]
+   if not pkgname then
+      log.error("[fg:red][bold]error[none] Debes especificar el nombre del paquete a compilar")
+      error("Debes especificar el nombre del paquete a compilar")
+   end
+
+   local path = DEFAULT_BUILD_DIR .. "/compilado/" .. pkgname .. "/" .. args.main .. ".exe"
+   build(path)
+   log.info("[fg:green][bold]compilado en[none] %s", path)
 end
 
 function SUBCOMMANDS.documentar(args)

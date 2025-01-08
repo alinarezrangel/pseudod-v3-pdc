@@ -1,0 +1,18 @@
+clase Foo
+    atributo bar
+finclase
+
+atributo Foo#baz
+
+metodo Foo#hola
+    escribir yo#bar
+    escribir { }
+    escribir yo#baz
+    nl
+finmetodo
+
+variable f
+fijar f a Foo#crear
+fijar f#bar a {hola}
+fijar f#baz a {mundo}
+f#hola
