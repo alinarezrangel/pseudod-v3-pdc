@@ -7,10 +7,6 @@ nl
 escribir (1#inventado: 2)
 nl
 
-metodo Objeto#miTipo
-    devolver TipoDe: yo
-finmetodo
-
 clase Foo
 finclase
 
@@ -19,6 +15,10 @@ finclase
 
 clase Baz hereda Foo
 finclase
+
+metodo Objeto#miTipo
+    devolver TipoDe: yo
+finmetodo
 
 escribir Bar#crear#miTipo#comoTexto
 nl
