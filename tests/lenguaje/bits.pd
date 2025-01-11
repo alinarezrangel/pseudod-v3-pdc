@@ -1,0 +1,34 @@
+escribir (1 <+> 2)#comoTexto
+nl
+escribir (3 <*> 2)#comoTexto
+nl
+escribir (2 <^> 3)#comoTexto
+nl
+escribir (1.0 <+> 2)#comoTexto
+nl
+escribir (3.0 <*> 2)#comoTexto
+nl
+escribir (2.0 <^> 3)#comoTexto
+nl
+escribir (1 <+> 2.0)#comoTexto
+nl
+escribir (3 <*> 2.0)#comoTexto
+nl
+escribir (2 <^> 3.0)#comoTexto
+nl
+escribir (1.0 <+> 2.0)#comoTexto
+nl
+escribir (3.0 <*> 2.0)#comoTexto
+nl
+escribir (2.0 <^> 3.0)#comoTexto
+nl
+escribir (1 << 8)#comoTexto
+nl
+escribir (256 >> 8)#comoTexto
+nl
+escribir 1#invertir#comoTexto
+nl
+escribir -9223372036854775807#invertir#comoTexto
+nl
+escribir 1.0#invertir#comoTexto
+nl

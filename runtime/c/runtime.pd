@@ -51,7 +51,7 @@ fijar OBJETO_ATR_CLASE_BASE a 3
 fijar OBJETO_ATR_SUBCLASES a 4
 fijar OBJETO_NÚM_ATR a 5
 
-fijar metodosObjeto a __RT#crearTabla: 19
+fijar metodosObjeto a __RT#crearTabla: 21
 
 metodosObjeto#fijarEn: {_obtenerMétodoDeInstancia}, metodo: nombre
     variable mets
@@ -183,6 +183,14 @@ metodosObjeto#fijarEn: {subclases}, metodo
     devolver __RT#obtenerAtributo: yo, OBJETO_ATR_SUBCLASES
 finmetodo
 
+metodosObjeto#fijarEn: {metodoNoEncontrado}, metodo: msj, args
+    __FallarConMensaje: ({Método estático ~t no encontrado en la clase ~t}#formatear: msj, yo)
+finmetodo
+
+metodosObjeto#fijarEn: {mensajeNoEncontrado}, metodo: msj, ...args
+    devolver yo#metodoNoEncontrado: msj, args
+finmetodo
+
 funcion CrearClase
     variables cls, metsEst
     fijar metsEst a __RT#crearTabla: metodosObjeto#longitud
@@ -254,6 +262,14 @@ finmetodo
 
 metodo Objeto#\operador_no=\: otro
     devolver no __CompararObjeto: yo, otro
+finmetodo
+
+metodo Objeto#metodoNoEncontrado: msj, args
+    __FallarConMensaje: ({Método ~t no encontrado en la instancia de ~t}#formatear: msj, (TipoDe: yo))
+finmetodo
+
+metodo Objeto#mensajeNoEncontrado: msj, ...args
+    devolver yo#metodoNoEncontrado: msj, args
 finmetodo
 
 __RT#fijarClaseObjeto: Objeto

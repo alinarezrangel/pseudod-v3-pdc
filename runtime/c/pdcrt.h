@@ -315,6 +315,12 @@ struct pdcrt_marco
     X(menor_o_igual_a, "menorOIgualA")                                  \
     X(operador_mayor_o_igual_a, "operador_>=")                          \
     X(mayor_o_igual_a, "mayorOIgualA")                                  \
+    X(operador_bitand, "operador_<*>")                                  \
+    X(operador_bitor, "operador_<+>")                                   \
+    X(operador_bitxor, "operador_<^>")                                  \
+    X(operador_bitlshift, "operador_<<")                                \
+    X(operador_bitrshift, "operador_>>")                                \
+    X(invertir, "invertir")                                             \
     X(negar, "negar")                                                   \
     X(piso, "piso")                                                     \
     X(techo, "techo")                                                   \
@@ -355,6 +361,7 @@ struct pdcrt_marco
     X(fijar_atributo, "fijarAtributo")                                  \
     X(es_instancia, "esInstancia")                                      \
     X(metodo_no_encontrado, "metodoNoEncontrado")                       \
+    X(mensaje_no_encontrado, "mensajeNoEncontrado")                     \
     X(enviar_mensaje, "enviarMensaje")                                  \
     X(fallar_con_mensaje, "fallarConMensaje")                           \
     X(leer_caracter, u8"leerCarácter")                                  \
@@ -575,6 +582,23 @@ void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f);
 
 pdcrt_k pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
+
+pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_k pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 #define PDCRT_DECLARAR_ENTRYPOINT(mod, fmain)                       \
     pdcrt_k pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k) \

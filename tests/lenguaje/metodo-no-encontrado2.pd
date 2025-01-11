@@ -1,0 +1,32 @@
+clase Foo
+finclase
+
+metodo Foo#metodoNoEncontrado: msj, args
+    escribir msj
+    escribir {: }
+    escribir args#comoTexto
+    nl
+    devolver 12
+finmetodo
+
+metodo estatico Foo#metodoNoEncontrado: msj, args
+    escribir {estatico }
+    escribir msj
+    escribir {: }
+    escribir args#comoTexto
+    nl
+    devolver 0
+finmetodo
+
+clase Bar
+finclase
+
+
+escribir (Foo#crear#yara: (Foo#crear#yara: 1), 2)#comoTexto
+nl
+escribir (Foo#crear#aray: 2, 1)#comoTexto
+nl
+escribir (Foo#yara: (Foo#yara: 1), 2)#comoTexto
+nl
+escribir (Foo#aray: 2, 1)#comoTexto
+nl
