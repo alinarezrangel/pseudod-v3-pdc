@@ -41,6 +41,609 @@ PDCRT_INLINE static pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k)
 }
 
 
+void *pdcrt_alojar(pdcrt_aloj *aloj, size_t bytes)
+{
+    return aloj->alojar(aloj, bytes);
+}
+
+void *pdcrt_realojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual, size_t tam_nuevo)
+{
+    return aloj->realojar(aloj, ptr, tam_actual, tam_nuevo);
+}
+
+void pdcrt_desalojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual)
+{
+    aloj->desalojar(aloj, ptr, tam_actual);
+}
+
+static void *pdcrt_alojar_malloc(void *yo, size_t bytes)
+{
+    (void) yo;
+    return malloc(bytes);
+}
+
+static void *pdcrt_realojar_malloc(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo)
+{
+    (void) yo;
+    (void) tam_actual;
+    return realloc(ptr, tam_nuevo);
+}
+
+static void pdcrt_desalojar_malloc(void *yo, void *ptr, size_t tam_actual)
+{
+    (void) yo;
+    (void) tam_actual;
+    free(ptr);
+}
+
+pdcrt_aloj* pdcrt_alojador_malloc(void)
+{
+    static pdcrt_aloj de_malloc = {
+        .alojar = &pdcrt_alojar_malloc,
+        .realojar = &pdcrt_realojar_malloc,
+        .desalojar = &pdcrt_desalojar_malloc,
+        .obtener_extensiones = NULL,
+    };
+    return &de_malloc;
+}
+
+typedef struct pdcrt_aloj_basico_pagina
+{
+    char *pagina;
+    uint64_t *ocupado;
+} pdcrt_aloj_basico_pagina;
+
+typedef struct pdcrt_aloj_basico
+{
+    pdcrt_aloj aloj;
+    pdcrt_aloj* base;
+    pdcrt_aloj_basico_cfg_v1 cfg;
+
+    size_t num_paginas;
+    pdcrt_aloj_basico_pagina *paginas;
+    size_t num_ocupado;
+} pdcrt_aloj_basico;
+
+
+static void *pdcrt_alojar_basico(void *yo, size_t bytes);
+static void *pdcrt_realojar_basico(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo);
+static void pdcrt_desalojar_basico(void *yo, void *ptr, size_t tam_actual);
+
+static void pdcrt_aloj_basico_inicializar_pagina(pdcrt_aloj_basico *basico, size_t pagina);
+
+pdcrt_aloj* pdcrt_alojador_basico(pdcrt_aloj* base, pdcrt_aloj_basico_cfg_v1* cfg, size_t tam_cfg)
+{
+    pdcrt_aloj_basico *basico = pdcrt_alojar(base, sizeof(pdcrt_aloj_basico));
+    if(!basico)
+        return NULL;
+
+    basico->aloj.alojar = &pdcrt_alojar_basico;
+    basico->aloj.realojar = &pdcrt_realojar_basico;
+    basico->aloj.desalojar = &pdcrt_desalojar_basico;
+    basico->aloj.obtener_extensiones = NULL;
+
+    assert(cfg->tam_pagina % 64 == 0);
+    assert(cfg->num_inicial_de_paginas > 0);
+
+    basico->base = base;
+    assert(tam_cfg == sizeof(pdcrt_aloj_basico_cfg_v1));
+    basico->cfg = *cfg;
+
+    basico->num_paginas = cfg->num_inicial_de_paginas;
+    basico->num_ocupado = basico->cfg.tam_pagina / 64;
+    basico->paginas = pdcrt_alojar(base, basico->num_paginas * sizeof(pdcrt_aloj_basico_pagina));
+    if(!basico->paginas)
+    {
+        pdcrt_desalojar(base, basico, sizeof(pdcrt_aloj_basico));
+        return NULL;
+    }
+    for(size_t i = 0; i < basico->num_paginas; i++)
+    {
+        pdcrt_aloj_basico_inicializar_pagina(basico, i);
+    }
+    return (pdcrt_aloj *) basico;
+}
+
+void pdcrt_desalojar_alojador_basico(pdcrt_aloj* basico)
+{
+    pdcrt_aloj_basico *yo = (pdcrt_aloj_basico *) basico;
+    for(size_t i = 0; i < yo->num_paginas; i++)
+    {
+        pdcrt_aloj_basico_pagina *p = &yo->paginas[i];
+        if(p->ocupado)
+            pdcrt_desalojar(yo->base, p->ocupado, sizeof(uint64_t) * yo->num_ocupado);
+        if(p->pagina)
+            pdcrt_desalojar(yo->base, p->pagina, yo->cfg.tam_pagina);
+    }
+    pdcrt_desalojar(yo->base, yo, sizeof(pdcrt_aloj_basico));
+}
+
+static void pdcrt_aloj_basico_inicializar_pagina(pdcrt_aloj_basico *basico, size_t pagina)
+{
+    pdcrt_aloj_basico_pagina *p = &basico->paginas[pagina];
+    p->pagina = NULL,
+    p->ocupado = NULL;
+}
+
+static bool pdcrt_aloj_basico_esta_ocupado(pdcrt_aloj_basico *basico, pdcrt_aloj_basico_pagina *pagina, size_t byte)
+{
+    assert(byte <= basico->cfg.tam_pagina);
+    return (pagina->ocupado[byte >> 6] & (UINT64_C(1) << (uint64_t) (byte & 63))) != 0;
+}
+
+static size_t pdcrt_aloj_basico_siguiente_alineacion(size_t cur)
+{
+    if((cur & 7) != 0)
+        return (cur | 7) + 1;
+    else
+        return cur;
+}
+
+static pdcrt_aloj_basico_pagina * pdcrt_aloj_basico_obtener_pagina(pdcrt_aloj_basico *basico, size_t pagina)
+{
+    if(basico->paginas[pagina].pagina == NULL)
+    {
+        char *pag = pdcrt_alojar(basico->base, basico->cfg.tam_pagina);
+        if(!pag)
+            return NULL;
+        memset(pag, 0, basico->cfg.tam_pagina); // TODO: HARDENED
+        basico->paginas[pagina].pagina = pag;
+    }
+    if(basico->paginas[pagina].ocupado == NULL)
+    {
+        uint64_t *ocupado = pdcrt_alojar(basico->base, sizeof(uint64_t) * basico->num_ocupado);
+        if(!ocupado)
+            return NULL;
+        memset(ocupado, 0, sizeof(uint64_t) * basico->num_ocupado);
+        basico->paginas[pagina].ocupado = ocupado;
+    }
+    return &basico->paginas[pagina];
+}
+
+static bool pdcrt_aloj_basico_buscar_libre(pdcrt_aloj_basico *basico,
+                                           size_t bytes,
+                                           size_t *pagina,
+                                           size_t *offset)
+{
+    assert(bytes <= basico->cfg.tam_pagina);
+
+    size_t tam_pagina = basico->cfg.tam_pagina;
+    for(size_t i = 0; i < basico->num_paginas; i++)
+    {
+        pdcrt_aloj_basico_pagina *p = pdcrt_aloj_basico_obtener_pagina(basico, i);
+        if(!p)
+        {
+            return false;
+        }
+
+        size_t off = 0, byte = 0;
+        for(byte = 0; byte < bytes && off + bytes <= tam_pagina;)
+        {
+            size_t j = bytes - (byte + 1);
+            if(pdcrt_aloj_basico_esta_ocupado(basico, p, off + j))
+            {
+                byte = 0;
+                off = pdcrt_aloj_basico_siguiente_alineacion(off + j + 1);
+            }
+            else
+            {
+                byte += 1;
+            }
+        }
+
+        if(off + bytes > tam_pagina || byte != bytes)
+        {
+            // No se encontró un espacio lo suficientemente grande en esta página
+            continue;
+        }
+        else
+        {
+            *offset = off;
+            *pagina = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool pdcrt_aloj_basico_crear_pagina(pdcrt_aloj_basico *basico)
+{
+    pdcrt_aloj_basico_pagina *nuevas_paginas = pdcrt_realojar(basico->base,
+                                                              basico->paginas,
+                                                              basico->num_paginas * sizeof(pdcrt_aloj_basico_pagina),
+                                                              (basico->num_paginas * 2) * sizeof(pdcrt_aloj_basico_pagina));
+    if(!nuevas_paginas)
+        return false;
+    basico->paginas = nuevas_paginas;
+    for(size_t i = basico->num_paginas; i < basico->num_paginas * 2; i++)
+    {
+        pdcrt_aloj_basico_inicializar_pagina(basico, i);
+    }
+    basico->num_paginas *= 2;
+    return true;
+}
+
+typedef bool (*pdcrt_aloj_basico_iter_bit)(uint64_t *ocupado, uint8_t bit, bool val, void *data);
+typedef bool (*pdcrt_aloj_basico_iter_palabra)(uint64_t *ocupado, void *data);
+
+static PDCRT_INLINE void pdcrt_aloj_basico_para_cada_bit(pdcrt_aloj_basico *basico,
+                                                         pdcrt_aloj_basico_pagina *p,
+                                                         size_t offset,
+                                                         size_t bytes,
+                                                         pdcrt_aloj_basico_iter_bit iter_bit,
+                                                         pdcrt_aloj_basico_iter_palabra iter_palabra,
+                                                         void *data)
+{
+    assert(offset + bytes <= basico->cfg.tam_pagina);
+    if(bytes == 0)
+        return;
+    size_t palabra_inic = offset >> 6;
+    uint64_t *ocupado = &p->ocupado[palabra_inic];
+    uint8_t bit_inic = offset & 63;
+    for(uint8_t bit = bit_inic; bit < 64 && bytes > 0; bit++)
+    {
+        bool val = (*ocupado & (UINT64_C(1) << (uint64_t) bit)) != 0;
+        if(!(*iter_bit)(ocupado, bit, val, data))
+            return;
+        assert(bytes > 0);
+        bytes -= 1;
+    }
+    if(bytes == 0)
+        return;
+    ocupado += 1;
+    size_t palabras_restantes = bytes >> 6;
+    uint8_t bits_restantes = bytes & 63;
+    for(size_t palabra = 0; palabra < palabras_restantes && bytes > 0; palabra++)
+    {
+        if(iter_palabra)
+        {
+            if(!(*iter_palabra)(ocupado, data))
+                return;
+        }
+        else
+        {
+            for(uint8_t bit = 0; bit < 64; bit++)
+            {
+                bool val = (*ocupado & (UINT64_C(1) << (uint64_t) bit)) != 0;
+                if(!(*iter_bit)(ocupado, bit, val, data))
+                    return;
+            }
+        }
+        assert(bytes >= 64);
+        bytes -= 64;
+        ocupado += 1;
+    }
+    if(bytes == 0)
+        return;
+    for(uint8_t bit = 0; bit < bits_restantes && bytes > 0; bit++)
+    {
+        bool val = (*ocupado & (UINT64_C(1) << (uint64_t) bit)) != 0;
+        if(!(*iter_bit)(ocupado, bit, val, data))
+            return;
+        assert(bytes > 0);
+        bytes -= 1;
+    }
+    assert(bytes == 0);
+}
+
+static bool pdcrt_aloj_basico_marcar_como_ocupado_iter_bit(uint64_t *ocupado, uint8_t bit, bool val, void *data)
+{
+    (void) val;
+    (void) data;
+    assert((*ocupado & (UINT64_C(1) << (uint64_t) bit)) == 0);
+    *ocupado = *ocupado | (UINT64_C(1) << (uint64_t) bit);
+    return true;
+}
+
+static bool pdcrt_aloj_basico_marcar_como_ocupado_iter_palabra(uint64_t *ocupado, void *data)
+{
+    (void) data;
+    assert(*ocupado == 0);
+    *ocupado = UINT64_MAX;
+    return true;
+}
+
+static void pdcrt_aloj_basico_marcar_como_ocupado(pdcrt_aloj_basico *basico, pdcrt_aloj_basico_pagina *p, size_t offset, size_t bytes)
+{
+    pdcrt_aloj_basico_para_cada_bit(basico, p,
+                                    offset, bytes,
+                                    &pdcrt_aloj_basico_marcar_como_ocupado_iter_bit,
+                                    &pdcrt_aloj_basico_marcar_como_ocupado_iter_palabra,
+                                    NULL);
+}
+
+typedef struct pdcrt_aloj_basico_extender_env
+{
+    bool ok;
+    size_t tam_actual;
+    size_t tam_nuevo;
+} pdcrt_aloj_basico_extender_env;
+
+#define PDCRT_DEC_CAP(v, n) v = ((v) == 0) ? 0 : ((v) - (n))
+
+static bool pdcrt_aloj_basico_puede_extender_iter_bit(uint64_t *ocupado, uint8_t bit, bool val, void *data)
+{
+    (void) ocupado;
+    (void) bit;
+    pdcrt_aloj_basico_extender_env *env = data;
+    assert(env->tam_actual > 0 || env->tam_nuevo > 0);
+    if(env->tam_actual > 0)
+        env->ok = env->ok && val;
+    else
+        env->ok = env->ok && !val;
+    PDCRT_DEC_CAP(env->tam_actual, 1);
+    PDCRT_DEC_CAP(env->tam_nuevo, 1);
+    return true;
+}
+
+static bool pdcrt_aloj_basico_puede_extender(pdcrt_aloj_basico *basico, pdcrt_aloj_basico_pagina *p, size_t offset, size_t tam_actual, size_t tam_nuevo)
+{
+    assert(p->pagina);
+    assert(offset + tam_actual <= basico->cfg.tam_pagina);
+    assert(offset + tam_nuevo <= basico->cfg.tam_pagina);
+    if(tam_nuevo <= tam_actual)
+        return true;
+    pdcrt_aloj_basico_extender_env env = {
+        .ok = true,
+        .tam_actual = tam_actual,
+        .tam_nuevo = tam_nuevo,
+    };
+    pdcrt_aloj_basico_para_cada_bit(basico, p,
+                                    offset, tam_actual < tam_nuevo ? tam_nuevo : tam_actual,
+                                    &pdcrt_aloj_basico_puede_extender_iter_bit,
+                                    NULL,
+                                    &env);
+    return env.ok;
+}
+
+static bool pdcrt_aloj_basico_extender_iter_bit(uint64_t *ocupado, uint8_t bit, bool val, void *data)
+{
+    (void) val;
+    (void) data;
+    *ocupado = *ocupado | (UINT64_C(1) << (uint64_t) bit);
+    return true;
+}
+
+static bool pdcrt_aloj_basico_extender_iter_palabra(uint64_t *ocupado, void *data)
+{
+    (void) data;
+    *ocupado = UINT64_MAX;
+    return true;
+}
+
+static void pdcrt_aloj_basico_extender(pdcrt_aloj_basico *basico, pdcrt_aloj_basico_pagina *p, size_t offset, size_t bytes)
+{
+    assert(offset + bytes <= basico->cfg.tam_pagina);
+    assert(p->pagina);
+    pdcrt_aloj_basico_para_cada_bit(basico, p,
+                                    offset, bytes,
+                                    &pdcrt_aloj_basico_extender_iter_bit,
+                                    &pdcrt_aloj_basico_extender_iter_palabra,
+                                    NULL);
+}
+
+static bool pdcrt_aloj_basico_marcar_como_desocupado_iter_bit(uint64_t *ocupado, uint8_t bit, bool val, void *data)
+{
+    (void) val;
+    (void) data;
+    assert((*ocupado & (UINT64_C(1) << (uint64_t) bit)) != 0);
+    *ocupado = *ocupado & ~(UINT64_C(1) << (uint64_t) bit);
+    return true;
+}
+
+static bool pdcrt_aloj_basico_marcar_como_desocupado_iter_palabra(uint64_t *ocupado, void *data)
+{
+    (void) data;
+    assert(*ocupado == UINT64_MAX);
+    *ocupado = 0;
+    return true;
+}
+
+static void pdcrt_aloj_basico_marcar_como_desocupado(pdcrt_aloj_basico *basico, pdcrt_aloj_basico_pagina *p, size_t offset, size_t bytes)
+{
+    assert(offset + bytes <= basico->cfg.tam_pagina);
+    pdcrt_aloj_basico_para_cada_bit(basico, p,
+                                    offset, bytes,
+                                    &pdcrt_aloj_basico_marcar_como_desocupado_iter_bit,
+                                    &pdcrt_aloj_basico_marcar_como_desocupado_iter_palabra,
+                                    NULL);
+}
+
+static pdcrt_aloj_basico_pagina *pdcrt_aloj_basico_buscar_pagina(pdcrt_aloj_basico *basico, void *ptr, size_t *pagina, size_t *offset)
+{
+    char *cptr = ptr;
+    *pagina = *offset = 0;
+    for(size_t i = 0; i < basico->num_paginas; i++)
+    {
+        pdcrt_aloj_basico_pagina* p = pdcrt_aloj_basico_obtener_pagina(basico, i);
+        if(!p)
+            return NULL;
+        // Técnicamente, lo siguiente tiene UB: no es legal comparar un puntero de un objeto con un puntero de otro
+        // objeto (en este caso, estamos comparando ptr con todas las páginas, incluso a las que no pertenece).
+        // Dudo mucho que los compiladores sean tan, pero tan malvados como para optimizar mal este caso, dado
+        // que sé que hay mucho software en el mundo que depende de este comportamiento. Sin embargo, sería
+        // ideal corregirlo en un futuro.
+        if(p->pagina && cptr >= p->pagina && cptr <= p->pagina + basico->cfg.tam_pagina)
+        {
+            *pagina = i;
+            *offset = cptr - p->pagina;
+            return p;
+        }
+    }
+    return NULL;
+}
+
+static void *pdcrt_alojar_basico(void *yo, size_t bytes)
+{
+    pdcrt_aloj_basico *basico = yo;
+
+    if(bytes > basico->cfg.tam_pagina)
+    {
+        return pdcrt_alojar(basico->base, bytes);
+    }
+
+    size_t pagina, offset;
+    pdcrt_aloj_basico_pagina *p;
+    if(!pdcrt_aloj_basico_buscar_libre(basico, bytes, &pagina, &offset))
+    {
+        if(!pdcrt_aloj_basico_crear_pagina(basico))
+            return NULL;
+    }
+    p = pdcrt_aloj_basico_obtener_pagina(basico, pagina);
+    if(!p)
+        return NULL;
+    void *res = &p->pagina[offset];
+    pdcrt_aloj_basico_marcar_como_ocupado(basico, p, offset, bytes);
+    return res;
+}
+
+static void *pdcrt_realojar_basico(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo)
+{
+    pdcrt_aloj_basico *basico = yo;
+
+    if(!ptr)
+    {
+        assert(tam_actual == 0);
+        return pdcrt_alojar_basico(yo, tam_nuevo);
+    }
+
+    bool act_ov = tam_actual > basico->cfg.tam_pagina;
+    bool nuevo_ov = tam_nuevo > basico->cfg.tam_pagina;
+    if(act_ov && nuevo_ov)
+    {
+        return pdcrt_realojar(basico->base, ptr, tam_actual, tam_nuevo);
+    }
+    else if((act_ov && !nuevo_ov) || (!act_ov && nuevo_ov))
+    {
+        void *nuevo = pdcrt_alojar_basico(yo, tam_nuevo);
+        if(nuevo)
+        {
+            memcpy(nuevo, ptr, tam_actual < tam_nuevo ? tam_actual : tam_nuevo);
+            pdcrt_desalojar_basico(yo, ptr, tam_actual);
+        }
+        return nuevo;
+    }
+    else
+    {
+        size_t pagina, offset;
+        pdcrt_aloj_basico_pagina* p = pdcrt_aloj_basico_buscar_pagina(basico, ptr, &pagina, &offset);
+        if(!p)
+        {
+            assert(0 && u8"estado del alojador de páginas inválido: alojación de tamaño ideal mas no se encontró entre las páginas");
+            return NULL;
+        }
+
+        if(offset + tam_nuevo < basico->cfg.tam_pagina && pdcrt_aloj_basico_puede_extender(basico, p, offset, tam_actual, tam_nuevo))
+        {
+            pdcrt_aloj_basico_extender(basico, p, offset, tam_nuevo);
+            return ptr;
+        }
+        else
+        {
+            void *nuevo = pdcrt_alojar_basico(yo, tam_nuevo);
+            if(nuevo)
+            {
+                memcpy(nuevo, ptr, tam_actual < tam_nuevo ? tam_actual : tam_nuevo);
+                pdcrt_desalojar_basico(yo, ptr, tam_actual);
+            }
+            return nuevo;
+        }
+    }
+}
+
+static void pdcrt_desalojar_basico(void *yo, void *ptr, size_t tam_actual)
+{
+    if(!ptr)
+        return;
+
+    pdcrt_aloj_basico *basico = yo;
+    if(tam_actual > basico->cfg.tam_pagina)
+    {
+        pdcrt_desalojar(basico->base, ptr, tam_actual);
+    }
+    else
+    {
+        size_t pagina, offset;
+        pdcrt_aloj_basico_pagina* p = pdcrt_aloj_basico_buscar_pagina(basico, ptr, &pagina, &offset);
+        if(!p)
+        {
+            assert(0 && u8"estado del alojador de páginas inválido: alojación de tamaño ideal mas no se encontró entre las páginas");
+            return;
+        }
+
+        pdcrt_aloj_basico_marcar_como_desocupado(basico, p, offset, tam_actual);
+    }
+}
+
+typedef struct pdcrt_aloj_con_estadisticas
+{
+    pdcrt_aloj aloj;
+    pdcrt_aloj *base;
+    size_t alojado;
+} pdcrt_aloj_con_estadisticas;
+
+static void *pdcrt_alojar_con_estadisticas(void *yo, size_t bytes);
+static void *pdcrt_realojar_con_estadisticas(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo);
+static void pdcrt_desalojar_con_estadisticas(void *yo, void *ptr, size_t tam_actual);
+
+pdcrt_aloj* pdcrt_alojador_con_estadisticas(pdcrt_aloj* base)
+{
+    pdcrt_aloj_con_estadisticas* res = pdcrt_alojar(base, sizeof(pdcrt_aloj_con_estadisticas));
+    if(!res)
+        return NULL;
+    res->aloj.alojar = &pdcrt_alojar_con_estadisticas;
+    res->aloj.realojar = &pdcrt_realojar_con_estadisticas;
+    res->aloj.desalojar = &pdcrt_desalojar_con_estadisticas;
+    res->aloj.obtener_extensiones = NULL;
+    res->base = base;
+    res->alojado = 0;
+    return (pdcrt_aloj *) res;
+}
+
+size_t pdcrt_alojador_con_estadisticas_obtener_usado(pdcrt_aloj* yo)
+{
+    pdcrt_aloj_con_estadisticas *est = (pdcrt_aloj_con_estadisticas *) yo;
+    return est->alojado;
+}
+
+void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo)
+{
+    pdcrt_aloj_con_estadisticas *est = (pdcrt_aloj_con_estadisticas *) yo;
+    pdcrt_desalojar(est->base, est, sizeof(pdcrt_aloj_con_estadisticas));
+}
+
+static void *pdcrt_alojar_con_estadisticas(void *yo, size_t bytes)
+{
+    pdcrt_aloj_con_estadisticas *est = yo;
+    void *res = pdcrt_alojar(est->base, bytes);
+    if(res)
+        est->alojado += bytes;
+    return res;
+}
+
+static void *pdcrt_realojar_con_estadisticas(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo)
+{
+    pdcrt_aloj_con_estadisticas *est = yo;
+    void *res = pdcrt_realojar(est->base, ptr, tam_actual, tam_nuevo);
+    if(res)
+    {
+        est->alojado -= tam_actual;
+        est->alojado += tam_nuevo;
+    }
+    return res;
+}
+
+static void pdcrt_desalojar_con_estadisticas(void *yo, void *ptr, size_t tam_actual)
+{
+    pdcrt_aloj_con_estadisticas *est = yo;
+    if(ptr)
+    {
+        est->alojado -= tam_actual;
+    }
+    pdcrt_desalojar(est->base, ptr, tam_actual);
+}
+
+
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
@@ -110,9 +713,40 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
-    if(ctx->recolector_de_basura_activo && (ctx->cnt++ % 1000000 == 0))
+    if(ctx->recolector_de_basura_activo)
     {
-        pdcrt_recolectar_basura_simple(ctx, m);
+        size_t usado = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        if(usado >= ctx->gc.tam_heap)
+        {
+            pdcrt_recolectar_basura_simple(ctx, m);
+            size_t usado = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+            if(usado >= ctx->gc.tam_heap)
+            {
+                ctx->gc.tam_heap = usado + 20 * 1024 * 1024; // +20MiB
+                ctx->gc.num_recolecciones = 0;
+            }
+            else if(usado >= ((ctx->gc.tam_heap / 10) * 6))
+            {
+                ctx->gc.tam_heap = usado + 20 * 1024 * 1024; // +20MiB
+                ctx->gc.num_recolecciones = 0;
+            }
+            else if(usado <= (ctx->gc.tam_heap / 2))
+            {
+                if(ctx->gc.num_recolecciones >= 10)
+                {
+                    ctx->gc.tam_heap = ctx->gc.tam_heap / 2;
+                    ctx->gc.num_recolecciones = 0;
+                }
+                else
+                {
+                    ctx->gc.num_recolecciones += 1;
+                }
+            }
+            else
+            {
+                ctx->gc.num_recolecciones = 0;
+            }
+        }
     }
 }
 
@@ -129,11 +763,12 @@ static void pdcrt_desactivar_recolector_de_basura(pdcrt_ctx *ctx)
 static void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tipo_obj_gc tipo, size_t sz)
 {
     pdcrt_intenta_invocar_al_recolector(ctx, m);
-    pdcrt_cabecera_gc *h = malloc(sz);
+    pdcrt_cabecera_gc *h = pdcrt_alojar_ctx(ctx, sz);
     assert(h);
     h->tipo = tipo;
     h->grupo = PDCRT_TGRP_NINGUNO;
     h->anterior = h->siguiente = NULL;
+    h->num_bytes = sz;
     pdcrt_gc_agregar_a_grupo(&ctx->gc.blanco, h);
     return h;
 }
@@ -291,23 +926,23 @@ static void pdcrt_gc_visitar_contenido(pdcrt_ctx *ctx,
     }
 }
 
-static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
+PDCRT_NOINLINE static void pdcrt_gc_marcar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
 {
     assert(h->grupo != PDCRT_TGRP_NINGUNO);
     if(h->grupo == PDCRT_TGRP_NEGRO)
     {
-        pdcrt_gc_visitar_contenido(ctx, h, &pdcrt_gc_no_debe_ser_blanco, &pdcrt_gc_no_debe_ser_blanco_obj);
-        return;
+#ifdef PDCRT_DBG_GC
+        pdcrt_gc_visitar_contenido(ctx, h, pdcrt_gc_no_debe_ser_blanco, pdcrt_gc_no_debe_ser_blanco_obj);
+#endif
     }
     else if(h->grupo == PDCRT_TGRP_BLANCO)
     {
         pdcrt_gc_mover_a_grupo(&ctx->gc.blanco, &ctx->gc.gris, h);
-        return;
     }
     else
     {
         assert(h->grupo == PDCRT_TGRP_GRIS);
-        pdcrt_gc_visitar_contenido(ctx, h, &pdcrt_gc_marcar_mover_a_gris, &pdcrt_gc_marcar_mover_a_gris_obj);
+        pdcrt_gc_visitar_contenido(ctx, h, pdcrt_gc_marcar_mover_a_gris, pdcrt_gc_marcar_mover_a_gris_obj);
         pdcrt_gc_mover_a_grupo(&ctx->gc.gris, &ctx->gc.negro, h);
     }
 }
@@ -378,7 +1013,7 @@ pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h, bool final)
     else if(h->tipo == PDCRT_TGC_ARREGLO)
     {
         pdcrt_arreglo *a = (pdcrt_arreglo *) h;
-        free(a->valores);
+        pdcrt_desalojar_ctx(ctx, a->valores, sizeof(pdcrt_obj) * a->capacidad);
     }
     else if(h->tipo == PDCRT_TGC_TABLA)
     {
@@ -386,7 +1021,7 @@ pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h, bool final)
         pdcrt_liberar_tabla(ctx, tbl->buckets, tbl->num_buckets);
     }
 
-    free(h);
+    pdcrt_desalojar_ctx(ctx, h, h->num_bytes);
 }
 
 static void pdcrt_gc_recolectar(pdcrt_ctx *ctx)
@@ -498,7 +1133,9 @@ static pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco *m, const char
         size_t ncap = ctx->cap_textos * 2;
         if(ncap == 0)
             ncap = 1;
-        pdcrt_texto **textos = realloc(ctx->textos, sizeof(pdcrt_texto *) * ncap);
+        pdcrt_texto **textos = pdcrt_realojar_ctx(ctx, ctx->textos,
+            sizeof(pdcrt_texto *) * ctx->cap_textos,
+            sizeof(pdcrt_texto *) * ncap);
         if(!textos)
             pdcrt_enomem(ctx);
         ctx->textos = textos;
@@ -1626,14 +2263,14 @@ pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_obj arg = ctx->pila[argp];
         pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
         size_t bufflen = yo.texto->longitud + arg.texto->longitud;
-        char *buff = malloc(bufflen);
+        char *buff = pdcrt_alojar_ctx(ctx, bufflen);
         if(!buff)
             pdcrt_enomem(ctx);
         memcpy(buff, yo.texto->contenido, yo.texto->longitud);
         memcpy(buff + yo.texto->longitud, arg.texto->contenido, arg.texto->longitud);
         pdcrt_extender_pila(ctx, k.marco, 1);
         pdcrt_texto *res = pdcrt_crear_texto(ctx, k.marco, buff, bufflen);
-        free(buff);
+        pdcrt_desalojar_ctx(ctx, buff, bufflen);
         pdcrt_empujar(ctx, pdcrt_objeto_texto(res));
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -1785,11 +2422,11 @@ pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
         else
         {
-            char *buffer = malloc(longitud);
+            char *buffer = pdcrt_alojar_ctx(ctx, longitud);
             assert(buffer);
             memcpy(buffer, yo.texto->contenido + inicio, longitud);
             pdcrt_empujar_texto(ctx, k.marco, buffer, longitud);
-            free(buffer);
+            pdcrt_desalojar_ctx(ctx, buffer, longitud);
         }
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -1822,11 +2459,11 @@ pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
         else
         {
-            char *buffer = malloc(final - inic);
+            char *buffer = pdcrt_alojar_ctx(ctx, final - inicio);
             assert(buffer);
             memcpy(buffer, yo.texto->contenido + inicio, final - inicio);
             pdcrt_empujar_texto(ctx, k.marco, buffer, final - inicio);
-            free(buffer);
+            pdcrt_desalojar_ctx(ctx, buffer, final - inicio);
         }
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -1859,11 +2496,11 @@ pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
             return pdcrt_continuar(ctx, k);
         }
 
-        char *buffer = malloc(buffer_len + 1);
+        char *buffer = pdcrt_alojar_ctx(ctx, buffer_len + 1);
         assert(buffer);
         ok = pdcrt_obtener_texto(ctx, argp + 1, buffer, buffer_len + 1);
         assert(ok);
-        ssize_t *skip_table = malloc(buffer_len * sizeof(ssize_t));
+        ssize_t *skip_table = pdcrt_alojar_ctx(ctx, buffer_len * sizeof(ssize_t));
         assert(skip_table);
 
         // Llena la tabla.
@@ -1918,8 +2555,8 @@ pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_empujar_nulo(ctx, k.marco);
     buscar_encontrado:
 
-        free(buffer);
-        free(skip_table);
+        pdcrt_desalojar_ctx(ctx, buffer, buffer_len + 1);
+        pdcrt_desalojar_ctx(ctx, skip_table, buffer_len * sizeof(ssize_t));
 
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -2339,7 +2976,7 @@ pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
                 tam_final += separador.texto->longitud;
         }
 
-        char *buffer = malloc(tam_final);
+        char *buffer = pdcrt_alojar_ctx(ctx, tam_final);
         if(!buffer)
             pdcrt_enomem(ctx);
         size_t cur = 0;
@@ -2360,7 +2997,7 @@ pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
 
         pdcrt_empujar_texto(ctx, k.marco, buffer, tam_final);
-        free(buffer);
+        pdcrt_desalojar_ctx(ctx, buffer, tam_final);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
@@ -2435,11 +3072,12 @@ pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Procedimiento: comoTexto no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
 #define PDCRT_MAX_LEN 32
-        char *buffer = malloc(PDCRT_MAX_LEN);
+        char *buffer = pdcrt_alojar_ctx(ctx, PDCRT_MAX_LEN);
         if(!buffer)
             pdcrt_enomem(ctx);
         snprintf(buffer, PDCRT_MAX_LEN, "Procedimiento: %p", yo.closure);
         pdcrt_empujar_texto_cstr(ctx, k.marco, buffer);
+        pdcrt_desalojar_ctx(ctx, buffer, PDCRT_MAX_LEN);
 #undef PDCRT_MAX_LEN
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -2487,7 +3125,7 @@ static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 static pdcrt_k pdcrt_tabla_para_cada_par_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static void pdcrt_tabla_inicializar_buckets(pdcrt_ctx *ctx, pdcrt_bucket *buckets, size_t tam);
-static void pdcrt_tabla_expandir(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
+static void pdcrt_tabla_inicializar_con_capacidad(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
 
 pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
@@ -2567,7 +3205,7 @@ pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
 
         if(yo.tabla->num_buckets == 0)
         {
-            pdcrt_tabla_expandir(ctx, yo.tabla, 1);
+            pdcrt_tabla_inicializar_con_capacidad(ctx, yo.tabla, 1);
             assert(yo.tabla->num_buckets > 0);
         }
 
@@ -2577,7 +3215,7 @@ pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         }
 
         size_t cap = yo.tabla->num_buckets + capacidad_adicional;
-        pdcrt_bucket *nuevos_buckets = malloc(sizeof(pdcrt_bucket) * cap);
+        pdcrt_bucket *nuevos_buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * cap);
         if(!nuevos_buckets)
             pdcrt_enomem(ctx);
         pdcrt_tabla_inicializar_buckets(ctx, nuevos_buckets, cap);
@@ -2686,11 +3324,11 @@ static void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl)
     pdcrt_tabla_inicializar_buckets(ctx, tbl->buckets, tbl->num_buckets);
 }
 
-static void pdcrt_tabla_expandir(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
+static void pdcrt_tabla_inicializar_con_capacidad(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
 {
     assert(tbl->num_buckets == 0);
     assert(tbl->buckets == NULL);
-    tbl->buckets = malloc(sizeof(pdcrt_bucket) * capacidad);
+    tbl->buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * capacidad);
     if(!tbl->buckets)
         pdcrt_enomem(ctx);
     tbl->num_buckets = capacidad;
@@ -2709,12 +3347,12 @@ static void pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_
             while(b)
             {
                 pdcrt_bucket *nb = b->siguiente_colision;
-                free(b);
+                pdcrt_desalojar_ctx(ctx, b, sizeof(pdcrt_bucket));
                 b = nb;
             }
         }
     }
-    free(lista);
+    pdcrt_desalojar_ctx(ctx, lista, sizeof(pdcrt_bucket) * tam_lista);
 }
 
 static pdcrt_k pdcrt_prn_helper(pdcrt_ctx *ctx, pdcrt_obj o);
@@ -2751,7 +3389,7 @@ static pdcrt_k pdcrt_tabla_fijar_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     // []
     if(yo.tabla->num_buckets == 0)
     {
-        pdcrt_tabla_expandir(ctx, yo.tabla, 1);
+        pdcrt_tabla_inicializar_con_capacidad(ctx, yo.tabla, 1);
         assert(yo.tabla->num_buckets > 0);
     }
 
@@ -2817,7 +3455,7 @@ static pdcrt_k pdcrt_tabla_fijar_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
     {
         if(!bucket->siguiente_colision)
         {
-            pdcrt_bucket *nb = malloc(sizeof(pdcrt_bucket));
+            pdcrt_bucket *nb = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket));
             if(!bucket)
                 pdcrt_enomem(ctx);
             nb->siguiente_colision = NULL;
@@ -3028,7 +3666,7 @@ static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
         {
             b = b->siguiente_colision;
         }
-        pdcrt_bucket *nb = malloc(sizeof(pdcrt_bucket));
+        pdcrt_bucket *nb = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket));
         if(!nb)
             pdcrt_enomem(ctx);
         nb->activo = true;
@@ -3105,7 +3743,7 @@ static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
         if(bucket_anterior)
         {
             bucket_anterior->siguiente_colision = bucket->siguiente_colision;
-            free(bucket);
+            pdcrt_desalojar_ctx(ctx, bucket, sizeof(bucket));
         }
         else
         {
@@ -3468,11 +4106,12 @@ pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Voidptr: comoTexto no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
 #define PDCRT_MAX_LEN 32
-        char *buffer = malloc(PDCRT_MAX_LEN);
+        char *buffer = pdcrt_alojar_ctx(ctx, PDCRT_MAX_LEN);
         if(!buffer)
             pdcrt_enomem(ctx);
         snprintf(buffer, PDCRT_MAX_LEN, "Voidptr: %p", yo.pval);
         pdcrt_empujar_texto_cstr(ctx, k.marco, buffer);
+        pdcrt_desalojar_ctx(ctx, buffer, PDCRT_MAX_LEN);
 #undef PDCRT_MAX_LEN
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -3496,11 +4135,12 @@ pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Valop: comoTexto no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
 #define PDCRT_MAX_LEN 32
-        char *buffer = malloc(PDCRT_MAX_LEN);
+        char *buffer = pdcrt_alojar_ctx(ctx, PDCRT_MAX_LEN);
         if(!buffer)
             pdcrt_enomem(ctx);
         snprintf(buffer, PDCRT_MAX_LEN, "Valop: %p", yo.valop);
         pdcrt_empujar_texto_cstr(ctx, k.marco, buffer);
+        pdcrt_desalojar_ctx(ctx, buffer, PDCRT_MAX_LEN);
 #undef PDCRT_MAX_LEN
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -3616,11 +4256,12 @@ pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Corrutina: comoTexto no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
 #define PDCRT_MAX_LEN 32
-        char *buffer = malloc(PDCRT_MAX_LEN);
+        char *buffer = pdcrt_alojar_ctx(ctx, PDCRT_MAX_LEN);
         if(!buffer)
             pdcrt_enomem(ctx);
         snprintf(buffer, PDCRT_MAX_LEN, "Corrutina: %p", yo.coro);
         pdcrt_empujar_texto_cstr(ctx, k.marco, buffer);
+        pdcrt_desalojar_ctx(ctx, buffer, PDCRT_MAX_LEN);
 #undef PDCRT_MAX_LEN
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
@@ -4015,6 +4656,21 @@ static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
 }
 
 
+void *pdcrt_alojar_ctx(pdcrt_ctx *ctx, size_t bytes)
+{
+    return pdcrt_alojar(ctx->alojador, bytes);
+}
+
+void *pdcrt_realojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual, size_t tam_nuevo)
+{
+    return pdcrt_realojar(ctx->alojador, ptr, tam_actual, tam_nuevo);
+}
+
+void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual)
+{
+    pdcrt_desalojar(ctx->alojador, ptr, tam_actual);
+}
+
 static inline size_t pdcrt_stp_a_pos(pdcrt_ctx *ctx, pdcrt_stp i)
 {
     if(i < 0)
@@ -4057,7 +4713,7 @@ pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco *m, size_t 
     }
     else
     {
-        a->valores = malloc(sizeof(pdcrt_obj) * capacidad);
+        a->valores = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_obj) * capacidad);
         if(!a->valores)
             pdcrt_enomem(ctx);
     }
@@ -4103,7 +4759,7 @@ pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad)
     tbl->funcion_hash = ctx->funcion_hash;
     if(capacidad > 0)
     {
-        tbl->buckets = malloc(sizeof(pdcrt_bucket) * capacidad);
+        tbl->buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * capacidad);
         if(!tbl->buckets)
             pdcrt_enomem(ctx);
         pdcrt_tabla_inicializar(ctx, tbl);
@@ -4160,12 +4816,18 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v)
 }
 
 
-pdcrt_ctx *pdcrt_crear_contexto(void)
+pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 {
-    pdcrt_ctx *ctx = malloc(sizeof(pdcrt_ctx));
-    assert(ctx);
+    pdcrt_aloj *est = pdcrt_alojador_con_estadisticas(aloj);
+    if(!est)
+        return NULL;
+
+    pdcrt_ctx *ctx = pdcrt_alojar(est, sizeof(pdcrt_ctx));
+    if(!ctx)
+        return NULL;
 
     ctx->recolector_de_basura_activo = true;
+    ctx->alojador = est;
 
     ctx->tam_pila = 0;
     ctx->pila = NULL;
@@ -4177,6 +4839,10 @@ pdcrt_ctx *pdcrt_crear_contexto(void)
     ctx->gc.gris.grupo = PDCRT_TGRP_GRIS;
     ctx->gc.negro.primero = ctx->gc.negro.ultimo = NULL;
     ctx->gc.negro.grupo = PDCRT_TGRP_NEGRO;
+
+    ctx->gc.tam_heap = 10 * 1024 * 1024; // 10MiB
+
+    ctx->gc.num_recolecciones = 0;
 
     ctx->primer_marco_activo = ctx->ultimo_marco_activo = NULL;
 
@@ -4278,9 +4944,11 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
     pdcrt_liberar_grupo(ctx, &ctx->gc.blanco);
     pdcrt_liberar_grupo(ctx, &ctx->gc.gris);
     pdcrt_liberar_grupo(ctx, &ctx->gc.negro);
-    free(ctx->textos);
-    free(ctx->pila);
-    free(ctx);
+    pdcrt_desalojar_ctx(ctx, ctx->textos, sizeof(pdcrt_texto *) * ctx->cap_textos);
+    pdcrt_desalojar_ctx(ctx, ctx->pila, sizeof(pdcrt_obj) * ctx->cap_pila);
+    pdcrt_aloj *aloj = ctx->alojador;
+    pdcrt_desalojar(ctx->alojador, ctx, sizeof(pdcrt_ctx));
+    pdcrt_desalojar_alojador_con_estadisticas(aloj);
 }
 
 
@@ -4289,7 +4957,9 @@ void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem)
     if((num_elem + ctx->tam_pila) > ctx->cap_pila)
     {
         size_t nueva_cap = num_elem + ctx->tam_pila;
-        void *nueva_pila = realloc(ctx->pila, sizeof(pdcrt_obj) * nueva_cap);
+        void *nueva_pila = pdcrt_realojar_ctx(ctx, ctx->pila,
+            sizeof(pdcrt_obj) * ctx->cap_pila,
+            sizeof(pdcrt_obj) * nueva_cap);
         if(!nueva_pila)
             pdcrt_enomem(ctx);
         ctx->pila = nueva_pila;
@@ -5078,7 +5748,9 @@ void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
     size_t nueva_cap = arr->longitud + espacio;
     if(nueva_cap == 0)
         return;
-    pdcrt_obj *nuevos_vals = realloc(arr->valores, sizeof(pdcrt_obj) * nueva_cap);
+    pdcrt_obj *nuevos_vals = pdcrt_realojar_ctx(ctx, arr->valores,
+                                                sizeof(pdcrt_obj) * arr->capacidad,
+                                                sizeof(pdcrt_obj) * nueva_cap);
     if(!nuevos_vals)
         pdcrt_enomem(ctx);
     arr->valores = nuevos_vals;
@@ -5220,7 +5892,8 @@ int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt
 {
     (void) argc;
     (void) argv;
-    pdcrt_ctx *ctx = pdcrt_crear_contexto();
+    pdcrt_aloj *aloj_malloc = pdcrt_alojador_malloc();
+    pdcrt_ctx *ctx = pdcrt_crear_contexto(aloj_malloc);
     pdcrt_fijar_argv(ctx, argc, argv);
     cargar_deps(ctx);
     pdcrt_ejecutar(ctx, 0, f);

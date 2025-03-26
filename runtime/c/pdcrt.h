@@ -13,10 +13,19 @@
 #include <stdlib.h>
 
 
+// Opciones de configuración:
+
+#ifdef PDCRT_DBG
+#define PDCRT_DBG_GC
+#endif
+
+
 #ifdef __GNUC__
 #define PDCRT_INLINE __attribute__((always_inline)) inline
+#define PDCRT_NOINLINE __attribute__((noinline))
 #else
-#define PDCRT_INLINE
+#define PDCRT_INLINE inline
+#define PDCRT_NOINLINE
 #endif
 
 
@@ -75,6 +84,39 @@ typedef uint64_t pdcrt_efloat;
 struct pdcrt_ctx;
 typedef struct pdcrt_ctx pdcrt_ctx;
 
+typedef struct pdcrt_aloj_exts
+{
+    uint32_t version;
+} pdcrt_aloj_exts;
+
+
+typedef struct pdcrt_aloj
+{
+    void *(*alojar)(void *yo, size_t bytes);
+    void *(*realojar)(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo);
+    void (*desalojar)(void *yo, void *ptr, size_t tam_actual);
+    void *(*obtener_extensiones)(void *yo);
+} pdcrt_aloj;
+
+void *pdcrt_alojar(pdcrt_aloj *aloj, size_t bytes);
+void *pdcrt_realojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual, size_t tam_nuevo);
+void pdcrt_desalojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual);
+
+pdcrt_aloj* pdcrt_alojador_malloc(void);
+
+typedef struct pdcrt_aloj_basico_cfg_v1
+{
+    size_t tam_pagina;
+    size_t num_inicial_de_paginas;
+} pdcrt_aloj_basico_cfg_v1;
+
+pdcrt_aloj* pdcrt_alojador_basico(pdcrt_aloj* base, pdcrt_aloj_basico_cfg_v1* cfg, size_t tam_cfg);
+void pdcrt_desalojar_alojador_basico(pdcrt_aloj* basico);
+
+pdcrt_aloj* pdcrt_alojador_con_estadisticas(pdcrt_aloj* base);
+size_t pdcrt_alojador_con_estadisticas_obtener_usado(pdcrt_aloj* yo);
+void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
+
 
 struct pdcrt_marco;
 typedef struct pdcrt_marco pdcrt_marco;
@@ -118,6 +160,7 @@ typedef struct pdcrt_cabecera_gc
     struct pdcrt_cabecera_gc *siguiente, *anterior;
     pdcrt_tipo_obj_gc tipo : 4;
     pdcrt_gc_tipo_grupo grupo : 4;
+    uint32_t num_bytes;
 } pdcrt_cabecera_gc;
 
 typedef struct pdcrt_gc_grupo
@@ -129,6 +172,9 @@ typedef struct pdcrt_gc_grupo
 typedef struct pdcrt_gc
 {
     pdcrt_gc_grupo blanco, gris, negro;
+
+    size_t tam_heap;
+    unsigned int num_recolecciones;
 } pdcrt_gc;
 
 
@@ -391,6 +437,8 @@ struct pdcrt_ctx
 {
     bool recolector_de_basura_activo;
 
+    pdcrt_aloj *alojador;
+
     pdcrt_obj* pila;
     size_t tam_pila;
     size_t cap_pila;
@@ -435,7 +483,7 @@ struct pdcrt_ctx
     bool hay_una_salida_del_trampolin;
 };
 
-pdcrt_ctx *pdcrt_crear_contexto(void);
+pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj);
 void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
@@ -483,6 +531,10 @@ void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
 #ifdef PDCRT_INTERNO
+
+void *pdcrt_alojar_ctx(pdcrt_ctx *ctx, size_t bytes);
+void *pdcrt_realojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual, size_t tam_nuevo);
+void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual);
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco *m, size_t capacidad);
