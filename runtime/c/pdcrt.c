@@ -5224,7 +5224,7 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 
     volatile int x;
     ctx->inicio_del_stack = (uintptr_t) &x;
-    ctx->tam_stack = 4 * 1024 * 1024; // 1 MiB
+    ctx->tam_stack = 4 * 1024 * 1024; // 4 MiB
 
     ctx->hay_un_manejador_de_errores = false;
     ctx->mensaje_de_error = NULL;
