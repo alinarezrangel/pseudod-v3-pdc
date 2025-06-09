@@ -119,7 +119,7 @@ finprocedimiento
 procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
     EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k)}
     EmitirLínea: puerto, «{»
-    EmitirLínea: puerto, {pdcrt_marco* m = pdcrt_crear_marco(ctx, }, func#númLocales, {, }, func#númCapturas, {, args, k);}
+    EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númLocales, {, }, func#númCapturas, {, args, k);}
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -131,7 +131,7 @@ procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
     EmitirLínea: puerto, {static pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
     EmitirLínea: puerto, «{»
-    EmitirLínea: puerto, «if(pdcrt_stack_lleno(ctx)) return (pdcrt_k) { .kf = », nombre, «, .marco = m };»
+    EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, }, nombre, {);}
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -201,7 +201,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#caja
-        EmitirLínea: puerto, {pdcrt_envolver_en_caja(ctx, m);}
+        EmitirLínea: puerto, {pdcrt_envolver_en_caja(ctx, &m);}
     finsi
 
     si opcode = Opcode#fijarCaja
@@ -249,7 +249,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#empujarTexto
-        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {);}
+        EmitirLínea: puerto, {pdcrt_empujar_texto(ctx, &m, }, (EscaparTexto: (tupla#en: 1)), {, }, (tupla#en: 1)#longitud, {);}
     finsi
 
     si opcode = Opcode#empujarNulo
@@ -269,7 +269,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#mkclz
-        EmitirLínea: puerto, {pdcrt_empujar_closure(ctx, m, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 1)), {, }, (tupla#en: 2), {);}
+        EmitirLínea: puerto, {pdcrt_empujar_closure(ctx, &m, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 1)), {, }, (tupla#en: 2), {);}
     finsi
 
     si opcode = Opcode#continuar
@@ -277,7 +277,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#empujarEspacioDeNombres
-        EmitirLínea: puerto, {pdcrt_empujar_espacio_de_nombres(ctx, m);}
+        EmitirLínea: puerto, {pdcrt_empujar_espacio_de_nombres(ctx, &m);}
     finsi
 
     si opcode = Opcode#agregarNombre
