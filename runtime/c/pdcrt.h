@@ -17,9 +17,20 @@
 
 #ifdef PDCRT_DBG
 #define PDCRT_DBG_GC
+#define PDCRT_EMP_INTR
 #endif
 
-//#define PDCRT_EMP_INTR
+#ifdef PDCRT_LOG
+#define PDCRT_LOG_GC
+#endif
+
+#ifndef PDCRT_LOG_COMPILADO
+#if defined(PDCRT_LOG_GC)
+#define PDCRT_LOG_COMPILADO 1
+#else
+#define PDCRT_LOG_COMPILADO 0
+#endif
+#endif
 
 
 #ifdef __GNUC__
@@ -519,6 +530,16 @@ struct pdcrt_ctx
     bool hay_un_manejador_de_errores;
     jmp_buf salir_del_trampolin;
     bool hay_una_salida_del_trampolin;
+
+    struct
+    {
+        bool time;
+    } capacidades;
+
+    struct
+    {
+        bool gc;
+    } log;
 };
 
 pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj);

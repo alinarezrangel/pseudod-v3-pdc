@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include "pdcrt-plataforma.h"
+
 #define PDCRT_INTERNO
 #include "pdcrt.h"
 
@@ -19,21 +21,108 @@ typedef enum pdcrt_subsistema
 #define PDCRT_PRINTF_FORMAT(fmtarg, fromarg)
 #endif
 
+#if !PDCRT_LOG_COMPILADO
+// Si no hay ningún logger activo, la función no hace nada. En ese caso,
+// siempre la inlineamos para que el compilador elimine las
+// llamadas. Efectivamente esto "borra" la función del programa.
+PDCRT_INLINE
+#endif
 static
-PDCRT_PRINTF_FORMAT(2, 3)
-void pdcrt_log(pdcrt_subsistema sis, const char *fmt, ...)
+PDCRT_PRINTF_FORMAT(3, 4)
+void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...)
 {
-    va_list ap;
-    va_start(ap, fmt);
+#if PDCRT_LOG_COMPILADO
     switch(sis)
     {
     case PDCRT_SUBSISTEMA_GC:
+        if(!ctx->log.gc)
+            return;
         fprintf(stderr, "; gc -- ");
         break;
+    default:
+        return;
     }
+    va_list ap;
+    va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     fflush(stderr);
     va_end(ap);
+#else
+    (void) sis;
+    (void) fmt;
+#endif
+}
+
+static int pdcrt_time(struct timespec *out)
+{
+    struct timespec tmp;
+#ifdef PDCRT_OS_CLOCK_GETTIME_MONOTONIC
+    if(clock_gettime(CLOCK_MONOTONIC, out ? out : &tmp) == 0)
+        return 1;
+#elif PDCRT_OS_TIMESPEC_GET_MONOTONIC
+    if(timespec_get(out ? out : &tmp, TIME_MONOTONIC) != 0)
+        return 1;
+#endif
+    return 0;
+}
+
+typedef struct pdcrt_timediff
+{
+    long dif_s;
+    long dif_ms;
+    long dif_us;
+    long dif_ns;
+} pdcrt_timediff;
+
+#define PDCRT_ABS(n) ((n) < 0 ? -(n) : (n))
+
+static void pdcrt_diferencia(struct timespec *primero, struct timespec *segundo, pdcrt_timediff *res)
+{
+    long dif_ns = segundo->tv_nsec - primero->tv_nsec;
+    long dif_us = (dif_ns / 1000L) % 1000;
+    long dif_ms = (dif_ns / 1000000L) % 1000;
+    res->dif_s = segundo->tv_sec - primero->tv_sec;
+    res->dif_ms = PDCRT_ABS(dif_ms);
+    res->dif_us = PDCRT_ABS(dif_us);
+    res->dif_ns = PDCRT_ABS(dif_ns % 1000);
+}
+
+#define PDCRT_FORMATEAR_BYTES_TAM_BUFFER 80LU
+
+static void pdcrt_formatear_bytes(char *buffer, size_t bytes)
+{
+    memset(buffer, 0, PDCRT_FORMATEAR_BYTES_TAM_BUFFER);
+    size_t frac = 0;
+
+    int res = 0;
+    if(bytes < 1024)
+    {
+        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zub", bytes);
+    }
+    else if(bytes < 1024LU * 1024LU)
+    {
+        frac = bytes % 1024LU;
+        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuKib", bytes / 1024LU, frac);
+    }
+    else if(bytes < 1024LU * 1024LU * 1024LU)
+    {
+        frac = (bytes / 1024LU) % 1024LU;
+        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuMib", bytes / (1024LU * 1024LU), frac);
+    }
+    else
+    {
+        frac = (bytes / (1024LU * 1024LU)) % 1024LU;
+        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuGib", bytes / (1024LU * 1024LU * 1024LU), frac);
+    }
+
+    if(res >= (int) PDCRT_FORMATEAR_BYTES_TAM_BUFFER)
+    {
+        buffer[PDCRT_FORMATEAR_BYTES_TAM_BUFFER - 1] = 0;
+    }
+    else if(res < 0)
+    {
+        strncpy(buffer, "no se pudo formatear la cantidad", PDCRT_FORMATEAR_BYTES_TAM_BUFFER);
+    }
 }
 
 
@@ -905,6 +994,8 @@ static pdcrt_cabecera_gc *pdcrt_gc_reubicar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h
     pdcrt_objeto_generico_gc *nuevo = pdcrt_alojar_obj(ctx, NULL, h->tipo, h->num_bytes);
     if(gc_activo)
         pdcrt_activar_recolector_de_basura(ctx);
+    if(!nuevo)
+        pdcrt_enomem(ctx);
     nuevo->gc.tipo = h->tipo;
     nuevo->gc.num_bytes = h->num_bytes;
 
@@ -1195,70 +1286,6 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx)
 static void pdcrt_gc_marcar_y_mover_todos_los_grises(pdcrt_ctx *ctx, pdcrt_recoleccion params);
 static void pdcrt_gc_mover_negros_a_blancos(pdcrt_ctx *ctx);
 
-static void pdcrt_time(struct timespec *out)
-{
-    assert(clock_gettime(CLOCK_MONOTONIC, out) == 0);
-}
-
-typedef struct pdcrt_timediff
-{
-    long dif_s;
-    long dif_ms;
-    long dif_us;
-    long dif_ns;
-} pdcrt_timediff;
-
-#define PDCRT_ABS(n) ((n) < 0 ? -(n) : (n))
-
-static void pdcrt_diferencia(struct timespec *primero, struct timespec *segundo, pdcrt_timediff *res)
-{
-    long dif_ns = segundo->tv_nsec - primero->tv_nsec;
-    long dif_us = (dif_ns / 1000L) % 1000;
-    long dif_ms = (dif_ns / 1000000L) % 1000;
-    res->dif_s = segundo->tv_sec - primero->tv_sec;
-    res->dif_ms = PDCRT_ABS(dif_ms);
-    res->dif_us = PDCRT_ABS(dif_us);
-    res->dif_ns = PDCRT_ABS(dif_ns % 1000);
-}
-
-#define PDCRT_FORMATEAR_BYTES_TAM_BUFFER 512LU
-
-static void pdcrt_formatear_bytes(char *buffer, size_t bytes)
-{
-    memset(buffer, 0, PDCRT_FORMATEAR_BYTES_TAM_BUFFER);
-    size_t frac = 0;
-
-    int res = 0;
-    if(bytes < 1024)
-    {
-        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zub", bytes);
-    }
-    else if(bytes < 1024LU * 1024LU)
-    {
-        frac = bytes % 1024LU;
-        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuKib", bytes / 1024LU, frac);
-    }
-    else if(bytes < 1024LU * 1024LU * 1024LU)
-    {
-        frac = (bytes / 1024LU) % 1024LU;
-        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuMib", bytes / (1024LU * 1024LU), frac);
-    }
-    else
-    {
-        frac = (bytes / (1024LU * 1024LU)) % 1024LU;
-        res = snprintf(buffer, PDCRT_FORMATEAR_BYTES_TAM_BUFFER, "%zu.%03zuGib", bytes / (1024LU * 1024LU * 1024LU), frac);
-    }
-
-    if(res >= (int) PDCRT_FORMATEAR_BYTES_TAM_BUFFER)
-    {
-        buffer[PDCRT_FORMATEAR_BYTES_TAM_BUFFER - 1] = 0;
-    }
-    else if(res < 0)
-    {
-        strncpy(buffer, "no se pudo formatear la cantidad", PDCRT_FORMATEAR_BYTES_TAM_BUFFER);
-    }
-}
-
 static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
                                            pdcrt_marco **m,
                                            pdcrt_recoleccion params)
@@ -1266,16 +1293,20 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
     struct timespec inicio, marcar, recolectar, total;
     pdcrt_timediff dif_marcar, dif_recolectar, dif_total;
     size_t mem_usada_al_inicio, mem_usada_al_final;
-
     char buffer[PDCRT_FORMATEAR_BYTES_TAM_BUFFER];
-    mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
-    pdcrt_formatear_bytes(buffer, mem_usada_al_inicio);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "inicio GC: %s\n", buffer);
 
-    pdcrt_formatear_bytes(buffer, ctx->gc.tam_heap);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "     heap: %s\n", buffer);
+    if(ctx->log.gc && PDCRT_LOG_COMPILADO)
+    {
+        mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        pdcrt_formatear_bytes(buffer, mem_usada_al_inicio);
+        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "inicio GC: %s\n", buffer);
 
-    pdcrt_time(&inicio);
+        pdcrt_formatear_bytes(buffer, ctx->gc.tam_heap);
+        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "     heap: %s\n", buffer);
+
+        if(ctx->capacidades.time)
+            pdcrt_time(&inicio);
+    }
 
     pdcrt_gc_marcar_y_mover_todo(ctx, m, params);
     while(ctx->gc.gris.primero)
@@ -1283,34 +1314,50 @@ static void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
         pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
     }
 
-    pdcrt_time(&marcar);
-    pdcrt_diferencia(&inicio, &marcar, &dif_marcar);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "marcar: %ld.%03ld (%03ld %03ld)\n", dif_marcar.dif_s, dif_marcar.dif_ms, dif_marcar.dif_us, dif_marcar.dif_ns);
+    if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
+    {
+        pdcrt_time(&marcar);
+        pdcrt_diferencia(&inicio, &marcar, &dif_marcar);
+        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "marcar: %ld.%03ld (%03ld %03ld)\n", dif_marcar.dif_s, dif_marcar.dif_ms, dif_marcar.dif_us, dif_marcar.dif_ns);
+    }
 
     pdcrt_gc_recolectar(ctx);
 
-    pdcrt_time(&recolectar);
-    pdcrt_diferencia(&inicio, &recolectar, &dif_recolectar);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "recolectar: %ld.%03ld (%03ld %03ld)\n", dif_recolectar.dif_s, dif_recolectar.dif_ms, dif_recolectar.dif_us, dif_recolectar.dif_ns);
+    if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
+    {
+        pdcrt_time(&recolectar);
+        pdcrt_diferencia(&inicio, &recolectar, &dif_recolectar);
+        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "recolectar: %ld.%03ld (%03ld %03ld)\n", dif_recolectar.dif_s, dif_recolectar.dif_ms, dif_recolectar.dif_us, dif_recolectar.dif_ns);
+    }
 
     pdcrt_gc_mover_negros_a_blancos(ctx);
 
-    pdcrt_time(&total);
-    pdcrt_diferencia(&inicio, &total, &dif_total);
-    mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
-    pdcrt_formatear_bytes(buffer, mem_usada_al_final);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "total: %ld.%03ld (%03ld %03ld)\n", dif_total.dif_s, dif_total.dif_ms, dif_total.dif_us, dif_total.dif_ns);
-    pdcrt_log(PDCRT_SUBSISTEMA_GC, "       %s\n", buffer);
+    if(ctx->log.gc && PDCRT_LOG_COMPILADO)
+    {
+        mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        pdcrt_formatear_bytes(buffer, mem_usada_al_final);
+        if(ctx->capacidades.time)
+        {
+            pdcrt_time(&total);
+            pdcrt_diferencia(&inicio, &total, &dif_total);
+            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "total: %ld.%03ld (%03ld %03ld)\n", dif_total.dif_s, dif_total.dif_ms, dif_total.dif_us, dif_total.dif_ns);
+            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       mem: %s\n", buffer);
+        }
+        else
+        {
+            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "total: mem: %s\n", buffer);
+        }
 
-    if(mem_usada_al_final > mem_usada_al_inicio)
-    {
-        pdcrt_formatear_bytes(buffer, mem_usada_al_final - mem_usada_al_inicio);
-        pdcrt_log(PDCRT_SUBSISTEMA_GC, "       delta: +%s\n", buffer);
-    }
-    else
-    {
-        pdcrt_formatear_bytes(buffer, mem_usada_al_inicio - mem_usada_al_final);
-        pdcrt_log(PDCRT_SUBSISTEMA_GC, "       delta: -%s\n", buffer);
+        if(mem_usada_al_final > mem_usada_al_inicio)
+        {
+            pdcrt_formatear_bytes(buffer, mem_usada_al_final - mem_usada_al_inicio);
+            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       delta: +%s\n", buffer);
+        }
+        else
+        {
+            pdcrt_formatear_bytes(buffer, mem_usada_al_inicio - mem_usada_al_final);
+            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       delta: -%s\n", buffer);
+        }
     }
 }
 
@@ -5187,6 +5234,10 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->pila = NULL;
     ctx->cap_pila = 0;
 
+    // TODO: Todas las funciones que alojan objetos en esta función, si se
+    // quedan sin memoria, fallarán con enomem terminando el proceso. La
+    // solución es poder un "handler" de errores al crear el contexto.
+
     ctx->gc.blanco.primero = ctx->gc.blanco.ultimo = NULL;
     ctx->gc.blanco.grupo = PDCRT_TGRP_BLANCO;
     ctx->gc.gris.primero = ctx->gc.gris.ultimo = NULL;
@@ -5222,6 +5273,7 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
 
+    // TODO: Esto debería estár en `pdcrt_ejecutar_opt`.
     volatile int x;
     ctx->inicio_del_stack = (uintptr_t) &x;
     ctx->tam_stack = 4 * 1024 * 1024; // 4 MiB
@@ -5248,6 +5300,16 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 
     ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, 0));
     ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, 0));
+
+    ctx->capacidades.time = !!pdcrt_time(NULL);
+
+    ctx->log.gc =
+#ifdef PDCRT_LOG_GC
+        true
+#else
+        false
+#endif
+        ;
 
     return ctx;
 }
