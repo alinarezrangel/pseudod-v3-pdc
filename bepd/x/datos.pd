@@ -35,6 +35,7 @@ funcion TipoDeDatos: nombre, ...campos
     finprocedimiento
 
     metodo Tipo#inicializar: ...valores
+        necesitas valores#longitud = campos#longitud
         ParaCadaElementoConÍndice: campos, procedimiento: campo, i
             EnviarMensaje: yo, ({fijar_}#concatenar: campo), (valores#en: i)
         finprocedimiento

@@ -81,6 +81,15 @@ metodo DiccionarioAlist#en: llave
     devolver yo#transformarPar: llave, &Identidad
 finmetodo
 
+metodo DiccionarioAlist#intentaEn: llave, predeterminado
+    [ TODO: Optimizar ]
+    si yo#contiene: llave
+        devolver yo#en: llave
+    sino
+        devolver predeterminado
+    finsi
+finmetodo
+
 metodo DiccionarioAlist#fijarEn: llave, nuevoValor
     yo#_transformarParImpl: llave, funcion: viejoValor
         devolver nuevoValor

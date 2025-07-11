@@ -1,0 +1,86 @@
+utilizar bepd/builtins
+
+utilizar bepd/x/algebraico (Alternativa, TipoAlgebraico)
+
+
+procedimiento PruebaCrear
+    variable T
+    fijar T a TipoAlgebraico: {T},
+        (Alternativa: {foo}, {hola}, {mundo}),
+        (Alternativa: {bar}, {adios}),
+        (Alternativa: {baz})
+
+    necesitas (T#foo: 1, 2)#comoTexto = {(T#foo: 1, 2)}
+    necesitas (T#foo: 3, 4)#comoTexto = {(T#foo: 3, 4)}
+    necesitas (T#bar: 1)#comoTexto = {(T#bar: 1)}
+    necesitas T#baz#comoTexto = {(T#baz: )}
+finprocedimiento
+
+procedimiento PruebaAtributos
+    variable T
+    fijar T a TipoAlgebraico: {T},
+        (Alternativa: {foo}, {hola}, {mundo}),
+        (Alternativa: {bar}, {adios}),
+        (Alternativa: {baz})
+
+    necesitas (T#foo: 1, 2)#hola = 1
+    necesitas (T#foo: 1, 2)#mundo = 2
+    necesitas (T#bar: 4)#adios = 4
+finprocedimiento
+
+procedimiento PruebaAtributosDuplicados
+    variable T
+    fijar T a TipoAlgebraico: {T},
+        (Alternativa: {foo}, {hola}, {mundo}),
+        (Alternativa: {bar}, {mundo}, {hola})
+
+    necesitas (T#foo: 1, 2)#hola = 1
+    necesitas (T#foo: 1, 2)#mundo = 2
+    necesitas (T#bar: 1, 2)#hola = 2
+    necesitas (T#bar: 1, 2)#mundo = 1
+finprocedimiento
+
+procedimiento PruebaEs
+    variable T
+    fijar T a TipoAlgebraico: {T},
+        (Alternativa: {foo}),
+        (Alternativa: {bar}),
+        (Alternativa: {baz})
+
+    necesitas T#foo#esFoo
+    necesitas T#bar#esBar
+    necesitas T#baz#esBaz
+
+    necesitas no T#foo#esBar
+    necesitas no T#bar#esBaz
+    necesitas no T#baz#esFoo
+    necesitas no T#foo#esBaz
+    necesitas no T#bar#esFoo
+    necesitas no T#baz#esBar
+finprocedimiento
+
+procedimiento PruebaEsUtf8
+    variable T
+    fijar T a TipoAlgebraico: {T},
+        (Alternativa: {áfoo}),
+        (Alternativa: {ñbar}),
+        (Alternativa: {übaz})
+
+    necesitas T#áfoo#esÁfoo
+    necesitas T#ñbar#esÑbar
+    necesitas T#übaz#esÜbaz
+
+    necesitas no T#áfoo#esÑbar
+    necesitas no T#ñbar#esÜbaz
+    necesitas no T#übaz#esÁfoo
+    necesitas no T#áfoo#esÜbaz
+    necesitas no T#ñbar#esÁfoo
+    necesitas no T#übaz#esÑbar
+finprocedimiento
+
+
+PruebaCrear
+PruebaAtributos
+PruebaAtributosDuplicados
+PruebaEs
+PruebaEsUtf8

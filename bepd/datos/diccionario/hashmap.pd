@@ -83,6 +83,14 @@ metodo DiccionarioHashMap#en: llave
     devolver yo#_tabla#en: llave
 finmetodo
 
+metodo DiccionarioHashMap#intentaEn: llave, predeterminado
+    si yo#contiene: llave
+        devolver yo#en: llave
+    sino
+        devolver predeterminado
+    finsi
+finmetodo
+
 metodo DiccionarioHashMap#fijarEn: llave, valor
     NecesitasLlavePrimitiva: llave
     si no yo#contiene: llave

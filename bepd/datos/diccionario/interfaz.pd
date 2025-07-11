@@ -78,6 +78,13 @@ clase IDiccionario
     metodo en: llave
 
     [DOCUMENTA
+    @brief{Obtiene el valor de una llave.}
+
+    Si la llave no existe en este diccionario devuelve @pd{predeterminado}.
+    DOCUMENTA]
+    metodo intentaEn: llave, predeterminado
+
+    [DOCUMENTA
     @brief{Cambia el valor asociado a una llave.}
 
     El nuevo valor de @param{llave} será @param{valor} y el anterior valor

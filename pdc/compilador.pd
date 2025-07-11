@@ -1,5 +1,6 @@
 utilizar bepd/builtins
 utilizar bepd/datos/caja (Caja)
+utilizar bepd/datos/conjunto (Conjunto)
 utilizar bepd/datos/resultado (Resultado)
 utilizar bepd/datos/diccionario (Diccionario)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
@@ -13,6 +14,7 @@ utilizar bepd/x/enum (Enum)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (SalidaEstándar)
 utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/algebraico (Alternativa, TipoAlgebraico)
 utilizar bepd/x/cli (Opción, CLI como ProcesarCLI)
 
 utilizar pdc/cst como CST
@@ -100,9 +102,13 @@ finfuncion
 variable RegistrarBuiltin
 fijar RegistrarBuiltin a TipoDeDatos: {RegistrarBuiltin}, {nombre}, {builtin}, {esAutoejecutable}
 
-variable BUILTINS
-fijar BUILTINS a Arreglo#crearCon:
-    (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO),
+variables BUILTINS_SOLO_RT, TODOS_LOS_BUILTINS
+
+fijar BUILTINS_SOLO_RT a Arreglo#crearCon:
+    (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO)
+
+fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
+    ...BUILTINS_SOLO_RT,
     (RegistrarBuiltin#crear: {__Impl}, {__Impl}, FALSO),
     (RegistrarBuiltin#crear: {VERDADERO}, {rt:VERDADERO}, FALSO),
     (RegistrarBuiltin#crear: {FALSO}, {rt:FALSO}, FALSO),
@@ -131,6 +137,12 @@ fijar BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__Capturar}, {rt:__Capturar}, VERDADERO),
     (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO),
     (RegistrarBuiltin#crear: {__Argv}, {rt:__Argv}, FALSO)
+
+variable AgregarBuiltins
+fijar AgregarBuiltins a Enum: {AgregarBuiltins},
+    {NINGÚN_BUILTIN},
+    {SOLO_RT},
+    {TODOS_LOS_BUILTINS}
 
 procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, agregarBuiltins, salidaCompilado
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
@@ -167,13 +179,21 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
 
     fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
 
-    si agregarBuiltins
-        ParaCadaElemento: BUILTINS, procedimiento: builtin
-            variables binding
-            fijar binding a (ámbito#crear: builtin#nombre, builtin#esAutoejecutable)#binding
-            tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: binding, builtin#builtin)
-        finprocedimiento
+    variable builtinsPorAgregar
+    fijar builtinsPorAgregar a Arreglo#vacio
+
+    si agregarBuiltins = AgregarBuiltins#TODOS_LOS_BUILTINS
+        fijar builtinsPorAgregar a TODOS_LOS_BUILTINS
     finsi
+    si agregarBuiltins = AgregarBuiltins#SOLO_RT
+        fijar builtinsPorAgregar a BUILTINS_SOLO_RT
+    finsi
+
+    ParaCadaElemento: builtinsPorAgregar, procedimiento: builtin
+        variables binding
+        fijar binding a (ámbito#crear: builtin#nombre, builtin#esAutoejecutable)#binding
+        tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: binding, builtin#builtin)
+    finprocedimiento
 
     ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
     ParaCadaElemento: parchesNombres, (MétodoComoFunción: {llamar})
@@ -253,7 +273,7 @@ fijar OpcionesDeCompilación a TipoDeDatos: {OpcionesDeCompilación},
     {mostrarAyuda}, [ Boole ]
     {mostrarVersión}, [ MostrarVersión ]
     {verboso}, [ Verbosidad ]
-    {experimentos}, [ Arreglo de Textos ]
+    {experimentos}, [ Diccionario de Textos a VERDADERO | Texto ]
     {salida}, [ SalidaAArchivo | SALIDA_A_SALIDA | IGNORAR_SALIDA ]
     {entrada}, [ (EntradaDesdeArchivo | EntradaDesdeTexto | ENTRADA_DESDE_ENTRADA) o NULO si no se especificó ]
     {guardarBaseDeDatos}, [ Texto o NULO ]
@@ -307,6 +327,12 @@ fijar EntradaDesdeEntrada a TipoDeDatos: {EntradaDesdeEntrada}
 variable ENTRADA_DESDE_ENTRADA
 fijar ENTRADA_DESDE_ENTRADA a EntradaDesdeEntrada#crear
 
+variable ResultadoCli
+fijar ResultadoCli a TipoAlgebraico: {ResultadoCli},
+    (Alternativa: {error}, {mensaje}),
+    (Alternativa: {okConOpciones}, {opciones}),
+    (Alternativa: {okYSalir})
+
 funcion ProcesarCLIDelCompilador: argumentosDelCLI
     variable opciones
     fijar opciones a OpcionesDeCompilación#predeterminado
@@ -353,56 +379,97 @@ funcion ProcesarCLIDelCompilador: argumentosDelCLI
         finprocedimiento
     finprocedimiento
 
-    variable opts
-    fijar opts a Arreglo#crearCon:
-        [ ===== Ayuda e información ===== ]
-        (Opción#crear: {h},  {help},                 0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
-        (Opción#crear: {a},  {ayuda},                0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
-        (Opción#crear: {?},  NULO,                   0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+    procedimiento ManejarExperimentos: opt, ...valores
+        variable dic
+        fijar dic a Diccionario#vacío
+        ParaCadaElemento: valores, procedimiento: experimento
+            si TextoContiene: experimento, {:}
+                variable i
+                fijar i a experimento#buscar: 0, {:}
+                dic#fijarEn: (experimento#parteDelTexto: 0, i), (experimento#parteDelTexto: (i + 1), experimento#longitud)
+            sino
+                dic#fijarEn: experimento, VERDADERO
+            finsi
+        finprocedimiento
+        fijar opciones#experimentos a dic
+    finprocedimiento
 
-        (Opción#crear: {v},  {version},              0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#VERSIÓN_Y_NOMBRE)),
-        (Opción#crear: NULO, {solo-version},         0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#SOLO_VERSIÓN)),
+    procedimiento ManejarInspeccionar: salir
+        devolver procedimiento: opt, var
+            si var = {backends}
+                Escribir: {cc}
+                %salir: (ResultadoCli#okYSalir)
+            finsi
 
-        (Opción#crear: {V},  {verboso},              0, VERDADERO, &ManejarVerboso),
+            si var = {experimentos}
+                Escribir: {Builtins}
+                Escribir: {Builtins:no}
+                Escribir: {Builtins:RT}
+                %salir: (ResultadoCli#okYSalir)
+            finsi
 
-        [ ===== Experimentos ===== ]
-        (Opción#crear: {X},  {experimento},          1, VERDADERO, (Fijar: {experimentos})),
+            si var = {variables}
+                Escribir: {backends}
+                Escribir: {experimentos}
+                %salir: (ResultadoCli#okYSalir)
+            finsi
 
-        [ ===== Entrada, salida y archivos temporales ===== ]
-        (Opción#crear: {o},  {salida},               1, FALSO,     &ManejarSalida),
-        (Opción#crear: NULO, {escribir-salida},      0, FALSO,     (Almacenar: {salida}, SALIDA_A_SALIDA)),
-        (Opción#crear: NULO, {ignorar-salida},       0, FALSO,     (Almacenar: {salida}, IGNORAR_SALIDA)),
-        (Opción#crear: NULO, {leer-entrada},         0, FALSO,     (Almacenar: {entrada}, ENTRADA_DESDE_ENTRADA)),
-        (Opción#crear: {c},  {codigo},               1, FALSO,     &ManejarEntradaDesdeTexto),
-        (Opción#crear: NULO, {código},               1, FALSO,     &ManejarEntradaDesdeTexto),
-
-        [ ===== Base de datos de módulos ===== ]
-        (Opción#crear: NULO, {guardar-db},           1, FALSO,     (Fijar: {guardarBaseDeDatos})),
-        (Opción#crear: NULO, {guardar-solo-modulo},  0, FALSO,     (Almacenar: {guardarMódulo}, VERDADERO)),
-        (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
-
-        [ ===== Compilación ===== ]
-        (Opción#crear: NULO, {id-modulo},            1, FALSO,     (Fijar: {identificadorDelMódulo})),
-        (Opción#crear: NULO, {paquete},              1, FALSO,     (Fijar: {nombreDelPaquete})),
-        (Opción#crear: NULO, {modulo},               1, FALSO,     (Fijar: {nombreDelMódulo}))
+            __FallarConMensaje: ({Variable a inspeccionar inválida: ~t}#formatear: var)
+        finprocedimiento
+    finprocedimiento
 
     devolver LlamarConEC: procedimiento: salir
+        variable opts
+        fijar opts a Arreglo#crearCon:
+            [ ===== Ayuda e información ===== ]
+            (Opción#crear: {h},  {help},                 0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+            (Opción#crear: {a},  {ayuda},                0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+            (Opción#crear: {?},  NULO,                   0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+
+            (Opción#crear: {v},  {version},              0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#VERSIÓN_Y_NOMBRE)),
+            (Opción#crear: NULO, {solo-version},         0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#SOLO_VERSIÓN)),
+
+            (Opción#crear: {V},  {verboso},              0, VERDADERO, &ManejarVerboso),
+
+            (Opción#crear: {I},  {inspeccionar},         1, FALSO,     (ManejarInspeccionar: salir)),
+
+            [ ===== Experimentos ===== ]
+            (Opción#crear: {X},  {experimento},          1, VERDADERO, &ManejarExperimentos),
+
+            [ ===== Entrada, salida y archivos temporales ===== ]
+            (Opción#crear: {o},  {salida},               1, FALSO,     &ManejarSalida),
+            (Opción#crear: NULO, {escribir-salida},      0, FALSO,     (Almacenar: {salida}, SALIDA_A_SALIDA)),
+            (Opción#crear: NULO, {ignorar-salida},       0, FALSO,     (Almacenar: {salida}, IGNORAR_SALIDA)),
+            (Opción#crear: NULO, {leer-entrada},         0, FALSO,     (Almacenar: {entrada}, ENTRADA_DESDE_ENTRADA)),
+            (Opción#crear: {c},  {codigo},               1, FALSO,     &ManejarEntradaDesdeTexto),
+            (Opción#crear: NULO, {código},               1, FALSO,     &ManejarEntradaDesdeTexto),
+
+            [ ===== Base de datos de módulos ===== ]
+            (Opción#crear: NULO, {guardar-db},           1, FALSO,     (Fijar: {guardarBaseDeDatos})),
+            (Opción#crear: NULO, {guardar-solo-modulo},  0, FALSO,     (Almacenar: {guardarMódulo}, VERDADERO)),
+            (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
+
+            [ ===== Compilación ===== ]
+            (Opción#crear: NULO, {id-modulo},            1, FALSO,     (Fijar: {identificadorDelMódulo})),
+            (Opción#crear: NULO, {paquete},              1, FALSO,     (Fijar: {nombreDelPaquete})),
+            (Opción#crear: NULO, {modulo},               1, FALSO,     (Fijar: {nombreDelMódulo}))
+
         variables opcs, pos
         fijar pos a ProcesarCLI: opts, NULO, argumentosDelCLI, procedimiento: error
-            devolver %salir: (Resultado#error: error)
+            devolver %salir: (ResultadoCli#error: error)
         finprocedimiento
         si pos#longitud > 1
-            devolver Resultado#error: {Se especificaron múltiples archivos de entrada}
+            devolver ResultadoCli#error: {Se especificaron múltiples archivos de entrada}
         finsi
         si pos#longitud = 1
             si EsNulo: opciones#entrada
                 fijar opciones#entrada a EntradaDesdeArchivo#crear: (pos#en: 0)
             sino
-                devolver Resultado#error: {Se especificaron múltiples archivos de entrada}
+                devolver ResultadoCli#error: {Se especificaron múltiples archivos de entrada}
             finsi
         finsi
 
-        devolver Resultado#ok: opciones
+        devolver ResultadoCli#okConOpciones: opciones
     finprocedimiento
 finfuncion
 
@@ -432,8 +499,12 @@ procedimiento EjecutarCompilador: cli
     si rOpciones#esError
         __FallarConMensaje: rOpciones#error
     finsi
+    si rOpciones#esOkYSalir
+        devolver NULO
+    finsi
     variable opciones
-    fijar opciones a rOpciones#valor
+    fijar opciones a rOpciones#opciones
+    Escribir: cli, opciones
 
     si opciones#mostrarAyuda
         MostrarAyuda
@@ -484,8 +555,18 @@ procedimiento EjecutarCompilador: cli
         bdMod#cargarDesdeArchivo: (__AbrirArchivo: archivo, 10)
     finprocedimiento
 
-    variable agregarBuiltins
-    fijar agregarBuiltins a no Contiene: opciones#experimentos, {NoBuiltins}
+    variables agregarBuiltins, exBuiltins
+    fijar exBuiltins a opciones#experimentos#intentaEn: {Builtins}, VERDADERO
+    si no (Conjunto#crearCon: {no}, {RT}, VERDADERO)#contiene: exBuiltins
+        __FallarConMensaje: ({Valor inválido para la extensión Builtins: ~t}#formatear: exBuiltins)
+    finsi
+    fijar agregarBuiltins a AgregarBuiltins#TODOS_LOS_BUILTINS
+    si exBuiltins = {no}
+        fijar agregarBuiltins a AgregarBuiltins#NINGÚN_BUILTIN
+    finsi
+    si exBuiltins = {RT}
+        fijar agregarBuiltins a AgregarBuiltins#SOLO_RT
+    finsi
 
     fijar res a Compilar: opciones#nombreDelPaquete,
                           opciones#nombreDelMódulo,

@@ -1,0 +1,157 @@
+utilizar bepd/builtins
+utilizar bepd/datos/diccionario (Diccionario)
+utilizar bepd/utilidades/arreglo (Únicos)
+utilizar bepd/utilidades/texto (Unir)
+utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII_MAYÚSCULAS, ALFABETO_ASCII_MINÚSCULAS)
+utilizar bepd/x/utf8 (ParaCadaCodepoint)
+
+utilizar bepd/x/datos (TipoDeDatos)
+
+
+variable númAtributo
+fijar númAtributo a 0
+procedimiento GenerarAtributo
+    fijar númAtributo a númAtributo + 1
+    devolver {_atr~t}#formatear: númAtributo
+finprocedimiento
+
+variables ESPECIALES_MINÚSCULAS, ESPECIALES_MAYÚSCULAS
+fijar ESPECIALES_MINÚSCULAS a {áéíóúüñ}
+fijar ESPECIALES_MAYÚSCULAS a {ÁÉÍÓÚÜÑ}
+
+variable TABLA_MINÚSCULAS, TABLA_MAYÚSCULAS
+fijar TABLA_MINÚSCULAS a ALFABETO_ASCII_MINÚSCULAS#concatenar: ESPECIALES_MINÚSCULAS
+fijar TABLA_MAYÚSCULAS a ALFABETO_ASCII_MAYÚSCULAS#concatenar: ESPECIALES_MAYÚSCULAS
+
+funcion Mayúscula: c
+    [ FIXME: Estoy asumiendo que cada carácter en mayúsculas ocupa la misma
+      cantidad de codeunits que su equivalente en minúsculas ]
+    variable i
+    fijar i a TABLA_MINÚSCULAS#buscar: 0, c
+    si EsNulo: i
+        devolver c
+    sino
+        devolver TABLA_MAYÚSCULAS#subTexto: i, c#longitud
+    finsi
+finfuncion
+
+funcion Capitalizar: txt
+    si txt = {}
+        devolver {}
+    finsi
+
+    variables primerCarácter, índiceSegundoCar
+    LlamarConEC: procedimiento: salir
+        ParaCadaCodepoint: txt, procedimiento: c, cp, pos
+            si pos = 0
+                fijar primerCarácter a c
+            sino
+                fijar índiceSegundoCar a pos
+                %salir: NULO
+            finsi
+        finprocedimiento
+    finprocedimiento
+
+    variable resto
+    si EsNulo: índiceSegundoCar
+        fijar resto a {}
+    sino
+        fijar resto a txt#subTexto: índiceSegundoCar, txt#longitud
+    finsi
+
+    devolver (Mayúscula: primerCarácter)#concatenar: resto
+finfuncion
+
+funcion AtributoConPrefijo: prefijo, atr
+    devolver prefijo#concatenar: (Capitalizar: atr)
+finfuncion
+
+variable AlternativaImpl
+fijar AlternativaImpl a TipoDeDatos: {Alternativa}, {nombre}, {campos}
+
+funcion Alternativa: nombre, ...campos
+    necesitas (Únicos: campos)#longitud = campos#longitud
+    devolver AlternativaImpl#crear: nombre, campos
+finfuncion
+
+funcion TipoAlgebraico: nombre, ...alternativas
+    variables camposPorTipo, atributosReales, númMaxCampos, mapeoDeCampos
+    fijar camposPorTipo a Diccionario#vacío
+    fijar atributosReales a Arreglo#vacio
+    fijar númMaxCampos a 0
+    fijar mapeoDeCampos a Diccionario#vacío
+
+    ParaCadaElemento: alternativas, procedimiento: alt
+        si camposPorTipo#contiene: alt#nombre
+            __FallarConMensaje: ({TipoAlgebraico ~t: alternativa ~t duplicada}#formatear: nombre, alt#nombre)
+        finsi
+
+        camposPorTipo#fijarEn: alt#nombre, alt#campos
+
+        ParaCadaElementoConÍndice: alt#campos, procedimiento: campo, i
+            variable subdic
+            si mapeoDeCampos#contiene: campo
+                fijar subdic a mapeoDeCampos#en: campo
+            sino
+                fijar subdic a Diccionario#vacío
+                mapeoDeCampos#fijarEn: campo, subdic
+            finsi
+            subdic#fijarEn: alt#nombre, i
+        finprocedimiento
+
+        fijar númMaxCampos a Max: númMaxCampos, alt#campos#longitud
+    finprocedimiento
+
+    ParaCadaNúmero: 0, númMaxCampos, procedimiento: _i
+        atributosReales#agregarAlFinal: GenerarAtributo
+    finprocedimiento
+
+    clase Algebraico
+        metodo comoTexto
+    finclase
+
+    atributo Algebraico#_tipo
+
+    fijar Algebraico#nombre a nombre
+    ParaCadaElemento: atributosReales, procedimiento: atr
+        Algebraico#agregarAtributo: atr
+    finprocedimiento
+
+    ParaCadaElemento: alternativas, procedimiento: alt
+        Algebraico#agregarMetodoEstatico: alt#nombre, metodo: ...valores
+            necesitas valores#longitud = alt#campos#longitud
+            variable inst
+            fijar inst a yo#_crear
+            fijar inst#_tipo a alt#nombre
+            ParaCadaElementoConÍndice: alt#campos, procedimiento: campo, i
+                EnviarMensaje: inst, ({fijar_}#concatenar: (atributosReales#en: i)), (valores#en: i)
+            finprocedimiento
+            devolver inst
+        finmetodo
+
+        Algebraico#agregarMetodo: (AtributoConPrefijo: {es}, alt#nombre), metodo
+            devolver yo#_tipo = alt#nombre
+        finmetodo
+    finprocedimiento
+
+    mapeoDeCampos#paraCadaPar: procedimiento: campo, subdic
+        Algebraico#agregarMetodo: campo, metodo
+            si no subdic#contiene: yo#_tipo
+                __FallarConMensaje: ({~t#~t no contiene el campo ~t}#formatear: nombre, yo#_tipo, campo)
+            finsi
+            variable i
+            fijar i a subdic#en: yo#_tipo
+            devolver EnviarMensaje: yo, (atributosReales#en: i)
+        finmetodo
+    finprocedimiento
+
+    Algebraico#agregarMetodo: {comoTexto}, metodo
+        variable campos
+        fijar campos a Mapear: (camposPorTipo#en: yo#_tipo), funcion: campo
+            devolver (EnviarMensaje: yo, campo)#comoTexto
+        finfuncion
+        devolver {(~t#~t: ~t)}#formatear: nombre, yo#_tipo, (Unir: campos, {, })
+    finmetodo
+
+    devolver Algebraico
+finfuncion

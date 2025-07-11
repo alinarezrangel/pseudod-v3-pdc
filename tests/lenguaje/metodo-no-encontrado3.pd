@@ -1,0 +1,46 @@
+clase Enum
+finclase
+
+atributo Enum#valor
+
+metodo Enum#inicializar: v
+    fijar yo#valor a v
+finmetodo
+
+metodo estatico Enum#metodoNoEncontrado: msj, args
+    si msj = {foo}
+        devolver yo#crear: 0
+    finsi
+    __FallarConMensaje: ({método no encontrado: }#concatenar: msj)
+finmetodo
+
+metodo Enum#comoTexto
+    devolver {(~t)}#formatear: yo#valor
+finmetodo
+
+clase Foo
+finclase
+
+atributos Foo#A, Foo#B
+
+metodo Foo#inicializar: A, B
+    fijar yo#A a A
+    fijar yo#B a B
+finmetodo
+
+metodo estatico Foo#ALFA: n
+    devolver yo#crear: Enum#foo, (Arreglo#crearCon: n)
+finmetodo
+
+metodo Foo#comoTexto
+    devolver {A = ~t, B = ~t}#formatear: yo#A, yo#B
+finmetodo
+
+funcion Calc: A, B, C
+    devolver C
+finfuncion
+
+variable r
+fijar r a Calc: 0, 1, (Foo#ALFA: 0)
+escribir r#comoTexto
+nl

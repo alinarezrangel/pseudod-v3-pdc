@@ -137,6 +137,10 @@ metodo Diccionario#en: llave
     devolver yo#_dispatch: {en}, llave
 finmetodo
 
+metodo Diccionario#intentaEn: llave, predeterminado
+    devolver yo#_dispatch: {intentaEn}, llave, predeterminado
+finmetodo
+
 metodo Diccionario#fijarEn: llave, nuevoValor
     si __Impl = {Lua Bootstrap}
         utilizar bepd/datos/diccionario/hashmap (HashMap)
