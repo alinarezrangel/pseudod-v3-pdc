@@ -9,11 +9,15 @@ project(pdcrt
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
 include(CPack)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 set(CMAKE_C_STANDARD 11)
 
 add_library(pdcrt STATIC
   runtime/c/pdcrt.c)
+
+target_link_libraries(pdcrt INTERFACE m)
 
 function(feature_test feat_name probe_file)
   message(CHECK_START "Feature ${feat_name}")
@@ -87,8 +91,15 @@ configure_file(
   @ONLY
 )
 
-target_include_directories(pdcrt PUBLIC "${PDCRT_PUBLIC_INCLUDES}")
-target_include_directories(pdcrt PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/")
+set_target_properties(pdcrt PROPERTIES
+  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt.h"
+)
+
+target_include_directories(pdcrt PUBLIC
+  "$<BUILD_INTERFACE:${PDCRT_PUBLIC_INCLUDES}>"
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/>"
+  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 
 set(PDCRT_RUNTIME "${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/runtime.pd")
 set(PDCRT_RUNTIME_OUT "${CMAKE_CURRENT_BINARY_DIR}/runtime.c")
@@ -119,8 +130,12 @@ set(CPACK_PACKAGE_CHECKSUM SHA256)
 
 install(
   TARGETS pdcrt
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
+  EXPORT pdcrt_targets
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  PUBLIC_HEADER COMPONENT Development
 )
 
 # install(
@@ -129,11 +144,35 @@ install(
 # )
 
 install(
+  EXPORT pdcrt_targets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
+  NAMESPACE pdcrt_
+  FILE pdcrt-targets.cmake
+)
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pdcrt-config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
+  PATH_VARS INSTALL_PREFIX
+)
+
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config-version.cmake"
+  COMPATIBILITY SameMajorVersion
+)
+
+install(
   FILES
-  "${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-plataforma.h"
-  DESTINATION include
-  COMPONENT Development
+  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config-version.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
+)
+
+export(
+  EXPORT pdcrt_targets
+  FILE "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-targets.cmake"
+  NAMESPACE pdcrt_
 )
 
 cpack_add_component(
