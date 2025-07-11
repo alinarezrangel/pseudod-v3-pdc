@@ -12,87 +12,24 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "pdcrt-plataforma.h"
 
-// Opciones de configuración:
 
-#ifdef PDCRT_DBG
-#define PDCRT_DBG_GC
-#define PDCRT_EMP_INTR
-#endif
-
-#ifdef PDCRT_LOG
-#define PDCRT_LOG_GC
-#endif
-
-#ifndef PDCRT_LOG_COMPILADO
-#if defined(PDCRT_LOG_GC)
-#define PDCRT_LOG_COMPILADO 1
+#ifdef __has_attribute
+#  if __has_attribute(always_inline)
+#    define PDCRT_INLINE __attribute__((always_inline)) inline
+#  else
+#    define PDCRT_INLINE inline
+#  endif
+#  if __has_attribute(noinline)
+#    define PDCRT_NOINLINE __attribute__((noinline))
+#  else
+#    define PDCRT_NOINLINE
+#  endif
 #else
-#define PDCRT_LOG_COMPILADO 0
+#  define PDCRT_INLINE inline
+#  define PDCRT_NOINLINE
 #endif
-#endif
-
-
-#ifdef __GNUC__
-#define PDCRT_INLINE __attribute__((always_inline)) inline
-#define PDCRT_NOINLINE __attribute__((noinline))
-#else
-#define PDCRT_INLINE inline
-#define PDCRT_NOINLINE
-#endif
-
-
-typedef int64_t pdcrt_entero;
-
-#define PDCRT_ENTERO_MAX INT64_MAX
-#define PDCRT_ENTERO_MIN INT64_MIN
-#define PDCRT_ENTERO_WIDTH INT64_WIDTH
-#define PDCRT_ENTERO_C(n) INT64_C(n)
-
-#define PDCRT_ENTERO_PRId PRId64
-#define PDCRT_ENTERO_PRIi PRIi64
-#define PDCRT_ENTERO_PRIu PRIu64
-#define PDCRT_ENTERO_PRIo PRIo64
-#define PDCRT_ENTERO_PRIx PRIx64
-#define PDCRT_ENTERO_PRIX PRIX64
-
-#define PDCRT_ENTERO_SCNd SCNd64
-#define PDCRT_ENTERO_SCNi SCNi64
-#define PDCRT_ENTERO_SCNu SCNu64
-#define PDCRT_ENTERO_SCNo SCNo64
-#define PDCRT_ENTERO_SCNx SCNx64
-
-typedef double pdcrt_float;
-typedef uint64_t pdcrt_efloat;
-
-#define PDCRT_FLOAT_C(n) n##L
-
-#define PDCRT_FLOAT_DECIMAL_DIG DBL_DECIMAL_DIG
-#define PDCRT_FLOAT_MIN DBL_MIN
-#define PDCRT_FLOAT_MAX DBL_MAX
-#define PDCRT_FLOAT_EPSILON DBL_EPSILON
-#define PDCRT_FLOAT_DIG DBL_DIG
-#define PDCRT_FLOAT_MANT_DIG DBL_MANT_DIG
-#define PDCRT_FLOAT_MIN_EXP DBL_MIN_EXP
-#define PDCRT_FLOAT_MIN_10_EXP DBL_MIN_10_EXP
-#define PDCRT_FLOAT_MAX_EXP DBL_MAX_EXP
-#define PDCRT_FLOAT_MAX_10_EXP DBL_MAX_10_EXP
-#define PDCRT_FLOAT_HAS_SUBNORM DBL_HAS_SUBNORM
-
-#define PDCRT_FLOAT_PRIf "f"
-#define PDCRT_FLOAT_PRIF "F"
-#define PDCRT_FLOAT_PRIg "g"
-#define PDCRT_FLOAT_PRIG "G"
-#define PDCRT_FLOAT_PRIa "a"
-#define PDCRT_FLOAT_PRIA "A"
-
-#define PDCRT_FLOAT_SCNf "f"
-
-#define PDCRT_FLOAT_FLOOR floor
-#define PDCRT_FLOAT_CEIL ceil
-#define PDCRT_FLOAT_TRUNC trunc
-#define PDCRT_FLOAT_FREXP frexp
-
 
 struct pdcrt_ctx;
 typedef struct pdcrt_ctx pdcrt_ctx;
@@ -163,9 +100,11 @@ typedef enum pdcrt_tipo_obj_gc
 
 typedef enum pdcrt_gc_tipo_grupo
 {
-    PDCRT_TGRP_BLANCO,
+    PDCRT_TGRP_BLANCO_JOVEN,
+    PDCRT_TGRP_BLANCO_VIEJO,
     PDCRT_TGRP_GRIS,
     PDCRT_TGRP_NEGRO,
+    PDCRT_TGRP_RAICES_VIEJAS,
     PDCRT_TGRP_NINGUNO,
 } pdcrt_gc_tipo_grupo;
 
@@ -189,7 +128,7 @@ typedef struct pdcrt_gc_grupo
 
 typedef struct pdcrt_gc
 {
-    pdcrt_gc_grupo blanco, gris, negro;
+    pdcrt_gc_grupo blanco_joven, blanco_viejo, gris, negro, raices_viejas;
 
     size_t tam_heap;
     unsigned int num_recolecciones;
@@ -597,7 +536,24 @@ void *pdcrt_alojar_ctx(pdcrt_ctx *ctx, size_t bytes);
 void *pdcrt_realojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual, size_t tam_nuevo);
 void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual);
 
+pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o);
+
 void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_marco **m);
+
+void pdcrt_gc_mover_a_grupo(pdcrt_gc_grupo *desde, pdcrt_gc_grupo *hacia, pdcrt_cabecera_gc *h);
+
+// NOTA: No necesitamos la barrera de escritura para ninguna "raiz" del GC
+inline void pdcrt_barrera_de_escritura(pdcrt_ctx *ctx, pdcrt_obj contenedor, pdcrt_obj valor)
+{
+    pdcrt_cabecera_gc *ch = pdcrt_gc_cabecera_de(contenedor);
+    pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
+    if(!vh || !ch)
+        return;
+    if(ch->grupo == PDCRT_TGRP_BLANCO_VIEJO && vh->grupo == PDCRT_TGRP_BLANCO_JOVEN)
+    {
+        pdcrt_gc_mover_a_grupo(&ctx->gc.blanco_viejo, &ctx->gc.raices_viejas, ch);
+    }
+}
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
 void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
@@ -635,8 +591,20 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
 
 #define pdcrt_obtener_local(ctx, m, idx) (m)->locales_y_capturas[(idx)]
 #define pdcrt_obtener_captura(ctx, m, idx) (m)->locales_y_capturas[(m)->num_locales + (idx)]
-#define pdcrt_fijar_local(ctx, m, idx, v) (m)->locales_y_capturas[(idx)] = (v)
-#define pdcrt_fijar_captura(ctx, m, idx, v) (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v)
+#define pdcrt_fijar_local(ctx, m, idx, v)                               \
+    do                                                                  \
+    {                                                                   \
+        pdcrt_barrera_de_escritura((ctx), (m)->locales_y_capturas[(idx)], (v)); \
+        (m)->locales_y_capturas[(idx)] = (v);                           \
+    }                                                                   \
+    while(0)
+#define pdcrt_fijar_captura(ctx, m, idx, v)                             \
+    do                                                                  \
+    {                                                                   \
+        pdcrt_barrera_de_escritura((ctx), (m)->locales_y_capturas[(m)->num_locales + (idx)], (v)); \
+        (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v);        \
+    }                                                                   \
+    while(0)
 
 pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco *m);
 
@@ -646,7 +614,13 @@ void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp ar
 void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
 void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
 
-#define pdcrt_fijar_caja(ctx, o, v) (o).caja->valor = (v)
+#define pdcrt_fijar_caja(ctx, o, v)                     \
+    do                                                  \
+    {                                                   \
+        pdcrt_barrera_de_escritura((ctx), (o), (v));    \
+        (o).caja->valor = (v);                          \
+    }                                                   \
+    while(0)
 #define pdcrt_obtener_caja(ctx, o) (o).caja->valor
 
 pdcrt_k pdcrt_params(pdcrt_ctx *ctx,

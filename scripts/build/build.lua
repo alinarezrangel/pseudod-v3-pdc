@@ -25,6 +25,8 @@ local unistd = require "posix.unistd"
 local libgen = require "posix.libgen"
 local errno = require "posix.errno"
 local dirent = require "posix.dirent"
+local poll = require "posix.poll"
+local fcntl = require "posix.fcntl"
 local lpeg = require "lpeg"
 local re = require "re"
 
@@ -1572,23 +1574,128 @@ local function flatten1(tbl)
    return res
 end
 
-local function run_cmd(db, fetch, invk)
+local function make_nonblocking(fd)
+   local flags = assert(fcntl.fcntl(fd, fcntl.F_GETFL, 0))
+   local new_flags = flags | fcntl.O_NONBLOCK
+   assert(fcntl.fcntl(fd, fcntl.F_SETFL, new_flags))
+   return flags & fcntl.O_NONBLOCK == 0
+end
+
+local function make_blocking(fd)
+   local flags = assert(fcntl.fcntl(fd, fcntl.F_GETFL, 0))
+   local new_flags = flags | fcntl.O_NONBLOCK
+   assert(fcntl.fcntl(fd, fcntl.F_SETFL, new_flags))
+   return flags & fcntl.O_NONBLOCK ~= 0
+end
+
+local function nonblocking_read(fd, buffersize)
+   local read, errmsg, errnum = unistd.read(fd, buffersize)
+   if not read then
+      if errnum == errno.EAGAIN or errnum == errno.EWOULDBLOCK then
+         return nil
+      else
+         error(errmsg)
+      end
+   else
+      return read
+   end
+end
+
+local function run_cmd(db, fetch, invk, options)
+   options = options or {}
    assert(#invk > 0, "invk debe tener al menos un elemento")
    fetch(invk[1])
    local cmd = invk[1]
    local args = {}
    table.move(invk, 2, #invk, 1, args)
+   args[0] = cmd
 
+   local read_fifos = options.read_fifos or {}
+
+   local read_stdout, write_stdout
+   if options.save_stdout then
+      read_stdout, write_stdout = assert(unistd.pipe())
+   end
    local cpid = assert(unistd.fork())
    if cpid == 0 then
       -- hijo
-      args[0] = cmd
+      if read_stdout then
+         assert(unistd.close(read_stdout))
+      end
+      if write_stdout then
+         assert(unistd.dup2(unistd.STDOUT_FILENO, write_stdout))
+      end
       assert(unistd.exec(cmd, args))
    else
       -- padre
-      local cpid, status, code = wait.wait(cpid)
-      if cpid then
-         return code
+      if write_stdout then
+         assert(unistd.close(write_stdout))
+      end
+
+      local saved_stdout, fifos
+
+      if read_stdout or next(read_fifos) then
+         local fds = {}
+         local buffers = {}
+         local fifo_fds = {}
+
+         if read_stdout then
+            fds[read_stdout] = { events = { IN = true } }
+            buffers[read_stdout] = {}
+            make_nonblocking(read_stdout)
+         end
+
+         for name, path in pairs(read_fifos) do
+            local fd = assert(fcntl.open(path, fcntl.O_RDONLY))
+            fds[fd] = { events = { IN = true } }
+            buffers[fd] = {}
+            make_nonblocking(fd)
+            fifo_fds[name] = fd
+         end
+
+         while true do
+            assert(poll.poll(fds, -1))
+            for fd, rec in pairs(fds) do
+               if rec.revents.IN then
+                  local read = nonblocking_read(fd, 1024)
+                  if read then
+                     table.insert(buffers[fd], read)
+                  end
+               end
+               if rec.revents.HUP then
+                  repeat
+                     local read = nonblocking_read(fd, 1024)
+                     if read then
+                        table.insert(buffers[fd], read)
+                     end
+                  until not read or string.len(read) == 0
+                  assert(unistd.close(fd))
+                  fds[fd] = nil
+                  if not next(fds) then
+                     goto PROCESSED_ALL
+                  end
+               end
+            end
+         end
+         ::PROCESSED_ALL::
+
+         for fd, buffer in pairs(buffers) do
+            buffers[fd] = table.concat(buffer)
+         end
+
+         if read_stdout then
+            saved_stdout = buffers[read_stdout]
+         end
+
+         for name, fd in pairs(fifo_fds) do
+            fifos = fifos or {}
+            fifos[name] = buffers[fd]
+         end
+      end
+
+      local ok, status, code = assert(wait.wait(cpid))
+      if ok then
+         return code, { stdout = saved_stdout, fifos = fifos }
       else
          error(status)
       end
@@ -1765,6 +1872,31 @@ local function write_objects_file(file, objs)
    end
 end
 
+local DEFAULT_MAKEDEPS_FIFO_RELNAME = "var/makedeps.fifo"
+
+local MAKEDEPS_GRAMMAR = re.compile [[
+deps <- {| emptylines* (rule %nl emptylines*)+ |}
+rule <- {| {:target: word :} ws ':' {:deps: {| (ws word)* ws |} :} |}
+ws <- wsc*
+wsc <- ' ' / '	' / '\' %nl
+word <- { (! wsc ! %nl [^:$'"] / '$$')+ }
+emptylines <- ws %nl
+]]
+
+local function parse_makedeps(makedeps)
+   local res = MAKEDEPS_GRAMMAR:match(makedeps)
+   if not res then
+      print(makedeps)
+      error("could not parse makedeps")
+   else
+      local graph = {}
+      for i = 1, #res do
+         graph[res[i].target] = res[i].deps
+      end
+      return graph
+   end
+end
+
 local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, module_assocs, target, rule)
    if rule.type == "source" then
       return function(fetch)
@@ -1876,6 +2008,54 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             main[1] = "-DPDCRT_MAIN"
          end
 
+         local makedeps_fifo_name = builddir .. "/" .. DEFAULT_MAKEDEPS_FIFO_RELNAME
+         mkdir_recur((assert(libgen.dirname(makedeps_fifo_name))))
+         local ok, errmsg, errnum = unistd.unlink(makedeps_fifo_name)
+         if not ok and errnum ~= errno.ENOENT then
+            error(errmsg)
+         end
+         assert(stat.mkfifo(makedeps_fifo_name))
+
+         local deps_invk = flatten1 {
+            cc_exe,
+            cflags,
+            main,
+            "-MM",
+            "-MT", target,
+            "-MF", makedeps_fifo_name,
+            rule.src,
+         }
+
+         log.info("[italic]dependencias de[none] %s -> c", rule.package_name .. "/" .. rule.module_name)
+         log.info("[bold]ejecutando[none] %s", table.concat(deps_invk, " "))
+
+         local code, results = run_cmd(db, fetch, deps_invk, { read_fifos = { makedeps = makedeps_fifo_name } })
+         if code ~= 0 then
+            log.error("[fg:red][bold]error[none] error en cc")
+            error("error en cc")
+         end
+
+         local makedeps = parse_makedeps(results.fifos.makedeps)
+         local visited = {}
+         local function add_transitive_deps(target)
+            local deps = makedeps[target]
+            if not deps then
+               return
+            end
+            if visited[target] then
+               return
+            end
+            visited[target] = true
+            for i = 1, #deps do
+               if deps[i] ~= rule.src then
+                  log.debug("[italic]dependencia de C[none]: %s", deps[i])
+                  fetch(deps[i])
+                  add_transitive_deps(deps[i])
+               end
+            end
+         end
+         add_transitive_deps(target)
+
          local invk = flatten1 {
             cc_exe,
             cflags,
@@ -1889,7 +2069,7 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
          log.info("[italic]compilando[none] %s -> c", rule.package_name .. "/" .. rule.module_name)
          log.info("[bold]ejecutando[none] %s", table.concat(invk, " "))
 
-         local code = run_cmd(db, fetch, invk)
+         code = run_cmd(db, fetch, invk)
          if code ~= 0 then
             log.error("[fg:red][bold]error[none] error en cc")
             error("error en cc")

@@ -1,0 +1,135 @@
+#ifndef PDCRT_PLATAFORMA_H
+#define PDCRT_PLATAFORMA_H
+
+#include <stdint.h>
+#include <inttypes.h>
+#include <float.h>
+#include <limits.h>
+
+
+#cmakedefine PDCRT_PLATAFORMA_CLOCK_GETTIME_MONOTONIC
+#cmakedefine PDCRT_PLATAFORMA_TIMESPEC_GET_MONOTONIC
+
+#cmakedefine PDCRT_DBG
+#cmakedefine PDCRT_DBG_GC
+#cmakedefine PDCRT_EMP_INTR
+
+#cmakedefine PDCRT_LOG
+#cmakedefine PDCRT_LOG_GC
+
+#define PDCRT_PTR_BITS @PDCRT_PTR_BITS@
+
+#define PDCRT_VERSION "@PROJECT_VERSION@"
+#define PDCRT_VERSION_MAYOR @PROJECT_VERSION_MAJOR@
+#define PDCRT_VERSION_MENOR @PROJECT_VERSION_MINOR@
+#define PDCRT_VERSION_PARCHE @PROJECT_VERSION_PATCH@
+
+
+// Opciones derivativas:
+
+#ifdef PDCRT_LOG
+#  define PDCRT_LOG_COMPILADO 1
+#else
+#  define PDCRT_LOG_COMPILADO 0
+#endif
+
+_Static_assert(sizeof(float) == 4, "float debe ser de 32 bits");
+_Static_assert(sizeof(double) == 8, "double debe ser de 64 bits");
+
+// ================================================================ //
+#if PDCRT_PTR_BITS == 64
+// ================================================================ //
+
+typedef int64_t pdcrt_entero;
+
+#  define PDCRT_ENTERO_MAX INT64_MAX
+#  define PDCRT_ENTERO_MIN INT64_MIN
+#  define PDCRT_ENTERO_WIDTH INT64_WIDTH
+#  define PDCRT_ENTERO_C(n) INT64_C(n)
+
+#  define PDCRT_ENTERO_PRId PRId64
+#  define PDCRT_ENTERO_PRIi PRIi64
+#  define PDCRT_ENTERO_PRIu PRIu64
+#  define PDCRT_ENTERO_PRIo PRIo64
+#  define PDCRT_ENTERO_PRIx PRIx64
+#  define PDCRT_ENTERO_PRIX PRIX64
+
+#  define PDCRT_ENTERO_SCNd SCNd64
+#  define PDCRT_ENTERO_SCNi SCNi64
+#  define PDCRT_ENTERO_SCNu SCNu64
+#  define PDCRT_ENTERO_SCNo SCNo64
+#  define PDCRT_ENTERO_SCNx SCNx64
+
+typedef double pdcrt_float;
+typedef uint64_t pdcrt_efloat;
+
+#  define PDCRT_FLOAT_C(n) n
+
+#  define PDCRT_FLOAT_DECIMAL_DIG DBL_DECIMAL_DIG
+#  define PDCRT_FLOAT_MIN DBL_MIN
+#  define PDCRT_FLOAT_MAX DBL_MAX
+#  define PDCRT_FLOAT_EPSILON DBL_EPSILON
+#  define PDCRT_FLOAT_DIG DBL_DIG
+#  define PDCRT_FLOAT_MANT_DIG DBL_MANT_DIG
+#  define PDCRT_FLOAT_MIN_EXP DBL_MIN_EXP
+#  define PDCRT_FLOAT_MIN_10_EXP DBL_MIN_10_EXP
+#  define PDCRT_FLOAT_MAX_EXP DBL_MAX_EXP
+#  define PDCRT_FLOAT_MAX_10_EXP DBL_MAX_10_EXP
+#  define PDCRT_FLOAT_HAS_SUBNORM DBL_HAS_SUBNORM
+
+#  define PDCRT_FLOAT_FLOOR floor
+#  define PDCRT_FLOAT_CEIL ceil
+#  define PDCRT_FLOAT_TRUNC trunc
+#  define PDCRT_FLOAT_FREXP frexp
+
+// ================================================================ //
+#elif PDCRT_PTR_BITS == 32
+// ================================================================ //
+
+typedef int32_t pdcrt_entero;
+
+#  define PDCRT_ENTERO_MAX INT32_MAX
+#  define PDCRT_ENTERO_MIN INT32_MIN
+#  define PDCRT_ENTERO_WIDTH INT32_WIDTH
+#  define PDCRT_ENTERO_C(n) INT32_C(n)
+
+#  define PDCRT_ENTERO_PRId PRId32
+#  define PDCRT_ENTERO_PRIi PRIi32
+#  define PDCRT_ENTERO_PRIu PRIu32
+#  define PDCRT_ENTERO_PRIo PRIo32
+#  define PDCRT_ENTERO_PRIx PRIx32
+#  define PDCRT_ENTERO_PRIX PRIX32
+
+#  define PDCRT_ENTERO_SCNd SCNd32
+#  define PDCRT_ENTERO_SCNi SCNi32
+#  define PDCRT_ENTERO_SCNu SCNu32
+#  define PDCRT_ENTERO_SCNo SCNo32
+#  define PDCRT_ENTERO_SCNx SCNx32
+
+typedef float pdcrt_float;
+typedef uint32_t pdcrt_efloat;
+
+#  define PDCRT_FLOAT_C(n) n##F
+
+#  define PDCRT_FLOAT_DECIMAL_DIG FLT_DECIMAL_DIG
+#  define PDCRT_FLOAT_MIN FLT_MIN
+#  define PDCRT_FLOAT_MAX FLT_MAX
+#  define PDCRT_FLOAT_EPSILON FLT_EPSILON
+#  define PDCRT_FLOAT_DIG FLT_DIG
+#  define PDCRT_FLOAT_MANT_DIG FLT_MANT_DIG
+#  define PDCRT_FLOAT_MIN_EXP FLT_MIN_EXP
+#  define PDCRT_FLOAT_MIN_10_EXP FLT_MIN_10_EXP
+#  define PDCRT_FLOAT_MAX_EXP FLT_MAX_EXP
+#  define PDCRT_FLOAT_MAX_10_EXP FLT_MAX_10_EXP
+#  define PDCRT_FLOAT_HAS_SUBNORM FLT_HAS_SUBNORM
+
+#  define PDCRT_FLOAT_FLOOR floorf
+#  define PDCRT_FLOAT_CEIL ceilf
+#  define PDCRT_FLOAT_TRUNC truncf
+#  define PDCRT_FLOAT_FREXP frexpf
+
+// ================================================================ //
+#endif // PDCRT_PTR_BITS
+// ================================================================ //
+
+#endif /* PDCRT_PLATAFORMA_H */
