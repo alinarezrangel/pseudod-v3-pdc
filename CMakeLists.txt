@@ -14,6 +14,7 @@ include(CPack)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+add_subdirectory(build-stage0)
 
 add_library(pdcrt STATIC
   runtime/c/pdcrt.c)
