@@ -6,13 +6,14 @@ project(pdcrt
   LANGUAGES C
 )
 
+set(CMAKE_C_STANDARD 11)
+
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
 include(CPack)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-set(CMAKE_C_STANDARD 11)
 
 add_library(pdcrt STATIC
   runtime/c/pdcrt.c)

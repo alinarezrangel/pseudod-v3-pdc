@@ -37,6 +37,8 @@ typedef struct pdcrt_ctx pdcrt_ctx;
 typedef struct pdcrt_aloj_exts
 {
     uint32_t version;
+    uint32_t tam_bytes;
+    char resto[];
 } pdcrt_aloj_exts;
 
 
@@ -45,7 +47,7 @@ typedef struct pdcrt_aloj
     void *(*alojar)(void *yo, size_t bytes);
     void *(*realojar)(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo);
     void (*desalojar)(void *yo, void *ptr, size_t tam_actual);
-    void *(*obtener_extensiones)(void *yo);
+    pdcrt_aloj_exts *(*obtener_extensiones)(void *yo);
 } pdcrt_aloj;
 
 void *pdcrt_alojar(pdcrt_aloj *aloj, size_t bytes);
@@ -74,7 +76,7 @@ typedef struct pdcrt_marco pdcrt_marco;
 struct pdcrt_k;
 typedef struct pdcrt_k pdcrt_k;
 
-typedef pdcrt_k (*pdcrt_f)(pdcrt_ctx *, int args, struct pdcrt_k);
+typedef pdcrt_k (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k);
 typedef pdcrt_k (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *);
 
 struct pdcrt_k
@@ -115,7 +117,7 @@ typedef struct pdcrt_cabecera_gc
     pdcrt_tipo_obj_gc tipo : 4;
     pdcrt_gc_tipo_grupo grupo : 4;
     bool en_la_pila : 1;
-    // } = 1+1/8 -> 4
+    // } = 1+1/8 -> 2 -> 4
     uint32_t num_bytes; // 4
     // total: 24
 } pdcrt_cabecera_gc;
@@ -287,7 +289,7 @@ struct pdcrt_reubicado
     char bytes_viejos[];
 };
 
-// Asegurate de que pdcrt_reubicado es menor que todos los demás objetos del
+// Asegúrate de que pdcrt_reubicado es menor que todos los demás objetos del
 // GC:
 #define PDCRT_VERIFICA_TAM_REUBICADO(T)                             \
     _Static_assert(sizeof(T) >= sizeof(pdcrt_reubicado),            \
@@ -376,7 +378,7 @@ typedef enum pdcrt_tipo
     X(formatear, "formatear")                                           \
     X(escojer, "escojer")                                               \
     X(llamarSegun, "llamarSegun")                                       \
-    X(llamarSegun2, "llamarSegún")                                      \
+    X(llamarSegun2, u8"llamarSegún")                                    \
     X(o, "o")                                                           \
     X(operador_o, "operador_||")                                        \
     X(y, "y")                                                           \

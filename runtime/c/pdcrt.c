@@ -29,14 +29,13 @@ typedef enum pdcrt_subsistema
 #if !PDCRT_LOG_COMPILADO
 // Si no hay ningún logger activo, la función no hace nada. En ese caso,
 // siempre la inlineamos para que el compilador elimine las
-// llamadas. Efectivamente esto "borra" la función del programa.
+// llamadas. Efectivamente, esto "borra" la función del programa.
 PDCRT_INLINE
 #endif
 static
 PDCRT_PRINTF_FORMAT(3, 4)
 void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...)
 {
-    (void) ctx;
 #if PDCRT_LOG_COMPILADO
     switch(sis)
     {
@@ -54,6 +53,7 @@ void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...)
     fflush(stderr);
     va_end(ap);
 #else
+    (void) ctx;
     (void) sis;
     (void) fmt;
 #endif
