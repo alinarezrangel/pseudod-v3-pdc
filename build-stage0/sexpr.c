@@ -6,7 +6,6 @@
 #include <ctype.h>
 
 #define SEXPR_SYMBOL_METATABLE "sexpr.symbol"
-#define SEXPR_READER_BUFFER_SIZE 1
 
 // Symbol userdata structure
 typedef struct
@@ -20,10 +19,8 @@ typedef struct
 {
     lua_State *L;
     int reader_ref;
-    char *buffer;
-    size_t buffer_size;
-    size_t pos;
-    size_t len;
+    int current_char;
+    int has_char;  // 1 if current_char has a valid character, 0 if we need to read a new one
     int eof;
 } reader_state_t;
 
@@ -32,38 +29,42 @@ static int read_datum(reader_state_t *rs);
 static int write_datum(lua_State *L, int writer_ref, int datum_idx);
 
 // Utility functions
-static int is_whitespace(char c)
+static int is_whitespace(int c)
 {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-static int is_symbol_char(char c)
+static int is_symbol_char(int c)
 {
     return isalnum(c) || c == '.' || c == '?' || c == '!' || c == '+' ||
         c == '*' || c == '/' || c == '_' || c == '-';
 }
 
 // Reader functions
-static int reader_fill_buffer(reader_state_t *rs)
+
+#define SEXPR_ERROR (-1024)
+#define SEXPR_EOF (-1025)
+
+static int reader_read_char(reader_state_t *rs)
 {
-    if(rs->eof) return 0;
+    if(rs->eof) return SEXPR_EOF;
 
     lua_rawgeti(rs->L, LUA_REGISTRYINDEX, rs->reader_ref);
     lua_pushstring(rs->L, "read");
     lua_gettable(rs->L, -2);
     lua_pushvalue(rs->L, -2); // self
-    lua_pushinteger(rs->L, rs->buffer_size);
+    lua_pushinteger(rs->L, 1);  // Read exactly 1 character
 
     if(lua_pcall(rs->L, 2, 1, 0) != LUA_OK)
     {
-        return -1;
+        return SEXPR_ERROR;
     }
 
     if(lua_isnil(rs->L, -1))
     {
         rs->eof = 1;
         lua_pop(rs->L, 2);
-        return 0;
+        return SEXPR_EOF;
     }
 
     size_t len;
@@ -72,12 +73,11 @@ static int reader_fill_buffer(reader_state_t *rs)
     {
         rs->eof = 1;
         lua_pop(rs->L, 2);
-        return 0;
+        return SEXPR_EOF;
     }
 
-    memcpy(rs->buffer, data, len);
-    rs->len = len;
-    rs->pos = 0;
+    rs->current_char = (unsigned char) data[0];
+    rs->has_char = 1;
 
     lua_pop(rs->L, 2);
     return 1;
@@ -85,25 +85,25 @@ static int reader_fill_buffer(reader_state_t *rs)
 
 static int reader_peek(reader_state_t *rs)
 {
-    if(rs->pos >= rs->len)
+    if(!rs->has_char)
     {
-        int result = reader_fill_buffer(rs);
-        if(result <= 0) return result;
+        int result = reader_read_char(rs);
+        if(result <= SEXPR_ERROR) return result;
     }
-    return rs->buffer[rs->pos];
+    return rs->current_char;
 }
 
 static int reader_next(reader_state_t *rs)
 {
     int c = reader_peek(rs);
-    if(c > 0) rs->pos++;
+    if(c > SEXPR_ERROR) rs->has_char = 0;  // Mark that we need to read a new character
     return c;
 }
 
 static void skip_whitespace(reader_state_t *rs)
 {
     int c;
-    while((c = reader_peek(rs)) > 0 && is_whitespace(c))
+    while((c = reader_peek(rs)) > SEXPR_ERROR && is_whitespace(c))
     {
         reader_next(rs);
     }
@@ -150,7 +150,7 @@ static int parse_string(reader_state_t *rs)
     reader_next(rs);
 
     int c;
-    while((c = reader_next(rs)) > 0)
+    while((c = reader_next(rs)) > SEXPR_ERROR)
     {
         if(c == '"')
         {
@@ -160,7 +160,7 @@ static int parse_string(reader_state_t *rs)
         else if(c == '\\')
         {
             c = reader_next(rs);
-            if(c <= 0) break;
+            if(c <= SEXPR_ERROR) break;
 
             switch(c)
             {
@@ -197,6 +197,7 @@ static int parse_number(reader_state_t *rs)
     luaL_buffinit(rs->L, &buf);
 
     int c = reader_peek(rs);
+    // FIXME: handle c <= ERROR
     if(c == '-')
     {
         luaL_addchar(&buf, reader_next(rs));
@@ -211,7 +212,7 @@ static int parse_number(reader_state_t *rs)
         return 2;
     }
 
-    while((c = reader_peek(rs)) > 0 && isdigit(c))
+    while((c = reader_peek(rs)) > SEXPR_ERROR && isdigit(c))
     {
         luaL_addchar(&buf, reader_next(rs));
     }
@@ -222,6 +223,7 @@ static int parse_number(reader_state_t *rs)
         luaL_addchar(&buf, reader_next(rs));
 
         c = reader_peek(rs);
+        // FIXME: handle c <= ERROR
         if(!isdigit(c))
         {
             lua_pushnil(rs->L);
@@ -229,7 +231,7 @@ static int parse_number(reader_state_t *rs)
             return 2;
         }
 
-        while((c = reader_peek(rs)) > 0 && isdigit(c))
+        while((c = reader_peek(rs)) > SEXPR_ERROR && isdigit(c))
         {
             luaL_addchar(&buf, reader_next(rs));
         }
@@ -251,7 +253,7 @@ static int parse_symbol_or_bool(reader_state_t *rs)
     luaL_buffinit(rs->L, &buf);
 
     int c;
-    while((c = reader_peek(rs)) > 0 && is_symbol_char(c))
+    while((c = reader_peek(rs)) > SEXPR_ERROR && is_symbol_char(c))
     {
         luaL_addchar(&buf, reader_next(rs));
     }
@@ -293,7 +295,7 @@ static int parse_list(reader_state_t *rs)
         skip_whitespace(rs);
 
         int c = reader_peek(rs);
-        if(c <= 0)
+        if(c <= SEXPR_ERROR)
         {
             lua_pushnil(rs->L);
             lua_pushstring(rs->L, "unterminated list");
@@ -302,6 +304,7 @@ static int parse_list(reader_state_t *rs)
 
         if(c == ')')
         {
+            // FIXME: handle ERROR case
             reader_next(rs);
             return 1;
         }
@@ -321,7 +324,7 @@ static int read_datum(reader_state_t *rs)
     skip_whitespace(rs);
 
     int c = reader_peek(rs);
-    if(c <= 0)
+    if(c <= SEXPR_ERROR)
     {
         lua_pushnil(rs->L);
         lua_pushstring(rs->L, "unexpected end of input");
@@ -576,26 +579,13 @@ static int sexpr_read(lua_State *L)
     reader_state_t rs;
     rs.L = L;
     rs.reader_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-    rs.buffer = malloc(SEXPR_READER_BUFFER_SIZE);
-    rs.buffer_size = SEXPR_READER_BUFFER_SIZE;
-    rs.pos = 0;
-    rs.len = 0;
+    rs.has_char = 0;
     rs.eof = 0;
-
-    if(!rs.buffer)
-    {
-        free(rs.buffer);
-        luaL_unref(L, LUA_REGISTRYINDEX, rs.reader_ref);
-        lua_pushnil(L);
-        lua_pushstring(L, "out of memory");
-        return 2;
-    }
 
     skip_whitespace(&rs);
     int c = reader_peek(&rs);
-    if(c <= 0)
+    if(c <= SEXPR_ERROR)
     {
-        free(rs.buffer);
         luaL_unref(L, LUA_REGISTRYINDEX, rs.reader_ref);
         lua_pushnil(L);
         lua_pushstring(L, "EOF");
@@ -604,7 +594,6 @@ static int sexpr_read(lua_State *L)
 
     int result = read_datum(&rs);
 
-    free(rs.buffer);
     luaL_unref(L, LUA_REGISTRYINDEX, rs.reader_ref);
 
     return result;
