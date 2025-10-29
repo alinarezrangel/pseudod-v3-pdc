@@ -1425,6 +1425,11 @@ function DEFAULT_CONFIG_VALUES.cc_clibs(get, getenv)
    return getenv "CLIBS" or ""
 end
 
+-- Archivos a considerar dependencias al enlazar
+function DEFAULT_CONFIG_VALUES.cc_clibs_deps(get, getenv)
+   return ""
+end
+
 -- Nombre del ejecutable de Lua 5.4 a usar.
 function DEFAULT_CONFIG_VALUES.lua_nombre(get, getenv)
    return "lua5.4"
@@ -2087,6 +2092,7 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
          local cc_exe = fetch_config_key(db, fetch, "cc_ejecutable")
          local cc_cflags = fetch_config_key(db, fetch, "cc_cflags")
          local cc_clibs = fetch_config_key(db, fetch, "cc_clibs")
+         local cc_clibs_deps = fetch_config_key(db, fetch, "cc_clibs_deps")
 
          if cc_exe == "" then
             log.error("[fg:red][bold]error[none] no se encontró un compilador de C a usar.")
@@ -2106,9 +2112,20 @@ local function run_rule(db, root, relcwd, manifest, manifest_path, builddir, mod
             error("no se pudo invocar al compilador de C")
          end
 
+         local clibs_deps, errmsg = split_shlike_args(cc_clibs_deps)
+         if not clibs_deps then
+            log.error("[fg:red][bold]error[none] valor inválido de la configuración cc_clibs_deps: %s", errmsg)
+            error("no se pudo invocar al compilador de C")
+         end
+
          local objs = {}
          fetch(rule.objs_file)
          load_objects_file(rule.objs_file, objs)
+
+         for i = 1, #clibs_deps do
+            local fname = clibs_deps[i]
+            fetch(fname)
+         end
 
          local to_link = {rule.src}
          for line in pairs(objs) do

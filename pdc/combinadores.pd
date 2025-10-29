@@ -68,7 +68,7 @@ metodo Tokens#áreaTextualDesde: pos
     si yo#posición = 0
         devolver (yo#tokens#en: 0)#áreaTextual
     sino
-        devolver Tokens#ÁreaTextual#crear:
+        devolver TokensNS#ÁreaTextual#crear:
             (yo#tokens#en: pos)#áreaTextual#posiciónInicial,
             (yo#tokens#en: (yo#posición - 1))#áreaTextual#posiciónFinal
     finsi

@@ -34,7 +34,7 @@ Los nodos variadic son usados en dos partes distíntas:
 @pd{...valores} es un @italic{parámetro variadic}. Estos siempre son
 representados como un @pd{NodoVariadic} cuyo @code{#interno} es siempre
 un @pd{NodoIdentificador}.}
-@item{Al llamar a una función/metodo/procedimiento: @pd{EscribirTabulado: 1, 2, ...otros},
+@item{Al llamar a una función/método/procedimiento: @pd{EscribirTabulado: 1, 2, ...otros},
 @pd{...otros} es un @italic{argumento variadic}. Estos son representados
 como un @pd{NodoVariadic} con un @pd{NodoExpresion} dentro.}
 )

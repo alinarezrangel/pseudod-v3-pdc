@@ -895,6 +895,16 @@ funcion PedazoDeArreglo: arr, inicio, final
 finfuncion
 
 [DOCUMENTA
+@brief{Devuelve el primer elemento de un arreglo.}
+
+El arreglo @param{arr} no debe estar vacío.
+DOCUMENTA]
+funcion PrimerElemento: arr
+    necesitas arr#longitud > 0
+    devolver arr#en: 0
+finfuncion
+
+[DOCUMENTA
 @brief{Devuelve el último elemento de un arreglo.}
 
 El arreglo @param{arr} no debe estar vacío.
@@ -902,6 +912,16 @@ DOCUMENTA]
 funcion ÚltimoElemento: arr
     necesitas arr#longitud > 0
     devolver arr#en: (arr#longitud - 1)
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve el único elemento de un arreglo.}
+
+El arreglo @param{arr} debe tener exactamente un (1) elemento.
+DOCUMENTA]
+funcion ÚnicoElemento: arr
+    necesitas arr#longitud = 1
+    devolver arr#en: 0
 finfuncion
 
 [DOCUMENTA

@@ -16,10 +16,20 @@ include(CMakePackageConfigHelpers)
 
 add_subdirectory(build-stage0)
 
+option(PDCRT_ASAN "Activa ASan" OFF)
+option(PDCRT_UBSAN "Activa UBSan" OFF)
+
 add_library(pdcrt STATIC
   runtime/c/pdcrt.c)
 
 target_link_libraries(pdcrt INTERFACE m)
+
+if(PDCRT_ASAN)
+    target_compile_options(pdcrt PUBLIC -fsanitize=address)
+endif()
+if(PDCRT_UBSAN)
+    target_compile_options(pdcrt PUBLIC -fsanitize=undefined)
+endif()
 
 function(feature_test feat_name probe_file)
   message(CHECK_START "Feature ${feat_name}")
@@ -121,6 +131,30 @@ add_custom_command(
 )
 
 target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
+
+add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/make-inner.sh"
+        --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
+        --binary-dir "${CMAKE_CURRENT_BINARY_DIR}"
+        --output "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+        DEPENDS
+        "$<TARGET_FILE:pdcrt>"
+        COMMENT "Compiling the inner PDC"
+        VERBATIM
+        USES_TERMINAL
+)
+
+add_custom_target(
+        build_inner_pdc ALL
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+)
+
+add_executable(inner_pdc IMPORTED GLOBAL)
+set_target_properties(inner_pdc PROPERTIES
+        IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+)
+add_dependencies(inner_pdc build_inner_pdc)
 
 # ============= CPack =============
 

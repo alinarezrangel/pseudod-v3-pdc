@@ -232,7 +232,7 @@ funcion AvanzarHasta: texto, pos, terminador
     variable inic
     fijar inic a pos
     mientras (pos < texto#longitud)
-        && sean diferentes (texto#subTexto: pos, terminador#longitud) y terminador
+        && (sean diferentes (texto#subTexto: pos, terminador#longitud) y terminador)
         fijar pos a pos + 1
     finmientras
     si pos >= texto#longitud

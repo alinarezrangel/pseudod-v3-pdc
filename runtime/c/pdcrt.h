@@ -104,6 +104,7 @@ typedef enum pdcrt_gc_tipo_grupo
 {
     PDCRT_TGRP_BLANCO_JOVEN,
     PDCRT_TGRP_BLANCO_VIEJO,
+    PDCRT_TGRP_BLANCO_EN_LA_PILA,
     PDCRT_TGRP_GRIS,
     PDCRT_TGRP_NEGRO,
     PDCRT_TGRP_RAICES_VIEJAS,
@@ -122,6 +123,9 @@ typedef struct pdcrt_cabecera_gc
     // total: 24
 } pdcrt_cabecera_gc;
 
+#define PDCRT_CABECERA_GC(v) ((pdcrt_cabecera_gc *) (v))
+#define PDCRT_CABECERA_GC_PTR(v) ((pdcrt_cabecera_gc **) (v))
+
 typedef struct pdcrt_gc_grupo
 {
     pdcrt_gc_tipo_grupo grupo;
@@ -130,7 +134,8 @@ typedef struct pdcrt_gc_grupo
 
 typedef struct pdcrt_gc
 {
-    pdcrt_gc_grupo blanco_joven, blanco_viejo, gris, negro, raices_viejas;
+    pdcrt_gc_grupo blanco_joven, blanco_viejo, blanco_en_la_pila,
+                   gris, negro, raices_viejas;
 
     size_t tam_heap;
     unsigned int num_recolecciones;
@@ -364,6 +369,7 @@ typedef enum pdcrt_tipo
     X(como_numero_entero, "comoNumeroEntero")                           \
     X(como_numero_real, "comoNumeroReal")                               \
     X(byte_como_texto, "byteComoTexto")                                 \
+    X(byte_en, "byteEn")                                                \
     X(longitud, "longitud")                                             \
     X(en, "en")                                                         \
     X(subtexto, "subTexto")                                             \
@@ -545,16 +551,21 @@ void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_marco **m);
 void pdcrt_gc_mover_a_grupo(pdcrt_gc_grupo *desde, pdcrt_gc_grupo *hacia, pdcrt_cabecera_gc *h);
 
 // NOTA: No necesitamos la barrera de escritura para ninguna "raiz" del GC
+inline void pdcrt_barrera_de_escritura_cabecera(pdcrt_ctx *ctx, pdcrt_cabecera_gc *ch, pdcrt_cabecera_gc *vh)
+{
+    if(ch->grupo == PDCRT_TGRP_BLANCO_VIEJO && (vh->grupo == PDCRT_TGRP_BLANCO_JOVEN || vh->grupo == PDCRT_TGRP_BLANCO_EN_LA_PILA))
+    {
+        pdcrt_gc_mover_a_grupo(&ctx->gc.blanco_viejo, &ctx->gc.raices_viejas, ch);
+    }
+}
+
 inline void pdcrt_barrera_de_escritura(pdcrt_ctx *ctx, pdcrt_obj contenedor, pdcrt_obj valor)
 {
     pdcrt_cabecera_gc *ch = pdcrt_gc_cabecera_de(contenedor);
     pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
     if(!vh || !ch)
         return;
-    if(ch->grupo == PDCRT_TGRP_BLANCO_VIEJO && vh->grupo == PDCRT_TGRP_BLANCO_JOVEN)
-    {
-        pdcrt_gc_mover_a_grupo(&ctx->gc.blanco_viejo, &ctx->gc.raices_viejas, ch);
-    }
+    pdcrt_barrera_de_escritura_cabecera(ctx, ch, vh);
 }
 
 pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k);
@@ -596,15 +607,21 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
 #define pdcrt_fijar_local(ctx, m, idx, v)                               \
     do                                                                  \
     {                                                                   \
-        pdcrt_barrera_de_escritura((ctx), (m)->locales_y_capturas[(idx)], (v)); \
-        (m)->locales_y_capturas[(idx)] = (v);                           \
+        pdcrt_obj local = (v);                                          \
+        pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(local);            \
+        if(vh)                                                          \
+            pdcrt_barrera_de_escritura_cabecera((ctx), PDCRT_CABECERA_GC(m), vh); \
+        (m)->locales_y_capturas[(idx)] = local;                         \
     }                                                                   \
     while(0)
 #define pdcrt_fijar_captura(ctx, m, idx, v)                             \
     do                                                                  \
     {                                                                   \
-        pdcrt_barrera_de_escritura((ctx), (m)->locales_y_capturas[(m)->num_locales + (idx)], (v)); \
-        (m)->locales_y_capturas[(m)->num_locales + (idx)] = (v);        \
+        pdcrt_obj cap = (v);                                            \
+        pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(cap);              \
+        if(vh)                                                          \
+            pdcrt_barrera_de_escritura_cabecera((ctx), PDCRT_CABECERA_GC(m), vh); \
+        (m)->locales_y_capturas[(m)->num_locales + (idx)] = cap;        \
     }                                                                   \
     while(0)
 
@@ -619,8 +636,9 @@ void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
 #define pdcrt_fijar_caja(ctx, o, v)                     \
     do                                                  \
     {                                                   \
-        pdcrt_barrera_de_escritura((ctx), (o), (v));    \
-        (o).caja->valor = (v);                          \
+        pdcrt_obj valor = (v);                          \
+        pdcrt_barrera_de_escritura((ctx), (o), valor);  \
+        (o).caja->valor = valor;                        \
     }                                                   \
     while(0)
 #define pdcrt_obtener_caja(ctx, o) (o).caja->valor
@@ -705,13 +723,16 @@ pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k);
     pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
     pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_locales, num_capturas, args, k)
 
-#define PDCRT_VERIFICA_PILA(ctx, m, nombre)            \
-    if(pdcrt_stack_lleno(ctx))                         \
-    {                                                  \
-        pdcrt_recolectar_basura_por_pila(ctx, &m);     \
-        return (pdcrt_k) { .kf = nombre, .marco = m }; \
-    }                                                  \
-    do {} while(0)
+#define PDCRT_VERIFICA_PILA(ctx, m, nombre)                \
+    do                                                     \
+    {                                                      \
+        if(pdcrt_stack_lleno(ctx))                         \
+        {                                                  \
+            pdcrt_recolectar_basura_por_pila(ctx, &m);     \
+            return (pdcrt_k) { .kf = nombre, .marco = m }; \
+        }                                                  \
+    }                                                      \
+    while(0)
 
 #define PDCRT_DECLARAR_ENTRYPOINT(mod, fmain)                       \
     pdcrt_k pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k) \

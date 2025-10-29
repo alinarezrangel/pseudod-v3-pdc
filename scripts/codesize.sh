@@ -1,4 +1,4 @@
-#!/usr/bin/env ysh
+#!/usr/bin/env bash
 
 lr -t 'name ~~ "*.pd" && path ~~ "pdc/*"' | \
     xe wc -l | \

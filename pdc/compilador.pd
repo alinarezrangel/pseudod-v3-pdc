@@ -288,7 +288,7 @@ metodo estatico OpcionesDeCompilación#predeterminado
         FALSO,
         MostrarVersión#NO,
         Verbosidad#NINGUNA,
-        Arreglo#vacio,
+        Diccionario#vacío,
         IGNORAR_SALIDA,
         NULO,
         NULO,
@@ -481,7 +481,7 @@ metodo SalidaDevNull#escribirTexto: txt
 finmetodo
 
 procedimiento MostrarAyuda
-    Escribir: {TODO}
+    Escribir: {TODO TODO}
 finprocedimiento
 
 procedimiento MostrarSoloVersión

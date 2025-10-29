@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LUA REQUIRED lua5.4)
+pkg_search_module(LUA lua5.4 lua-5.4)
+if(NOT LUA_FOUND)
+    message(WARNING "`lua5.4` not found via pkg-config, falling back to `lua`")
+    pkg_search_module(LUA REQUIRED lua)
+endif()
 
 add_library(sexpr SHARED sexpr.c)
 
