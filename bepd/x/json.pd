@@ -44,7 +44,7 @@ procedimiento DesdeJSON: json
             finfuncion)
         si esTexto
             fijar c a puerto#leerCarácter
-            si res#esOk && no son identicos c y EOF
+            si no son identicos c y EOF
                 devolver Resultado#error: ({Carácter inesperado ~t}#formatear: c)
             finsi
         finsi
