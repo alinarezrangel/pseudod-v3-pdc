@@ -26,7 +26,7 @@ El [tokenizador](../pdc/tokenizador.pd) toma un programa como entrada,
 extrayendo sus [tokens](../pdc/tokens.pd). El [parser](../pdc/parser.pd) toma
 esta secuencia de tokens y produce un [CST](../pdc/cst.pd).
 
-El parser esta hecho con una biblioteca de
+El parser está hecho con una biblioteca de
 [combinadores](../pdc/combinadores.pd).
 
 ## Resolución de nombres ##
@@ -59,7 +59,7 @@ del IR.
 
 ### El IR ###
 
-El IR esta basado en [tuplas](https://cs.lmu.edu/~ray/notes/squid/), donde cada
+El IR está basado en [tuplas](https://cs.lmu.edu/~ray/notes/squid/), donde cada
 instrucción es una tupla cuyo primer elemento es el opcode y los demás son los
 argumentos.
 

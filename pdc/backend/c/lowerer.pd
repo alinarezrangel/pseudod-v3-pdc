@@ -25,7 +25,7 @@ transitivas) de este módulo.}
 DOCUMENTA]
 procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, identificadoresDeDependencias, programa
     EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
-    EmitirLínea: puertoDeEscritura, {#include "pdcrt.h"}
+    EmitirLínea: puertoDeEscritura, {#include "pdcrt/pdcrt.h"}
 
     ParaCadaElemento: programa#funciones, procedimiento: func
         DeclararFunción: puertoDeEscritura, identificadorDelMódulo, func

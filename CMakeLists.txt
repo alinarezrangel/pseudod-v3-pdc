@@ -20,7 +20,10 @@ option(PDCRT_ASAN "Activa ASan" OFF)
 option(PDCRT_UBSAN "Activa UBSan" OFF)
 
 add_library(pdcrt STATIC
-  runtime/c/pdcrt.c)
+        runtime/c/pdcrt/pdcrt.c
+        runtime/c/pdcrt/pdcrt.h
+        runtime/c/pdcrt/pdffi.c
+        runtime/c/pdcrt/pdffi.h)
 
 target_link_libraries(pdcrt INTERFACE m)
 
@@ -104,7 +107,7 @@ configure_file(
 )
 
 set_target_properties(pdcrt PROPERTIES
-  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt.h"
+  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt/pdcrt.h"
 )
 
 target_include_directories(pdcrt PUBLIC
@@ -138,8 +141,7 @@ add_custom_command(
         --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
         --binary-dir "${CMAKE_CURRENT_BINARY_DIR}"
         --output "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
-        DEPENDS
-        "$<TARGET_FILE:pdcrt>"
+        DEPENDS pdcrt
         COMMENT "Compiling the inner PDC"
         VERBATIM
         USES_TERMINAL

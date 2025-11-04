@@ -7,7 +7,7 @@
 #include "pdcrt-plataforma.h"
 
 #define PDCRT_INTERNO
-#include "pdcrt.h"
+#include "pdcrt/pdcrt.h"
 
 
 static uintptr_t pdcrt_obtener_stack_pointer(void)
@@ -152,6 +152,7 @@ static _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj)
     }
     else
     {
+        pdcrt_recolectar_basura_por_pila(ctx, NULL);
         longjmp(ctx->manejador_de_errores, 1);
     }
 }
@@ -5531,9 +5532,12 @@ static void pdcrt_liberar_grupo(pdcrt_ctx *ctx, pdcrt_gc_grupo *grupo)
     for(pdcrt_cabecera_gc *h = grupo->primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
+        h->grupo = PDCRT_TGRP_NINGUNO;
+        h->siguiente = h->anterior = NULL;
         pdcrt_gc_liberar_objeto(ctx, h);
         h = s;
     }
+    grupo->primero = grupo->ultimo = NULL;
 }
 
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)

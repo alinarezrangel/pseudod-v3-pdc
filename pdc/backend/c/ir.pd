@@ -225,6 +225,9 @@ extraído.}
 
 @defenum("sacar"){Saca el valor en la cima de la pila. No acepta argumentos.}
 
+@defenum("obtenerEspacioDeNombresDelRuntime"){Empuja en la pila el espacio de
+nombres del runtime. No acepta argumentos.}
+
 @defenum("comoEspacioDeNombres"){Convierte un valor importado en la cima de la
 pila a un espacio de nombres. Se debe usar con el valor empujado por el opcode
 @code{importar}. No acepta argumentos. Saca el valor de la pila y empuja el
