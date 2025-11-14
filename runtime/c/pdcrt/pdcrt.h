@@ -70,6 +70,15 @@ size_t pdcrt_alojador_con_estadisticas_obtener_usado(pdcrt_aloj* yo);
 void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
 
 
+#ifdef PDCRT_INTERNO
+
+#include <stdalign.h>
+
+void *pdcrt_alojar_ctx(pdcrt_ctx *ctx, size_t bytes);
+void *pdcrt_realojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual, size_t tam_nuevo);
+void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual);
+
+
 struct pdcrt_marco;
 typedef struct pdcrt_marco pdcrt_marco;
 
@@ -536,13 +545,6 @@ void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp pos, size_t nu
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
-#ifdef PDCRT_INTERNO
-
-#include <stdalign.h>
-
-void *pdcrt_alojar_ctx(pdcrt_ctx *ctx, size_t bytes);
-void *pdcrt_realojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual, size_t tam_nuevo);
-void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual);
 
 pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o);
 

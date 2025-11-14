@@ -5452,7 +5452,7 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->textos = NULL;
 
     // TODO: Esto debería estár en `pdcrt_ejecutar_opt`.
-    ctx->inicio_del_stack = pdcrt_obtener_stack_pointer();
+    ctx->inicio_del_stack = 0;
     ctx->tam_stack = 3 * 1024 * 1024; // 3 MiB
 
     ctx->hay_un_manejador_de_errores = false;
@@ -6503,6 +6503,14 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     memcpy((jmp_buf *) &viejo_e, &ctx->manejador_de_errores, sizeof(jmp_buf));
     volatile bool habia_s = ctx->hay_una_salida_del_trampolin;
     volatile bool habia_e = ctx->hay_un_manejador_de_errores;
+    volatile uintptr_t viejo_sp = ctx->inicio_del_stack;
+
+    if(ctx->inicio_del_stack == 0)
+    {
+        ctx->inicio_del_stack = pdcrt_obtener_stack_pointer();
+        if(ctx->inicio_del_stack == 0)
+            ctx->inicio_del_stack = 1;
+    }
 
 #define CLEANUP()                                                       \
     do                                                                  \
@@ -6511,6 +6519,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
         memcpy(&ctx->manejador_de_errores, (jmp_buf *) &viejo_e, sizeof(jmp_buf)); \
         ctx->hay_una_salida_del_trampolin = habia_s;                    \
         ctx->hay_un_manejador_de_errores = habia_e;                     \
+        ctx->inicio_del_stack = viejo_sp;                               \
     }                                                                   \
     while(0)
 
