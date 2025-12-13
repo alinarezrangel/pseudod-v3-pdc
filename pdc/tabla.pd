@@ -92,7 +92,7 @@ clase Tabla
     Trata de obtener el registro cuyos campos (todos @pd{Texto}s) tienen los
     valores dados. Los campos consisten de @pd{campo} y los valores de
     @pd{valor}. @pd{camposYValores} deben ser campos y valores adicionales,
-    alternandose. Por ejemplo: para buscar un registro con los campos @code{A}
+    alternándose. Por ejemplo: para buscar un registro con los campos @code{A}
     y @code{B} con los valores @code{1} y @code{2} utilizarías
     @pd|{tabla#buscarOrdenado: {A}, 1, {B}, 2}|.
 
@@ -306,7 +306,10 @@ metodo Tabla#buscarOrdenado: campo, valor, ...camposYValores
             finmientras
         finprocedimiento
 
-        devolver Mapear: (PedazoDeArreglo: índice, j, k), funcion: tupla
+        variable frag
+        fijar frag a PedazoDeArreglo: índice, j, k
+
+        devolver Mapear: frag, funcion: tupla
             devolver tupla#registro
         finfuncion
     sino

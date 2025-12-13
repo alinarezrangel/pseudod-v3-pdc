@@ -32,7 +32,7 @@ clase LecturaParcial
 finclase
 
 metodo LecturaParcial#comoTexto
-    devolver {(LecturaParcial con leído: [~t], finPorEOF: ~t)}#formatear: yo#leído, (yo#finPorEOF#escojer: {VERDADERO}, {FALSO})
+    devolver {(LecturaParcial con leído: [~t], finPorEOF: ~t)}#formatear: yo#leído, (yo#finPorEOF#escoger: {VERDADERO}, {FALSO})
 finmetodo
 
 [DOCUMENTA

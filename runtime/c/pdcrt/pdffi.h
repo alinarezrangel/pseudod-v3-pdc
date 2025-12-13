@@ -83,6 +83,17 @@ int pdffi_verrorf(pdffi_ctx *ctx, const char *msj, va_list v);
 bool pdffi_obtener_builtin(pdffi_ctx *ctx, const char *nombre, size_t tam_nombre);
 bool pdffi_obtener_de_espacio_de_nombre(pdffi_ctx *ctx, pdffi_stp ns,
                                         const char *nombre, size_t tam_nombre);
+void pdffi_utilizar(pdffi_ctx *ctx, const char *nombre, size_t tam_nombre);
+int pdffi_utilizark(pdffi_ctx *ctx, const char *nombre, size_t tam_nombre, pdffi_k k);
+
+typedef struct pdffi_exportacion
+{
+    const char *nombre;
+    size_t tam_nombre;
+    bool es_procedimiento;
+} pdffi_exportacion;
+
+int pdffi_exportar(pdffi_ctx *ctx, pdffi_exportacion *proto, size_t nproto);
 
 void pdffi_enviar_mensaje(pdffi_ctx *ctx, pdffi_stp obj,
                           const char *nombre, size_t tam_nombre,

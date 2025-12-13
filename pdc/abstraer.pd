@@ -78,14 +78,23 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         fijar ámbito a tablasRnCst#tablaÁmbitos#buscarÚnico: {idNodo}, nodoCst#instrucciones#id
         fijar exportaciones a Arreglo#vacio
         ámbito#ámbito#paraCadaNombreExportado: procedimiento: nombre, datos
-            variable id
-            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombre
+            variables id, txt, reg, áreaTextual
+            fijar reg a tablasRnCst#tablaDefiniciones#intentaBuscarÚnico: {binding}, datos#binding
+            si EsNulo: reg
+                fijar áreaTextual a nodoCst#áreaTextual
+            sino
+                fijar reg a tablaCst#buscarÚnico: {id}, reg#idNodo
+                fijar áreaTextual a reg#nodo#áreaTextual
+            finsi
+
+            fijar id a AST#NodoIdentificador#crear: áreaTextual, nombre
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, datos#binding)
             finprocedimiento
-            exportaciones#agregarAlFinal: (AST#NodoArgumento#crear: nodoCst#áreaTextual, id, FALSO)
+            fijar txt a AST#NodoLiteralTextual#crear: áreaTextual, nombre
+            exportaciones#agregarAlFinal: (AST#NodoExportación#crear: áreaTextual, id, txt, datos#esAutoejecutable)
         finprocedimiento
-        bloque#cuerpo#agregarAlFinal: (AST#NodoBuiltin#crear: nodoCst#áreaTextual, {exportar}, exportaciones)
+        bloque#cuerpo#agregarAlFinal: (AST#NodoExportar#crear: nodoCst#áreaTextual, exportaciones)
         devolver AST#NodoPrograma#crear: nodoCst#áreaTextual, bloque
     finsi
 
@@ -278,7 +287,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         [ CLASE#agregarMetodo: {NOMBRE}, funcion: yo, ...P CUERPO finfuncion ]
         devolver AST#NodoEnviarMensaje#crear: nodoCst#áreaTextual,
             (abstraer: nodoCst#deClase),
-            (nodoCst#esEstático#escojer: {agregarMetodoEstatico}, {agregarMetodo}),
+            (nodoCst#esEstático#escoger: {agregarMetodoEstatico}, {agregarMetodo}),
             (abstraerArgumentos:
                 (Arreglo#crearCon:
                     (AST#NodoLiteralTextual#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre),
@@ -307,21 +316,22 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         fijar nombresImportados a tablasRnCst#tablaNombresImportados#buscarOrdenado: {idNodo}, nodoCst#id
         fijar regNombresImportados a Arreglo#vacio
 
+        ParaCadaElemento: nombresImportados, procedimiento: nombreImportado
+            regNombresImportados#agregarAlFinal:
+                    (NombreImportado#crear: NULO, nombreImportado#nombre, nombreImportado#binding)
+        finprocedimiento
+
         si no EsNulo: nodoCst#nombresEspecíficos
             fijar nombres a Mapear: nodoCst#nombresEspecíficos, funcion: nombreORenombre
                 si EsInstancia: nombreORenombre, CST#NodoIdentificador
                     variable binding
                     fijar binding a ObtenerBinding: nombreORenombre, tablasRnCst
-                    regNombresImportados#agregarAlFinal:
-                        (NombreImportado#crear: NULO, nombreORenombre#nombre, binding)
                     devolver AST#NodoNombreEspecífico#crear: nombreORenombre#áreaTextual,
                         (AST#NodoLiteralTextual#crear: nombreORenombre#áreaTextual, nombreORenombre#nombre),
                         (abstraer: nombreORenombre)
                 sino
                     variable binding
                     fijar binding a ObtenerBinding: (nombreORenombre#en: 1), tablasRnCst
-                    regNombresImportados#agregarAlFinal:
-                        (NombreImportado#crear: NULO, (nombreORenombre#en: 0)#nombre, binding)
                     devolver AST#NodoNombreEspecífico#crear: (nombreORenombre#en: 1)#áreaTextual,
                         (abstraer: (nombreORenombre#en: 0)),
                         (abstraer: (nombreORenombre#en: 1))

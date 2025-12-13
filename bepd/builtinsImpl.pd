@@ -951,7 +951,7 @@ necesitas (Max: 2, 5, 3, 56, 2, 102, 5, -6) = 102
 }|
 DOCUMENTA]
 funcion Max: x, ...vals
-    necesitas vals#longitud > 0
+    necesitas vals#longitud >= 0
     variable max
     fijar max a x
     ParaCadaElemento: vals, procedimiento: v
@@ -978,7 +978,7 @@ necesitas (Min: 2, 5, 3, 56, 2, 102, 5, -6) = -6
 }|
 DOCUMENTA]
 funcion Min: x, ...vals
-    necesitas vals#longitud > 0
+    necesitas vals#longitud >= 0
     variable min
     fijar min a x
     ParaCadaElemento: vals, procedimiento: v
@@ -1243,3 +1243,38 @@ funcion OperadorBinario: op
         devolver EnviarMensaje: lhs, ({operador_}#concatenar: op), rhs
     finfuncion
 finfuncion
+
+funcion ContienePredicado: arr, pred
+    devolver LlamarConEC: procedimiento: salir
+        ParaCadaElemento: arr, procedimiento: el
+            si %pred: el
+                %salir: VERDADERO
+            finsi
+        finprocedimiento
+        devolver FALSO
+    finprocedimiento
+finfuncion
+
+funcion BuscarPredicado: inicio, arr, pred
+    variable i
+    fijar i a inicio
+    necesitas i >= 0
+    si i >= arr#longitud [ ¿Es buena idea? ]
+        devolver NULO
+    finsi
+    mientras i < arr#longitud
+        si %pred: (arr#en: i)
+            devolver i
+        finsi
+        fijar i a i + 1
+    finmientras
+    devolver NULO
+finfuncion
+
+procedimiento ParaCadaElementoEnReversa: arr, proc
+    ParaCadaNúmero: 0, arr#longitud, procedimiento: i
+        variable j
+        fijar j a (arr#longitud - 1) - i
+        devolver %proc: (arr#en: j)
+    finprocedimiento
+finprocedimiento

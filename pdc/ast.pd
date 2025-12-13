@@ -234,7 +234,7 @@ metodo NodoParámetro#recursivo: f
 finmetodo
 
 metodo NodoParámetro#comoTexto
-    devolver {(NodoParámetro ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#identificador
+    devolver {(NodoParámetro ~t~t)}#formatear: (yo#esVariadic#escoger: {...}, {}), yo#identificador
 finmetodo
 
 metodo NodoParámetro#esExpresión
@@ -437,6 +437,49 @@ metodo NodoNombreEspecífico#comoTexto
     devolver {(NodoNombreEspecífico ~t ~t)}#formatear: yo#nombre, yo#renombre
 finmetodo
 
+clase NodoExportar hereda Nodo
+    atributo exportaciones
+finclase
+
+metodo NodoExportar#inicializar: áreaTextual, exportaciones
+    fijar yo#áreaTextual a áreaTextual
+    fijar yo#exportaciones a exportaciones
+finmetodo
+
+metodo NodoExportar#recursivo: f
+    ParaCadaElemento: yo#exportaciones, f
+finmetodo
+
+metodo NodoExportar#comoTexto
+    devolver {(NodoExportar ~t ~t)}#formatear: yo#áreaTextual, yo#exportaciones
+finmetodo
+
+clase NodoExportación hereda Nodo
+    atributo expresión
+    atributo nombre
+    atributo esAutoejecutable
+finclase
+
+metodo NodoExportación#inicializar: áreaTextual, expresión, nombre, esAutoejecutable
+    fijar yo#áreaTextual a áreaTextual
+    fijar yo#expresión a expresión
+    fijar yo#nombre a nombre
+    fijar yo#esAutoejecutable a esAutoejecutable
+finmetodo
+
+metodo NodoExportación#recursivo: f
+    %f: yo#expresión
+    %f: yo#nombre
+finmetodo
+
+metodo NodoExportación#esExpresión
+    devolver VERDADERO
+finmetodo
+
+metodo NodoExportación#comoTexto
+    devolver {(NodoExportación ~t expr=~t nom=~t ejec=~t)}#formatear: yo#áreaTextual, yo#expresión, yo#nombre, yo#esAutoejecutable
+finmetodo
+
 [DOCUMENTA
 @brief{Literal numérica.}
 DOCUMENTA]
@@ -517,7 +560,7 @@ metodo NodoArgumento#recursivo: f
 finmetodo
 
 metodo NodoArgumento#comoTexto
-    devolver {(NodoArgumento ~t~t)}#formatear: (yo#esVariadic#escojer: {...}, {}), yo#expresión
+    devolver {(NodoArgumento ~t~t)}#formatear: (yo#esVariadic#escoger: {...}, {}), yo#expresión
 finmetodo
 
 metodo NodoArgumento#esExpresión

@@ -142,7 +142,7 @@ static void pdcrt_formatear_bytes(char *buffer, size_t bytes)
 }
 
 
-static _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj)
+_Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj)
 {
     ctx->mensaje_de_error = msj;
     if(!ctx->hay_un_manejador_de_errores)
@@ -161,8 +161,6 @@ static _Noreturn void pdcrt_enomem(pdcrt_ctx *ctx)
 {
     pdcrt_error(ctx, "Sin memoria");
 }
-
-static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o);
 
 static void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
 {
@@ -781,26 +779,6 @@ static void pdcrt_desalojar_con_estadisticas(void *yo, void *ptr, size_t tam_act
 }
 
 
-
-#define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
-#define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })
-#define pdcrt_objeto_booleano(b) ((pdcrt_obj) { .recv = &pdcrt_recv_booleano, .bval = (b) })
-#define pdcrt_objeto_marco(m) ((pdcrt_obj) { .recv = &pdcrt_recv_marco, .marco = (m) })
-#define pdcrt_objeto_texto(txt) ((pdcrt_obj) { .recv = &pdcrt_recv_texto, .texto = (txt) })
-#define pdcrt_objeto_nulo() ((pdcrt_obj) { .recv = &pdcrt_recv_nulo })
-#define pdcrt_objeto_arreglo(arr) ((pdcrt_obj) { .recv = &pdcrt_recv_arreglo, .arreglo = (arr) })
-#define pdcrt_objeto_closure(cls) ((pdcrt_obj) { .recv = &pdcrt_recv_closure, .closure = (cls) })
-#define pdcrt_objeto_caja(cj) ((pdcrt_obj) { .recv = &pdcrt_recv_caja, .caja = (cj) })
-#define pdcrt_objeto_tabla(tbl) ((pdcrt_obj) { .recv = &pdcrt_recv_tabla, .tabla = (tbl) })
-#define pdcrt_objeto_runtime() ((pdcrt_obj) { .recv = &pdcrt_recv_runtime })
-#define pdcrt_objeto_voidptr(ptr) ((pdcrt_obj) { .recv = &pdcrt_recv_voidptr, .pval = (ptr) })
-#define pdcrt_objeto_valop(vo) ((pdcrt_obj) { .recv = &pdcrt_recv_valop, .valop = (vo) })
-#define pdcrt_objeto_espacio_de_nombres(tbl) ((pdcrt_obj) { .recv = &pdcrt_recv_espacio_de_nombres, .tabla = (tbl) })
-#define pdcrt_objeto_corrutina(corrutina) ((pdcrt_obj) { .recv = &pdcrt_recv_corrutina, .coro = (corrutina) })
-#define pdcrt_objeto_instancia(instancia) ((pdcrt_obj) { .recv = &pdcrt_recv_instancia, .inst = (instancia) })
-#define pdcrt_objeto_reubicado(reub) ((pdcrt_obj) { .recv = &pdcrt_recv_reubicado, .reubicado = (reub) })
-
-
 static size_t pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista);
 
 
@@ -1054,8 +1032,8 @@ static void pdcrt_gc_visitar_contenido(
             pdcrt_marco *m = (pdcrt_marco *) h;
             if(m->k.marco)
                 f(ctx, PDCRT_CABECERA_GC_PTR(&m->k.marco), params);
-            for(size_t i = 0; i < (m->num_locales + m->num_capturas); i++)
-                f_obj(ctx, &m->locales_y_capturas[i], params);
+            for(size_t i = 0; i < m->num_registros; i++)
+                f_obj(ctx, &m->registros[i], params);
             break;
         }
         case PDCRT_TGC_ARREGLO:
@@ -1543,7 +1521,7 @@ static int pdcrt_comparar_str(const char *s1, size_t l1, const char *s2, size_t 
         return memcmp(s1, s2, l1);
 }
 
-static pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len)
+pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len)
 {
     // Al alojar un texto nuevo (en caso de que no exista) se podría invocar al
     // recolector de basura. En ese caso, la lista de textos sobre la que
@@ -2487,10 +2465,10 @@ pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.escojer))
+    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.escoger))
     {
         if(args != 2)
-            pdcrt_error(ctx, "Booleano: escojer necesita 2 argumentos");
+            pdcrt_error(ctx, "Booleano: escoger necesita 2 argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
         pdcrt_obj siVerdadero = ctx->pila[argp];
         pdcrt_obj siFalso = ctx->pila[argp + 1];
@@ -4409,7 +4387,7 @@ pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
         pdcrt_extender_pila(ctx, k.marco, 1);
         // [num_atrs, metodos, metodo_no_encontrado]
         bool ok = false;
-        pdcrt_entero num_atrs = pdcrt_obtener_entero(ctx, -3, &ok);;
+        pdcrt_entero num_atrs = pdcrt_obtener_entero(ctx, -3, &ok);
         if(!ok)
             pdcrt_error(ctx, "Runtime: crearInstancia: numAtrs debe ser un entero");
         pdcrt_empujar_instancia(ctx, &k.marco, -2, -1, num_atrs);
@@ -4893,8 +4871,8 @@ static pdcrt_k pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     if(args != 1)
         pdcrt_error(ctx, "Corrutina: generador debe llamarse con un argumento");
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 1, args, k);
-    pdcrt_obj obj_coro = pdcrt_obtener_captura(ctx, m, 0);
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 1, args, k);
+    pdcrt_obj obj_coro = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_corrutina *coro = obj_coro.coro;
     // [res]
     if(coro->estado != PDCRT_CORO_EJECUTANDOSE)
@@ -5092,7 +5070,7 @@ static pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
 
 static pdcrt_k pdcrt_funcion_igualdad_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 
-static pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, struct pdcrt_k k)
+static pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     if(args != 2)
         pdcrt_error(ctx, u8"FunciónIgualdad: se esperaban 2 argumentos");
@@ -5113,7 +5091,7 @@ static pdcrt_k pdcrt_funcion_igualdad_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     return pdcrt_devolver(ctx, m, 1);
 }
 
-static pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, struct pdcrt_k k)
+static pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
     if(args != 1)
         pdcrt_error(ctx, u8"FunciónHash: se esperaba 1 argumento");
@@ -5125,7 +5103,7 @@ static pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, struct pdcrt_k k)
 
 
 
-static pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
+pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
 {
     if(o.recv == &pdcrt_recv_entero)
     {
@@ -5227,15 +5205,18 @@ static inline size_t pdcrt_stp_a_pos(pdcrt_ctx *ctx, pdcrt_stp i)
 
 static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
                                          pdcrt_marco *m,
-                                         size_t locales,
+                                         size_t registros,
                                          size_t capturas,
                                          int args,
                                          pdcrt_k k)
 {
     m->args = args;
     m->k = k;
-    m->num_locales = locales;
-    m->num_capturas = capturas;
+    m->num_registros = registros;
+    for(size_t i = 0; i < registros; i++)
+    {
+        m->registros[i] = pdcrt_objeto_nulo();
+    }
     size_t top = ctx->tam_pila;
     for(size_t i = 0; i < capturas; i++)
     {
@@ -5243,34 +5224,30 @@ static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
         pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(val);
         if(vh)
             pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(m), vh);
-        m->locales_y_capturas[locales + i] = val;
-    }
-    for(size_t i = 0; i < locales; i++)
-    {
-        m->locales_y_capturas[i] = pdcrt_objeto_nulo();
+        m->registros[i] = val;
     }
     ctx->tam_pila -= capturas;
 }
 
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t locales, size_t capturas, int args, pdcrt_k k)
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, size_t capturas, int args, pdcrt_k k)
 {
-    pdcrt_marco *m = pdcrt_alojar_obj(ctx, &k.marco, PDCRT_TGC_MARCO, sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (locales + capturas));
+    pdcrt_marco *m = pdcrt_alojar_obj(ctx, &k.marco, PDCRT_TGC_MARCO, sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * registros);
     if(!m)
         pdcrt_enomem(ctx);
-    pdcrt_inicializar_marco_impl(ctx, m, locales, capturas, args, k);
+    pdcrt_inicializar_marco_impl(ctx, m, registros, capturas, args, k);
     return m;
 }
 
 void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
                              pdcrt_marco *m,
                              size_t sz,
-                             size_t locales,
+                             size_t registros,
                              size_t capturas,
                              int args,
                              pdcrt_k k)
 {
     pdcrt_inicializar_obj(ctx, PDCRT_CABECERA_GC(m), PDCRT_TGC_MARCO, sz);
-    pdcrt_inicializar_marco_impl(ctx, m, locales, capturas, args, k);
+    pdcrt_inicializar_marco_impl(ctx, m, registros, capturas, args, k);
     m->gc.en_la_pila = true;
     pdcrt_gc_mover_a_grupo(&ctx->gc.blanco_joven, &ctx->gc.blanco_en_la_pila, PDCRT_CABECERA_GC(m));
 }
@@ -5310,12 +5287,12 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, s
     return c;
 }
 
-pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_obj valor)
+pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco **m)
 {
     pdcrt_caja *c = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_CAJA, sizeof(pdcrt_caja));
     if(!c)
         pdcrt_enomem(ctx);
-    c->valor = valor;
+    c->valor = pdcrt_objeto_nulo();
     return c;
 }
 
@@ -5512,12 +5489,10 @@ void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
     (void) pdcrt_sacar(ctx);
 }
 
-void pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m)
+pdcrt_obj pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj mod)
 {
-    pdcrt_extender_pila(ctx, m, 1);
-    pdcrt_obj o = pdcrt_sacar(ctx);
-    pdcrt_debe_tener_tipo(ctx, o, PDCRT_TOBJ_TABLA);
-    pdcrt_empujar(ctx, pdcrt_objeto_espacio_de_nombres(o.tabla));
+    pdcrt_debe_tener_tipo(ctx, mod, PDCRT_TOBJ_TABLA);
+    return pdcrt_objeto_espacio_de_nombres(mod.tabla);
 }
 
 static void pdcrt_preparar_registros(pdcrt_ctx *ctx, size_t num_mods)
@@ -5561,6 +5536,8 @@ void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem)
     (void) m;
     if((num_elem + ctx->tam_pila) > ctx->cap_pila)
     {
+        // TODO: Redimensionar por el mínimo necesario es estúpido, mejor
+        //  redimensionar por MAX(num_elem + tam_pila, cap_pila * 2)
         size_t nueva_cap = num_elem + ctx->tam_pila;
         void *nueva_pila = pdcrt_realojar_ctx(ctx, ctx->pila,
             sizeof(pdcrt_obj) * ctx->cap_pila,
@@ -5624,7 +5601,7 @@ void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacid
 void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco **m)
 {
     pdcrt_extender_pila(ctx, *m, 1);
-    pdcrt_obj obj = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, m, pdcrt_objeto_nulo()));
+    pdcrt_obj obj = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, m));
     pdcrt_empujar(ctx, obj);
 }
 
@@ -5635,11 +5612,16 @@ void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad
     pdcrt_empujar(ctx, obj);
 }
 
-void pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
+pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt_marco **m)
 {
-    pdcrt_extender_pila(ctx, m, 1);
-    pdcrt_obj obj = pdcrt_objeto_runtime();
-    pdcrt_empujar(ctx, obj);
+    return pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, m, 32));
+}
+
+pdcrt_obj pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    (void) ctx;
+    (void) m;
+    return pdcrt_objeto_runtime();
 }
 
 void* pdcrt_empujar_valop(pdcrt_ctx *ctx, pdcrt_marco **m, size_t num_bytes)
@@ -5831,7 +5813,8 @@ void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja)
 
 void pdcrt_envolver_en_caja(pdcrt_ctx *ctx, pdcrt_marco **m)
 {
-    pdcrt_obj c = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, m, pdcrt_cima(ctx)));
+    pdcrt_obj c = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, m));
+    pdcrt_fijar_caja(ctx, c, pdcrt_cima(ctx));
     pdcrt_fijar_pila(ctx, ctx->tam_pila - 1, c);
 }
 
@@ -5922,54 +5905,51 @@ void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp pos, size_t nu
 }
 
 
-pdcrt_k pdcrt_params(pdcrt_ctx *ctx,
+void pdcrt_params(pdcrt_ctx *ctx,
                      pdcrt_marco *m,
-                     int params,
-                     bool variadic,
-                     pdcrt_kf kf)
+                     pdcrt_params_data *restrict p)
 {
-    for(size_t i = 0; i < m->num_locales; i++)
+    if(m->args < p->base.num_params - (p->base.tiene_variadic ? 1 : 0))
+        pdcrt_error(ctx, u8"función llamada de forma inválida");
+
+    // Núm. parámetros antes del variadic
+    size_t prefijo = p->base.tiene_variadic ? p->base.idc_variadic : p->base.num_params;
+    // Núm. parámetros después del variadic
+    size_t sufijo = p->base.tiene_variadic ? p->base.num_params - p->base.idc_variadic - 1 : 0;
+    // Núm. argumentos variadic
+    size_t num_args_variadic = p->base.tiene_variadic ? m->args - prefijo - sufijo : 0;
+    // Núm. parámetros variadic
+    size_t num_param_variadic = p->base.tiene_variadic ? 1 : 0;
+
+    assert(m->args == (prefijo + num_args_variadic + sufijo));
+    assert(p->base.num_params == (prefijo + sufijo + num_param_variadic));
+
+    for(size_t i = 0; i < prefijo; i++)
     {
-        pdcrt_fijar_local(ctx, m, i, pdcrt_objeto_nulo());
+        m->registros[p->params[i].reg] = ctx->pila[ctx->tam_pila - m->args + i];
+    }
+    for(size_t i = 0; i < sufijo; i++)
+    {
+        m->registros[p->params[prefijo + num_param_variadic + i].reg] =
+            ctx->pila[ctx->tam_pila - m->args + prefijo + num_args_variadic + i];
     }
 
-    if(m->args < params)
-        pdcrt_error(ctx, u8"función llamada de forma inválida");
-    if(variadic)
+    if(p->base.tiene_variadic)
     {
-        int varargs = m->args - params;
         pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar_arreglo_vacio(ctx, &m, varargs);
-        for(int i = 0; i < varargs; i++)
+        pdcrt_empujar_arreglo_vacio(ctx, &m, num_args_variadic);
+        for(int i = 0; i < num_args_variadic; i++)
         {
-            pdcrt_obj val = ctx->pila[(ctx->tam_pila - varargs - 1) + i];
+            // -1 por el arreglo que acabamos de empujar
+            pdcrt_obj val = ctx->pila[ctx->tam_pila - m->args - 1 + prefijo + i];
             pdcrt_empujar(ctx, val);
             pdcrt_arreglo_empujar_al_final(ctx, m, -2);
         }
         pdcrt_obj var = pdcrt_sacar(ctx);
-        for(int i = 0; i < varargs; i++)
-            (void) pdcrt_sacar(ctx);
-        pdcrt_empujar(ctx, var);
+        m->registros[p->params[p->base.idc_variadic].reg] = var;
     }
-    return (*kf)(ctx, m);
-}
 
-void pdcrt_variadic(pdcrt_ctx *ctx, pdcrt_marco *m, int params)
-{
-    (void) ctx;
-    (void) m;
-    (void) params;
-    // Nada que hacer por ahora
-}
-
-bool pdcrt_saltar_condicional(pdcrt_ctx *ctx)
-{
-    pdcrt_obj o = pdcrt_sacar(ctx);
-    if(pdcrt_tipo_de_obj(o) != PDCRT_TOBJ_BOOLEANO)
-    {
-        pdcrt_error(ctx, "Se esperaba un objeto de tipo Booleano");
-    }
-    return o.bval;
+    ctx->tam_pila -= m->args; // saca todos los argumentos
 }
 
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
@@ -6125,16 +6105,16 @@ static void pdcrt_prn_helper(pdcrt_ctx *ctx, pdcrt_obj o)
     }
 }
 
-pdcrt_k pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
+void pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj v)
 {
-    pdcrt_obj o = pdcrt_sacar(ctx);
-    pdcrt_prn_helper(ctx, o);
-    return (*kf)(ctx, m);
+    (void) m;
+    pdcrt_prn_helper(ctx, v);
 }
 
-void pdcrt_prnl(pdcrt_ctx *ctx)
+void pdcrt_prnl(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     (void) ctx;
+    (void) m;
     puts("");
 }
 
@@ -6266,11 +6246,18 @@ static pdcrt_k pdcrt_importar_k5(pdcrt_ctx *ctx, pdcrt_marco *m)
 pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
-pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf)
+pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx,
+                       pdcrt_marco *m,
+                       pdcrt_obj mod,
+                       const char *nombre,
+                       size_t tam_nombre,
+                       pdcrt_kf kf)
 {
     // Esta función asume que al llamarla, no existe ninguna referencia al
     // marco `m` excepto por el parámetro `m`.
 
+    pdcrt_extender_pila(ctx, m, 4);
+    pdcrt_empujar(ctx, mod);
     // [mod]
     pdcrt_kf *valop = pdcrt_empujar_valop(ctx, &m, sizeof(pdcrt_kf));
     *valop = kf;
@@ -6297,27 +6284,38 @@ pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_extraerv_k2);
     // [mod, valop, val]
-    pdcrt_extraer(ctx, -2);
-    // [mod, val, valop]
+    pdcrt_insertar(ctx, -3);
+    // [val, mod, valop]
     bool ok;
     pdcrt_kf *kf = pdcrt_obtener_valop(ctx, -1, &ok);
     if(!ok)
         pdcrt_error(ctx, "error interno: valop esperado");
     (void) pdcrt_sacar(ctx);
+    (void) pdcrt_sacar(ctx);
+    // [val]
     return (*kf)(ctx, m);
 }
 
 static pdcrt_k pdcrt_agregar_nombre_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 
-pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, bool autoejec, pdcrt_kf kf)
+pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx,
+                             pdcrt_marco *m,
+                             pdcrt_obj mod,
+                             pdcrt_obj valor,
+                             const char *nombre,
+                             size_t tam_nombre,
+                             bool autoejec,
+                             pdcrt_kf kf)
 {
     // Esta función asume que al llamarla, no existe ninguna referencia al
     // marco `m` excepto por el parámetro `m`.
 
-    pdcrt_extender_pila(ctx, m, 5);
+    pdcrt_extender_pila(ctx, m, 7);
+
+    pdcrt_empujar(ctx, mod);
+    pdcrt_empujar(ctx, valor);
     // [mod, valor]
-    pdcrt_obj val = ctx->pila[ctx->tam_pila - 2];
-    pdcrt_empujar(ctx, val);
+    pdcrt_empujar(ctx, mod);
     // [mod, valor, mod]
     pdcrt_insertar(ctx, -2);
     // [mod, mod, valor]
@@ -6356,18 +6354,24 @@ static pdcrt_k pdcrt_agregar_nombre_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
         pdcrt_error(ctx, "Error interno: valop esperado");
     pdcrt_kf kf = *pkf;
     (void) pdcrt_sacar(ctx);
-    // [mod]
+    (void) pdcrt_sacar(ctx);
+    // []
     return (*kf)(ctx, m);
 }
 
 static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
 
-pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *modulo, size_t tam_modulo)
+pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx,
+                       pdcrt_marco *m,
+                       pdcrt_obj mod,
+                       const char *modulo,
+                       size_t tam_modulo)
 {
     // Esta función asume que al llamarla, no existe ninguna referencia al
     // marco `m` excepto por el parámetro `m`.
 
-    pdcrt_extender_pila(ctx, m, 3);
+    pdcrt_extender_pila(ctx, m, 4);
+    pdcrt_empujar(ctx, mod);
     // [mod]
     pdcrt_empujar(ctx, ctx->registro_de_espacios_de_nombres);
     // [mod, reg]
@@ -6388,10 +6392,10 @@ static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     return pdcrt_devolver(ctx, m, 1);
 }
 
-void pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m)
+pdcrt_obj pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
-    pdcrt_extender_pila(ctx, m, 1);
-    pdcrt_empujar(ctx, ctx->clase_objeto);
+    (void) m;
+    return ctx->clase_objeto;
 }
 
 void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t num_caps)
@@ -6407,36 +6411,51 @@ void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t nu
     pdcrt_empujar(ctx, pdcrt_objeto_closure(c));
 }
 
-void pdcrt_assert(pdcrt_ctx *ctx)
+pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
+                           pdcrt_marco **m,
+                           pdcrt_f f,
+                           const pdcrt_captura *caps,
+                           size_t ncaps)
 {
-    pdcrt_obj b = pdcrt_sacar(ctx);
-    pdcrt_debe_tener_tipo(ctx, b, PDCRT_TOBJ_BOOLEANO);
-    if(!b.bval)
+    pdcrt_closure *c = pdcrt_crear_closure(ctx, m, f, ncaps);
+    for(size_t i = 0; i < ncaps; i++)
+    {
+        pdcrt_obj cap = pdcrt_obtener_local(ctx, *m, caps[i].registro);
+        pdcrt_barrera_de_escritura(ctx, pdcrt_objeto_closure(c), cap);
+        c->capturas[i] = cap;
+    }
+    return pdcrt_objeto_closure(c);
+}
+
+void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj v)
+{
+    (void) m;
+    pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+    if(!v.bval)
     {
         pdcrt_error(ctx, "necesitas fallido");
     }
 }
 
-void pdcrt_son_identicos(pdcrt_ctx *ctx)
+bool pdcrt_son_identicos(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj x, pdcrt_obj y)
 {
-    pdcrt_obj a = pdcrt_sacar(ctx);
-    pdcrt_obj b = pdcrt_sacar(ctx);
-    if(pdcrt_tipo_de_obj(a) != pdcrt_tipo_de_obj(b))
+    (void) ctx;
+    (void) m;
+    if(pdcrt_tipo_de_obj(x) != pdcrt_tipo_de_obj(y))
     {
-        pdcrt_empujar(ctx, pdcrt_objeto_booleano(false));
+        return false;
     }
     else
     {
         // HACK: Debería haber una forma de comparar los "datos" de dos
-        // objetos, pero como no hay comparamos en cambio sus enteros.
-        pdcrt_empujar(ctx, pdcrt_objeto_booleano(a.ival == b.ival));
+        //  objetos, pero como no hay comparamos en cambio sus enteros.
+        return x.ival == y.ival;
     }
 }
 
-void pdcrt_obtener_espacio_de_nombres_del_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
+pdcrt_obj pdcrt_obtener_espacio_de_nombres_del_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
-    pdcrt_extender_pila(ctx, m, 1);
-    pdcrt_empujar(ctx, ctx->espacio_de_nombres_runtime);
+    return ctx->espacio_de_nombres_runtime;
 }
 
 void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
@@ -6570,8 +6589,7 @@ static pdcrt_k pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int a
 static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_preparar_registro_de_modulos_importar_k1);
-    pdcrt_convertir_a_espacio_de_nombres(ctx, m);
-    ctx->espacio_de_nombres_runtime = pdcrt_sacar(ctx);
+    ctx->espacio_de_nombres_runtime = pdcrt_convertir_a_espacio_de_nombres(ctx, m, pdcrt_sacar(ctx));
     pdcrt_empujar_nulo(ctx, m);
     return pdcrt_devolver(ctx, m, 1);
 }

@@ -121,7 +121,7 @@ funcion ParsearOpciones: númeroDeArgumentosDe, acumulaValores, argv, error
             opciones#fijarEn: opt, (Concatenar: valoresAnteriores, valores)
         sino
             si opciones#contiene: opt
-                devolver %error: ({La opción ~t~t ya fue especificada}#formatear: ((tipoOpt = OPCIÓN_PROCESADA#CORTA)#escojer: {-}, {--}), opt)
+                devolver %error: ({La opción ~t~t ya fue especificada}#formatear: ((tipoOpt = OPCIÓN_PROCESADA#CORTA)#escoger: {-}, {--}), opt)
             sino
                 opciones#fijarEn: opt, valores
             finsi
@@ -307,21 +307,21 @@ funcion CLI: opciones, númArgumentos, argv, error
     funcion númeroDeArgumentosDe: optTexto, optLeída
         devolver LlamarConEC: procedimiento: dev
             ParaCadaElemento: opciones, procedimiento: opt
-                si (EnviarMensaje: opt, ((optLeída = OPCIÓN_PROCESADA#CORTA)#escojer: {opCorta}, {opLarga})) = optTexto
+                si (EnviarMensaje: opt, ((optLeída = OPCIÓN_PROCESADA#CORTA)#escoger: {opCorta}, {opLarga})) = optTexto
                     %dev: opt#númArgumentos
                 finsi
             finprocedimiento
-            devolver %error: ({No existe la opción ~t~t}#formatear: ((optLeída = OPCIÓN_PROCESADA#CORTA)#escojer: {-}, {--}), optTexto)
+            devolver %error: ({No existe la opción ~t~t}#formatear: ((optLeída = OPCIÓN_PROCESADA#CORTA)#escoger: {-}, {--}), optTexto)
         finprocedimiento
     finfuncion
     funcion acumulaValores: optTexto, optLeída
         devolver LlamarConEC: procedimiento: dev
             ParaCadaElemento: opciones, procedimiento: opt
-                si (EnviarMensaje: opt, ((optLeída = OPCIÓN_PROCESADA#CORTA)#escojer: {opCorta}, {opLarga})) = optTexto
+                si (EnviarMensaje: opt, ((optLeída = OPCIÓN_PROCESADA#CORTA)#escoger: {opCorta}, {opLarga})) = optTexto
                     %dev: opt#acumular
                 finsi
             finprocedimiento
-            devolver %error: ({No existe la opción ~t~t}#formatear: ((optLeída = OPCIÓN_PROCESADA#CORTA)#escojer: {-}, {--}), optTexto)
+            devolver %error: ({No existe la opción ~t~t}#formatear: ((optLeída = OPCIÓN_PROCESADA#CORTA)#escoger: {-}, {--}), optTexto)
         finprocedimiento
     finfuncion
     fijar res a ParsearOpciones: &númeroDeArgumentosDe, &acumulaValores, argv, error
@@ -333,7 +333,7 @@ funcion CLI: opciones, númArgumentos, argv, error
     resOpciones#paraCadaPar: procedimiento: opt, valores
         ParaCadaElemento: opciones, procedimiento: opción
             si (opción#opCorta = opt) || (opción#opLarga = opt)
-                %(opción#callback): opción, ...((EsInstancia: valores, Boole)#escojer: (Arreglo#crearCon: valores), valores)
+                %(opción#callback): opción, ...((EsInstancia: valores, Boole)#escoger: (Arreglo#crearCon: valores), valores)
             finsi
         finprocedimiento
     finprocedimiento

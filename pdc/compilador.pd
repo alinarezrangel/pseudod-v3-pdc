@@ -221,7 +221,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar emisor a Emisor#crear
     fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     estado#emitir: ast
-    fijar programa a estado#emisor#moverAPrograma
+    fijar programa a estado#emisor#programa
 
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
     fijar prefijosTransitivos' a Diccionario#vacío

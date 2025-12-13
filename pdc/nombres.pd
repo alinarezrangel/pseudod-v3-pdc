@@ -123,8 +123,8 @@ fijar Builtin a CrearTipoDeRegistro: {Builtin},
 [DOCUMENTA
 @brief{Un nombre importado.}
 
-En las instrucciones @pd{utilizar}, cada nombre importado será registrado en
-esta tabla.
+En las instrucciones @pd{utilizar} sin nombres específicos ni espacio de
+nombres, cada nombre importado será registrado en esta tabla.
 
 @itemlist(
 @item{@code{idNodo}: ID del nodo utilizar.}
@@ -298,7 +298,7 @@ metodo Ámbito#comoTexto
         nombres#agregarAlFinal: ({~t: ~t}#formatear: datos#binding, nombre)
     finprocedimiento
     devolver {(Ámbito ~t ~t)}#formatear:
-        ((no EsNulo: yo#_ámbitoSuperior)#escojer: {(con sup.)}, {}),
+        ((no EsNulo: yo#_ámbitoSuperior)#escoger: {(con sup.)}, {}),
         (Unir: nombres, {, })
 finmetodo
 

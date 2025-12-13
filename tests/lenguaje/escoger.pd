@@ -1,0 +1,8 @@
+variables V, F
+fijar V a 1 = 1
+fijar F a 1 = 0
+
+escribir V#escoger: {A}, {B}
+nl
+escribir F#escoger: {A}, {B}
+nl

@@ -6,7 +6,8 @@ utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
 utilizar pdc/ast como AST
 utilizar pdc/nombres (TablasDeResoluciónDeNombres)
 utilizar pdc/capturas (TablasDeCapturas)
-utilizar pdc/backend/c/ir (Opcode, FunciónIR, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/tabla (EscribirTabla)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Parámetro, Argumento, Retorno, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
 utilizar pdc/info (IMPL_COMPILADOR)
 
 
@@ -32,9 +33,8 @@ clase Emisor
     [DOCUMENTA
     @brief{Crea un nuevo subemisor.}
 
-    Los dos emisores (el devuelto y @pd{emisorPadre}) comparten continuaciones
-    y podrán ser combinados de vuelta en uno en un futuro (mediante el método
-    @code{#combinar}).
+    Los dos emisores (el devuelto y @pd{emisorPadre}) comparten funciones
+    y continuaciones.
     DOCUMENTA]
     metodo estatico subEmisor: emisorPadre
 
@@ -57,24 +57,21 @@ clase Emisor
     [DOCUMENTA
     @brief{Mueve todo el código emitido hasta ahora a una función nueva.}
 
+    @pd{params} son los @pd{Parámetro}s de la función. @pd{númTotalLocales} es el
+    número de locales de la función.
+
     Devuelve la @pd{FunciónIR} creada.
     DOCUMENTA]
-    metodo moverAFunción
+    metodo moverAFunción: params, númTotalLocales, númCapturas
 
     [DOCUMENTA
     @brief{Mueve todo el código, funciones y continuaciones a un programa
     nuevo.}
 
-    Devuelve el @pd{ProgramaIR} creado.
+    El programa creado es devuelto y guardado en el emisor. Véase
+    @pd{Emisor#programa}.
     DOCUMENTA]
-    metodo moverAPrograma
-
-    [DOCUMENTA
-    @brief{Mueve todas las funciones del @pd{subEmisor} al emisor actual.}
-
-    @pd{subEmisor} debe ser un subemisor del emisor actual.
-    DOCUMENTA]
-    metodo combinar: subEmisor
+    metodo moverAPrograma: númTotalLocales, númCapturas
 
     [DOCUMENTA
     @brief{Ajusta una etiqueta ya emitida para que apunte a la posición
@@ -83,18 +80,28 @@ clase Emisor
     @pd{etiqueta} debe ser una @pd{Etiqueta} ya fue emitida.
     DOCUMENTA]
     metodo ajustarEtiqueta: etiqueta
+
+    [DOCUMENTA
+    @brief{Devuelve el programa generado.}
+
+    Solo se puede llamar después de llamar @code{#moverAPrograma}. Devuelve
+    el @pd{ProgramaIR}.
+    DOCUMENTA]
+    metodo programa
 finclase
 
-atributos Emisor#cabecera, Emisor#instrucciones, Emisor#idDeContinuaciónActual,
+atributos Emisor#instrucciones, Emisor#idDeContinuaciónActual,
           Emisor#funciones, Emisor#continuaciones, Emisor#idDeFunción,
-          Emisor#idDeContinuación
+          Emisor#idDeContinuación, Emisor#_programa, Emisor#cabecera
 
 metodo estatico Emisor#subEmisor: emisorPadre
     variable c
     fijar c a yo#crear
+    fijar c#funciones a emisorPadre#funciones
     fijar c#continuaciones a emisorPadre#continuaciones
     fijar c#idDeFunción a emisorPadre#idDeFunción
     fijar c#idDeContinuación a emisorPadre#idDeContinuación
+    fijar c#_programa a emisorPadre#_programa
     devolver c
 finmetodo
 
@@ -106,6 +113,7 @@ metodo Emisor#inicializar
     fijar yo#idDeContinuaciónActual a NULO
     fijar yo#idDeFunción a Caja#crear: 0
     fijar yo#idDeContinuación a Caja#crear: 0
+    fijar yo#_programa a Caja#crear: NULO
 finmetodo
 
 metodo Emisor#emitir: ...tupla
@@ -130,9 +138,9 @@ metodo Emisor#emitir: ...tupla
     finsi
 finmetodo
 
-metodo Emisor#moverAFunción
+metodo Emisor#moverAFunción: params, númTotalLocales, númCapturas
     variable func
-    fijar func a FunciónIR#crear: yo#cabecera
+    fijar func a FunciónIR#crear: params, númTotalLocales, númCapturas, yo#cabecera
     fijar func#id a yo#idDeFunción#valor
     fijar yo#idDeFunción#valor a yo#idDeFunción#valor + 1
     yo#funciones#agregarAlFinal: func
@@ -142,21 +150,22 @@ metodo Emisor#moverAFunción
     devolver func
 finmetodo
 
-metodo Emisor#moverAPrograma
-    variable funcPrincipal
-    fijar funcPrincipal a yo#moverAFunción
-    devolver ProgramaIR#crear: funcPrincipal#id, yo#funciones, yo#continuaciones
-finmetodo
-
-metodo Emisor#combinar: subEmisor
-    ParaCadaElemento: subEmisor#funciones, procedimiento: func
-        yo#funciones#agregarAlFinal: func
-    finprocedimiento
+metodo Emisor#moverAPrograma: númTotalLocales, númCapturas
+    variables funcPrincipal, prog
+    fijar funcPrincipal a yo#moverAFunción: Arreglo#vacio, númTotalLocales, númCapturas
+    fijar prog a ProgramaIR#crear: funcPrincipal#id, yo#funciones, yo#continuaciones
+    fijar yo#_programa#valor a prog
+    devolver prog
 finmetodo
 
 metodo Emisor#ajustarEtiqueta: etiqueta
     yo#emitir: Opcode#etiqueta, etiqueta
     fijar etiqueta#id a yo#idDeContinuaciónActual
+finmetodo
+
+metodo Emisor#programa
+    necesitas no EsNulo: yo#_programa#valor
+    devolver yo#_programa#valor
 finmetodo
 
 
@@ -180,7 +189,7 @@ procedimiento EscribirEmisor: emisor
     finprocedimiento
 
     Escribir: {.instrucciones}
-    escribirInstrucciones: {}, emisor#cabecera
+    escribirInstrucciones: {}, emisor#instrucciones
     Escribir: {.funciones}
     ParaCadaElemento: emisor#funciones, procedimiento: func
         Escribir: {  .func}, func#id, func#númCapturas, func#númLocales
@@ -245,7 +254,20 @@ atributos EstadoDeEmisión#tablasRnAst, EstadoDeEmisión#tablasMcAst,
           EstadoDeEmisión#locales,
           [ Diccionario que mapea cada binding local a su índice de captura. ]
           EstadoDeEmisión#capturas,
-          EstadoDeEmisión#bdMod
+          EstadoDeEmisión#bdMod,
+          [ Índice de la local actual de la pila.
+
+            Por motivos de simplicidad, el compilador utiliza una pila de
+            locales para almacenar los valores temporales en el programa.
+            Imagínalo como una pila de enteros con las locales en uso:
+            {1 2 3} + empujar -> {1 2 3 4}.
+
+            Esto puede ser simplificado a un único número: el offset de la
+            local en la cima de la pila. Eso es lo que representa este atributo:
+            3 + empujar -> 4.
+           ]
+          EstadoDeEmisión#localesTemporales,
+          EstadoDeEmisión#númTotalTemporales
 
 metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     devolver yo#crear: tablasRnAst, tablasMcAst, emisor, bdMod
@@ -258,6 +280,8 @@ metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor, bdMod
     fijar yo#locales a Diccionario#vacío
     fijar yo#capturas a Diccionario#vacío
     fijar yo#bdMod a bdMod
+    fijar yo#localesTemporales a 0
+    fijar yo#númTotalTemporales a 0
 finmetodo
 
 metodo EstadoDeEmisión#subestado: emisor, locales, capturas
@@ -269,7 +293,79 @@ metodo EstadoDeEmisión#subestado: emisor, locales, capturas
     fijar sub#locales a locales
     fijar sub#capturas a capturas
     fijar sub#bdMod a yo#bdMod
+    fijar sub#localesTemporales a 0
+    fijar sub#númTotalTemporales a 0
     devolver sub
+finmetodo
+
+metodo EstadoDeEmisión#localARegistro: nLocal
+    necesitas 0 =< nLocal && nLocal < yo#locales#longitud
+    devolver yo#capturas#longitud + nLocal
+finmetodo
+
+metodo EstadoDeEmisión#capturaARegistro: nCaptura
+    necesitas 0 =< nCaptura && nCaptura < yo#capturas#longitud
+    devolver nCaptura
+finmetodo
+
+metodo EstadoDeEmisión#temporalARegistro: nTemp
+    necesitas 0 =< nTemp
+    devolver yo#capturas#longitud + yo#locales#longitud + nTemp
+finmetodo
+
+metodo EstadoDeEmisión#empujar
+    variable res
+    fijar res a yo#localesTemporales
+    fijar yo#localesTemporales a yo#localesTemporales + 1
+    fijar yo#númTotalTemporales a Max: yo#númTotalTemporales, (res + 1)
+    devolver yo#temporalARegistro: res
+finmetodo
+
+metodo EstadoDeEmisión#sacar
+    necesitas yo#localesTemporales > 0
+    yo#emisor#emitir: Opcode#nulo, (yo#temporalARegistro: (yo#localesTemporales - 1))
+    fijar yo#localesTemporales a yo#localesTemporales - 1
+finmetodo
+
+metodo EstadoDeEmisión#sacarRegistro: reg
+    necesitas yo#localesTemporales > 0
+    necesitas (yo#temporalARegistro: (yo#localesTemporales - 1)) = reg
+    fijar yo#localesTemporales a yo#localesTemporales - 1
+    yo#emisor#emitir: Opcode#nulo, reg
+finmetodo
+
+metodo EstadoDeEmisión#registroEnLaPila: n
+    necesitas (0 =< n) && (n < yo#localesTemporales)
+    variable p
+    fijar p a (yo#localesTemporales - 1) - n
+    devolver yo#temporalARegistro: p
+finmetodo
+
+metodo EstadoDeEmisión#cima
+    devolver yo#registroEnLaPila: 0
+finmetodo
+
+metodo EstadoDeEmisión#númTotalLocales
+    devolver yo#locales#longitud + yo#númTotalTemporales
+finmetodo
+
+metodo EstadoDeEmisión#registroDeBinding: binding
+    si yo#locales#contiene: binding
+        devolver yo#localARegistro: (yo#locales#en: binding)
+    sino
+        devolver yo#capturaARegistro: (yo#capturas#en: binding)
+    finsi
+finmetodo
+
+metodo EstadoDeEmisión#emitirFijarBinding: binding
+    variable regValor
+    fijar regValor a yo#cima
+    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+        yo#emisor#emitir: Opcode#fijarRegistro, (yo#registroDeBinding: binding), regValor
+    sino
+        yo#emisor#emitir: Opcode#fijarCaja, (yo#registroDeBinding: binding), regValor
+    finsi
+    yo#sacarRegistro: regValor
 finmetodo
 
 metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
@@ -278,20 +374,19 @@ metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
     si EsNulo: reg
         fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
     finsi
-    si EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
-        si yo#locales#contiene: reg#binding
-            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
-        finsi
-    sino
-        si yo#locales#contiene: reg#binding
-            yo#emisor#emitir: Opcode#fijarCaja, (yo#locales#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#fijarCajaC, (yo#capturas#en: reg#binding)
-        finsi
-    finsi
+    yo#emitirFijarBinding: reg#binding
     devolver reg#binding
+finmetodo
+
+metodo EstadoDeEmisión#emitirObtenerBinding: binding
+    variable regRes
+    fijar regRes a yo#empujar
+
+    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+        yo#emisor#emitir: Opcode#fijarRegistro, regRes, (yo#registroDeBinding: binding)
+    sino
+        yo#emisor#emitir: Opcode#valorDeCaja, regRes, (yo#registroDeBinding: binding)
+    finsi
 finmetodo
 
 metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
@@ -300,24 +395,11 @@ metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
     si EsNulo: reg
         fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
     finsi
-
-    si EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
-        si yo#locales#contiene: reg#binding
-            yo#emisor#emitir: Opcode#obtenerLocal, (yo#locales#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#obtenerLocalC, (yo#capturas#en: reg#binding)
-        finsi
-    sino
-        si yo#locales#contiene: reg#binding
-            yo#emisor#emitir: Opcode#obtenerCaja, (yo#locales#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#obtenerCajaC, (yo#capturas#en: reg#binding)
-        finsi
-    finsi
+    yo#emitirObtenerBinding: reg#binding
     devolver reg#binding
 finmetodo
 
-funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor
+funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst
     variables reg, locales, capturas, sub, ordenDeCapturas
 
     fijar reg a tablasMcAst#tablaCapturas#buscarÚnico: {idNodo}, nodoConCapturas#id
@@ -327,58 +409,38 @@ funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst, emisor
         capturas#fijarEn: binding, i
         ordenDeCapturas#agregarAlFinal: binding
     finprocedimiento
-    emisor#emitir: Opcode#capturas, reg#bindingsCapturados#longitud
 
     fijar reg a tablasMcAst#tablaLocales#buscarÚnico: {idNodo}, nodoConCapturas#id
     fijar locales a Diccionario#vacío
     ParaCadaElementoConÍndice: reg#bindingsLocales, procedimiento: binding, i
         locales#fijarEn: binding, i
     finprocedimiento
-    emisor#emitir: Opcode#locales, reg#bindingsLocales#longitud
 
     devolver ObjetoAdHoc: {locales}, locales,
                           {capturas}, capturas,
-                          {ordenDeCapturas}, ordenDeCapturas
+                          {ordenDeCapturas}, ordenDeCapturas,
+                          {númLocales}, locales#longitud,
+                          {númCapturas}, capturas#longitud
 finfuncion
-
-metodo EstadoDeEmisión#inicializarVariable: nodoIdentificador
-    variable reg
-    fijar reg a yo#tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
-    si EsNulo: reg
-        fijar reg a yo#tablasRnAst#tablaUsos#buscarÚnico: {idNodo}, nodoIdentificador#id
-    finsi
-
-    si no EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
-        si yo#capturas#contiene: reg#binding
-            yo#emisor#emitir: Opcode#fijarCajaC, (yo#capturas#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#fijarCaja, (yo#locales#en: reg#binding)
-        finsi
-    sino
-        si yo#capturas#contiene: reg#binding
-            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
-        finsi
-    finsi
-finmetodo
 
 metodo EstadoDeEmisión#prepararDeclaración: nodoIdentificador
     variable reg
-    fijar reg a yo#tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
+    fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
     si EsNulo: reg
-        fijar reg a yo#tablasRnAst#tablaUsos#buscarÚnico: {idNodo}, nodoIdentificador#id
+        fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
     finsi
+    yo#prepararDeclaraciónConBinding: reg#binding
+finmetodo
 
-    si no EsNulo: yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, reg#binding
-        [ La variable es capturada, necesitamos inicializarla a una caja vacía ]
-        yo#emisor#emitir: Opcode#empujarNulo
-        yo#emisor#emitir: Opcode#caja
-        si yo#capturas#contiene: reg#binding
-            yo#emisor#emitir: Opcode#fijarLocalC, (yo#capturas#en: reg#binding)
-        sino
-            yo#emisor#emitir: Opcode#fijarLocal, (yo#locales#en: reg#binding)
-        finsi
+metodo EstadoDeEmisión#prepararDeclaraciónConBinding: binding
+    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+        yo#emisor#emitir: Opcode#nulo, (yo#registroDeBinding: binding)
+    sino
+        variable regTemp
+        fijar regTemp a yo#empujar
+        yo#emisor#emitir: Opcode#nulo, regTemp
+        yo#emisor#emitir: Opcode#caja, (yo#registroDeBinding: binding), regTemp
+        yo#sacarRegistro: regTemp
     finsi
 finmetodo
 
@@ -392,8 +454,11 @@ metodo EstadoDeEmisión#emitir: ast
                 si no EsNulo: nodo#espacioDeNombres
                     yo#prepararDeclaración: nodo#espacioDeNombres
                 finsi
-                ParaCadaElemento: nodo#nombresEspecíficos, procedimiento: nombreEspecífico
-                    yo#prepararDeclaración: nombreEspecífico#renombre
+
+                variable imps
+                fijar imps a yo#tablasRnAst#tablaNombresImportados#buscarOrdenado: {idNodo}, nodo#id
+                ParaCadaElemento: imps, procedimiento: imp
+                    yo#prepararDeclaraciónConBinding: imp#binding
                 finprocedimiento
             finsi
         finprocedimiento
@@ -401,7 +466,7 @@ metodo EstadoDeEmisión#emitir: ast
         ParaCadaElemento: ast#cuerpo, procedimiento: ast
             yo#emitir: ast
             si ast#esExpresión
-                yo#emisor#emitir: Opcode#sacar
+                yo#sacar
             finsi
         finprocedimiento
         devolver NULO
@@ -409,9 +474,10 @@ metodo EstadoDeEmisión#emitir: ast
 
     si EsInstancia: ast, AST#NodoPrograma
         variables sub, caps
-        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst, yo#emisor
+        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst
         fijar sub a yo#subestado: yo#emisor, caps#locales, caps#capturas
         sub#emitir: ast#cuerpo
+        sub#emisor#moverAPrograma: sub#númTotalLocales, sub#capturas#longitud
         devolver NULO
     finsi
 
@@ -422,8 +488,7 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoVariable
-        yo#emisor#emitir: Opcode#empujarNulo
-        yo#inicializarVariable: ast#nombre
+        [ Nada que hacer: los bloques inicializan las locales ]
         devolver NULO
     finsi
 
@@ -435,7 +500,8 @@ metodo EstadoDeEmisión#emitir: ast
 
     si EsInstancia: ast, AST#NodoEscribir
         yo#emitir: ast#expresión
-        yo#emisor#emitir: Opcode#prn
+        yo#emisor#emitir: Opcode#prn, yo#cima
+        yo#sacar
         devolver NULO
     finsi
 
@@ -446,24 +512,30 @@ metodo EstadoDeEmisión#emitir: ast
 
     si EsInstancia: ast, AST#NodoNecesitas
         yo#emitir: ast#expresión
-        yo#emisor#emitir: Opcode#assert
+        yo#emisor#emitir: Opcode#assert, yo#cima
+        yo#sacar
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoDevolver
         yo#emitir: ast#expresión
-        yo#emisor#emitir: Opcode#devolverN, 1
+        yo#emisor#emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, yo#cima))
+        yo#sacar
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoSi
-        variable etqSino, etqFinsi
+        variables etqSino, etqFinsi, regDet, regTemp
         fijar etqSino a Etiqueta#vacía
         fijar etqFinsi a Etiqueta#vacía
 
         yo#emitir: ast#condición
-        yo#emisor#emitir: Opcode#negar
-        yo#emisor#emitir: Opcode#csaltar, etqSino
+        fijar regDet a yo#cima
+        fijar regTemp a yo#empujar
+        yo#emisor#emitir: Opcode#negar, regTemp, regDet
+        yo#emisor#emitir: Opcode#csaltar, etqSino, regTemp
+        yo#sacarRegistro: regTemp
+        yo#sacarRegistro: regDet
         yo#emitir: ast#cuerpoSiVerdadero
         yo#emisor#emitir: Opcode#saltar, etqFinsi
         yo#emisor#ajustarEtiqueta: etqSino
@@ -473,14 +545,18 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoMientras
-        variable etqInicio, etqFinmientras
+        variables etqInicio, etqFinmientras, regDet, regTemp
         fijar etqInicio a Etiqueta#vacía
         fijar etqFinmientras a Etiqueta#vacía
 
         yo#emisor#ajustarEtiqueta: etqInicio
         yo#emitir: ast#condición
-        yo#emisor#emitir: Opcode#negar
-        yo#emisor#emitir: Opcode#csaltar, etqFinmientras
+        fijar regDet a yo#cima
+        fijar regTemp a yo#empujar
+        yo#emisor#emitir: Opcode#negar, regTemp, regDet
+        yo#emisor#emitir: Opcode#csaltar, etqFinmientras, regTemp
+        yo#sacarRegistro: regTemp
+        yo#sacarRegistro: regDet
         yo#emitir: ast#cuerpo
         yo#emisor#emitir: Opcode#saltar, etqInicio
         yo#emisor#ajustarEtiqueta: etqFinmientras
@@ -488,143 +564,165 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoUtilizar
-        variables informaciónDelMódulo, módulo
+        variables informaciónDelMódulo, módulo, regMód
         fijar informaciónDelMódulo a yo#tablasRnAst#tablaInformaciónDeMódulo#buscarÚnico: {idNodo}, ast#id
         fijar módulo a yo#bdMod#buscarMódulo: informaciónDelMódulo#paquete, informaciónDelMódulo#módulo
 
-        yo#emisor#emitir: Opcode#importar, módulo#prefijoDelMódulo
+        fijar regMód a yo#empujar
+        yo#emisor#emitir: Opcode#importar_s1, regMód, módulo#prefijoDelMódulo
+        yo#emisor#emitir: Opcode#importar_s2, regMód, módulo#prefijoDelMódulo
         ParaCadaElemento: ast#nombresEspecíficos, procedimiento: nombreEspecífico
-            yo#emisor#emitir: Opcode#extraer, nombreEspecífico#nombre#valor
-            yo#inicializarVariable: nombreEspecífico#renombre
+            variable regValor
+            fijar regValor a yo#empujar
+            yo#emisor#emitir: Opcode#extraer_s1, regValor, regMód, nombreEspecífico#nombre#valor
+            yo#emisor#emitir: Opcode#extraer_s2, regValor, regMód, nombreEspecífico#nombre#valor
+            yo#emitirFijarIdentificador: nombreEspecífico#renombre
         finprocedimiento
 
         si no EsNulo: ast#espacioDeNombres
-            yo#emisor#emitir: Opcode#comoEspacioDeNombres
-            yo#inicializarVariable: ast#espacioDeNombres
-        sino
-            yo#emisor#emitir: Opcode#sacar
+            variable regNs
+            fijar regNs a yo#empujar
+            yo#emisor#emitir: Opcode#comoEspacioDeNombres, regNs, regMód
+            yo#emitirFijarIdentificador: ast#espacioDeNombres
         finsi
+
+        yo#sacarRegistro: regMód
 
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoLiteralNumérica
-        yo#emisor#emitir: Opcode#empujarNúmero, ast#valor
+        yo#emisor#emitir: Opcode#número, yo#empujar, ast#valor
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoLiteralTextual
-        yo#emisor#emitir: Opcode#empujarTexto, ast#valor
+        yo#emisor#emitir: Opcode#texto, yo#empujar, ast#valor
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoEnviarMensaje
-        variable proto
+        variables regObj, args, regRet, rets
+        fijar regRet a yo#empujar
         yo#emitir: ast#objeto
-        ParaCadaElemento: ast#argumentos, funcion: arg
+        fijar regObj a yo#cima
+        fijar args a Mapear: ast#argumentos, funcion: arg
             yo#emitir: arg#expresión
+            devolver Argumento#crear: arg#esVariadic, yo#cima
         finfuncion
-        fijar proto a Mapear: ast#argumentos, funcion: arg
-            devolver arg#esVariadic
-        finfuncion
-        yo#emisor#emitir: Opcode#enviarMensaje, ast#mensaje, proto
+        fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
+        yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regObj, ast#mensaje, args
+        yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regObj, ast#mensaje, args
+        ParaCadaElementoEnReversa: args, procedimiento: arg
+            yo#sacarRegistro: arg#registro
+        finprocedimiento
+        yo#sacarRegistro: regObj
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoFunciónAnónima
-        variables sub, caps, emisor, func, paramsSinVariadic, tieneVariadic
+        variables sub, caps, emisor, func, params, regRet, regClz, regsCaps
         fijar emisor a Emisor#subEmisor: yo#emisor
-        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst, emisor
+        fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst
         fijar sub a yo#subestado: emisor, caps#locales, caps#capturas
 
-        fijar paramsSinVariadic a 0
-        fijar tieneVariadic a FALSO
-        ParaCadaElemento: ast#parámetros, procedimiento: param
-            si param#esVariadic
-                fijar tieneVariadic a VERDADERO
-            sino
-                fijar paramsSinVariadic a paramsSinVariadic + 1
-            finsi
+        fijar params a Mapear: ast#parámetros, procedimiento: param
+            devolver Parámetro#crear: param#esVariadic, sub#empujar
         finprocedimiento
-        sub#emisor#emitir: Opcode#params, paramsSinVariadic, tieneVariadic
 
-        ParaCadaElemento: ast#parámetros, procedimiento: param
+        ParaCadaElementoEnReversa: ast#parámetros, procedimiento: param
             sub#prepararDeclaración: param#identificador
+            sub#emitirFijarIdentificador: param#identificador
         finprocedimiento
 
-        ParaCadaElementoEnReversaConÍndice: ast#parámetros, procedimiento: param, i
-            si param#esVariadic
-                sub#emisor#emitir: Opcode#variadic, i
-            finsi
-            sub#inicializarVariable: param#identificador
-        finprocedimiento
         sub#emitir: ast#cuerpo
-        sub#emisor#emitir: Opcode#empujarNulo
-        sub#emisor#emitir: Opcode#devolverN, 1
+        fijar regRet a sub#empujar
+        sub#emisor#emitir: Opcode#nulo, regRet
+        sub#emisor#emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, regRet))
+        sub#sacarRegistro: regRet
 
-        fijar func a sub#emisor#moverAFunción
-        yo#emisor#combinar: sub#emisor
-        ParaCadaElemento: caps#ordenDeCapturas, procedimiento: binding
-            si yo#capturas#contiene: binding
-                yo#emisor#emitir: Opcode#obtenerLocalC, (yo#capturas#en: binding)
-            sino
-                yo#emisor#emitir: Opcode#obtenerLocal, (yo#locales#en: binding)
-            finsi
+        fijar func a sub#emisor#moverAFunción: params, sub#númTotalLocales, sub#capturas#longitud
+        fijar regClz a yo#empujar
+        fijar regsCaps a Mapear: caps#ordenDeCapturas, procedimiento: binding
+            devolver yo#registroDeBinding: binding
         finprocedimiento
-        yo#emisor#emitir: Opcode#mkclz, func#id, caps#capturas#longitud
+        yo#emisor#emitir: Opcode#mkclz, regClz, func#id, regsCaps
+
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoNo
+        variable reg
+        fijar reg a yo#empujar
         yo#emitir: ast#expresión
-        yo#emisor#emitir: Opcode#negar
+        yo#emisor#emitir: Opcode#negar, reg, yo#cima
+        yo#sacar
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoSonIdénticos
+        variable reg
+        fijar reg a yo#empujar
         yo#emitir: ast#lhs
         yo#emitir: ast#rhs
-        yo#emisor#emitir: Opcode#sonIdénticos
+        yo#emisor#emitir: Opcode#sonIdénticos, reg, (yo#registroEnLaPila: 1), (yo#registroEnLaPila: 0)
+        yo#sacar
+        yo#sacar
         devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoExportar
+        variable regNs
+        fijar regNs a yo#empujar
+        yo#emisor#emitir: Opcode#espacioDeNombres, regNs
+        ParaCadaElemento: ast#exportaciones, procedimiento: exp
+            necesitas EsInstancia: exp, AST#NodoExportación
+            variable regExp
+            yo#emitir: exp#expresión
+            fijar regExp a yo#cima
+            yo#emisor#emitir: Opcode#agregarNombre, regNs, regExp, exp#nombre#valor, exp#esAutoejecutable
+            yo#sacarRegistro: regExp
+        finprocedimiento
+        yo#emisor#emitir: Opcode#exportar, regNs
+        yo#sacarRegistro: regNs
+        devolver NULO
+    finsi
+
+    si EsInstancia: ast, AST#NodoExportación
+        Escribir: {Exportación}, ast
+        Inalcanzable
     finsi
 
     si EsInstancia: ast, AST#NodoBuiltin
         si ast#nombre = {objeto}
-            yo#emisor#emitir: Opcode#obtenerObjeto
-            devolver NULO
-        finsi
-        si ast#nombre = {exportar}
-            yo#emisor#emitir: Opcode#empujarEspacioDeNombres
-            ParaCadaElemento: ast#argumentos, procedimiento: arg
-                variables binding, reg
-                necesitas no arg#esVariadic
-                fijar binding a yo#emitirObtenerIdentificador: arg#expresión
-                fijar reg a yo#tablasRnAst#tablaNombres#buscarÚnico: {binding}, binding
-                yo#emisor#emitir: Opcode#agregarNombre, arg#expresión#nombre, reg#esAutoejecutable
-            finprocedimiento
-            yo#emisor#emitir: Opcode#exportar
+            yo#emisor#emitir: Opcode#obtenerObjeto, yo#empujar
             devolver NULO
         finsi
         si ast#nombre = {obtenerRuntime}
-            yo#emisor#emitir: Opcode#obtenerRuntime
+            yo#emisor#emitir: Opcode#obtenerRuntime, yo#empujar
             devolver NULO
         finsi
         si ast#nombre = {__Impl}
-            yo#emisor#emitir: Opcode#empujarTexto, IMPL_COMPILADOR
+            yo#emisor#emitir: Opcode#texto, yo#empujar, IMPL_COMPILADOR
             devolver NULO
         finsi
         si (ast#nombre#subTexto: 0, 3) = {rt:}
-            variable nombre
+            variables nombre, regRt, args, regRet, rets
             fijar nombre a ast#nombre#parteDelTexto: 3, ast#nombre#longitud
-            yo#emisor#emitir: Opcode#obtenerEspacioDeNombresDelRuntime
-            ParaCadaElemento: ast#argumentos, procedimiento: arg
+            fijar regRet a yo#empujar
+            fijar regRt a yo#empujar
+            yo#emisor#emitir: Opcode#obtenerEspacioDeNombresDelRuntime, regRt
+            fijar args a Mapear: ast#argumentos, procedimiento: arg
                 yo#emitir: arg#expresión
+                devolver Argumento#crear: arg#esVariadic, yo#cima
             finprocedimiento
-            variable proto
-            fijar proto a Mapear: ast#argumentos, funcion: arg
-                devolver arg#esVariadic
-            finfuncion
-            yo#emisor#emitir: Opcode#enviarMensaje, nombre, proto
+            fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
+            yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regRt, nombre, args
+            yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regRt, nombre, args
+            ParaCadaElementoEnReversa: args, procedimiento: arg
+                yo#sacarRegistro: arg#registro
+            finprocedimiento
+            yo#sacarRegistro: regRt
             devolver NULO
         finsi
 
