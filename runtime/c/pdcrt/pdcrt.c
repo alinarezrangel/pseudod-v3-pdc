@@ -5,9 +5,26 @@
 #include <stdarg.h>
 
 #include "pdcrt-plataforma.h"
+#include "pdcrt_hash.h"
 
 #define PDCRT_INTERNO
 #include "pdcrt/pdcrt.h"
+
+
+#if defined(__has_builtin)
+#  if __has_builtin(__builtin_popcountll)
+#    define PDCRT_POPCOUNTLL(x) __builtin_popcountll(x)
+#  else
+#    error popcount needed
+#  endif
+#  if __has_builtin(__builtin_clzll)
+#    define PDCRT_CLZLL(x) __builtin_clzll(x)
+#  else
+#    error clz needed
+#  endif
+#else
+#  error builtins needed
+#endif
 
 
 static uintptr_t pdcrt_obtener_stack_pointer(void)
@@ -17,6 +34,20 @@ static uintptr_t pdcrt_obtener_stack_pointer(void)
     asm inline("mov %%rsp, %0\n"
         : "=r" (sp));
     return sp;
+}
+
+static size_t pdcrt_redondear_a_p2(size_t n)
+{
+    // Devuelve un entero N tal que N = 1 << x
+    // y N es el menor entero tal que N >= n.
+    if(n <= 1)
+    {
+        return 1;
+    }
+    else
+    {
+        return 1 << ((sizeof(n) * 8) - PDCRT_CLZLL(n - 1));
+    }
 }
 
 
@@ -172,7 +203,8 @@ static void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
 
 PDCRT_INLINE static pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k)
 {
-    return k.kf(ctx, k.marco);
+    //return k.kf(ctx, k.marco); // TODO
+    return k;
 }
 
 
@@ -779,8 +811,6 @@ static void pdcrt_desalojar_con_estadisticas(void *yo, void *ptr, size_t tam_act
 }
 
 
-static size_t pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista);
-
 
 static void pdcrt_gc_eliminar_de_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
 {
@@ -950,6 +980,454 @@ static void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_tipo_obj_gc
 }
 
 
+enum pdcrt_comparacion
+{
+    //                              ABC
+    PDCRT_MENOR_QUE       = 1,  // 0001
+    PDCRT_MENOR_O_IGUAL_A = 3,  // 0011
+    PDCRT_MAYOR_QUE       = 4,  // 0100
+    PDCRT_MAYOR_O_IGUAL_A = 6,  // 0110
+    PDCRT_IGUAL_A         = 10  // 1010
+    // El bit A es si es "mayor que", el bit B es el bit "igual a", el bit C es
+    // el bit "menor que".
+};
+
+static bool pdcrt_es_menor_que(enum pdcrt_comparacion op)
+{
+    return op & 1;
+}
+
+static bool pdcrt_es_igual_a(enum pdcrt_comparacion op)
+{
+    return op & 2;
+}
+
+static bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
+{
+    return op & 4;
+}
+
+static bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
+static bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_comparacion op);
+
+static bool pdcrt_es_primitivo(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    (void) ctx;
+
+    switch(pdcrt_tipo_de_obj(o))
+    {
+    case PDCRT_TOBJ_ENTERO:
+    case PDCRT_TOBJ_FLOAT:
+    case PDCRT_TOBJ_TEXTO:
+    case PDCRT_TOBJ_BOOLEANO:
+    case PDCRT_TOBJ_NULO:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    switch(pdcrt_tipo_de_obj(o))
+    {
+        case PDCRT_TOBJ_ENTERO:
+            return pdcrt_hash_entero(o.ival);
+        case PDCRT_TOBJ_FLOAT:
+            return pdcrt_hash_float(o.fval);
+        case PDCRT_TOBJ_TEXTO:
+            return pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud);
+        case PDCRT_TOBJ_BOOLEANO:
+            return o.bval ? 0 : 1;
+        case PDCRT_TOBJ_NULO:
+            return 2;
+        default:
+            pdcrt_error(ctx, "No se puede hashear objeto de ese tipo");
+    }
+}
+
+static bool pdcrt_igualdad(pdcrt_ctx *ctx, pdcrt_obj a, pdcrt_obj b)
+{
+    (void) ctx;
+
+    pdcrt_tipo ta = pdcrt_tipo_de_obj(a);
+    pdcrt_tipo tb = pdcrt_tipo_de_obj(b);
+
+    if(ta == tb)
+    {
+        switch(ta)
+        {
+        case PDCRT_TOBJ_ENTERO:
+            return a.ival == b.ival;
+        case PDCRT_TOBJ_FLOAT:
+            return a.fval == b.fval;
+        case PDCRT_TOBJ_BOOLEANO:
+            return a.bval == b.bval;
+        case PDCRT_TOBJ_NULO:
+            return true;
+        case PDCRT_TOBJ_TEXTO:
+            return pdcrt_comparar_textos(a.texto, b.texto);
+        default:
+            return false;
+        }
+    }
+    else if(ta == PDCRT_TOBJ_ENTERO && tb == PDCRT_TOBJ_FLOAT)
+    {
+        return pdcrt_comparar_entero_y_float(a.ival, b.fval, PDCRT_IGUAL_A);
+    }
+    else if(ta == PDCRT_TOBJ_FLOAT && tb == PDCRT_TOBJ_ENTERO)
+    {
+        return pdcrt_comparar_entero_y_float(b.ival, a.fval, PDCRT_IGUAL_A);
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
+static pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    if(args != 2)
+        pdcrt_error(ctx, u8"FunciónIgualdad: se esperaban 2 argumentos");
+
+    pdcrt_obj a = pdcrt_cima_en(ctx, 0);
+    pdcrt_obj b = pdcrt_cima_en(ctx, 1);
+
+    if(pdcrt_es_primitivo(ctx, a) || pdcrt_es_primitivo(ctx, b))
+    {
+        bool ok = pdcrt_igualdad(ctx, a, b);
+        pdcrt_sacar(ctx);
+        pdcrt_sacar(ctx);
+        pdcrt_empujar_booleano(ctx, k.marco, ok);
+        return pdcrt_continuar(ctx, k);
+    }
+    else
+    {
+        static const int proto[] = {0};
+        return pdcrt_enviar_mensaje(ctx, k.marco, "igualA", 6, proto, 1, k.kf);
+    }
+}
+
+static pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k)
+{
+    if(args != 1)
+        pdcrt_error(ctx, u8"FunciónHash: se esperaba 1 argumento");
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, args, k);
+    pdcrt_fijar_local(ctx, m, 0, pdcrt_sacar(ctx));
+    pdcrt_empujar_entero(ctx, m, pdcrt_hash(ctx, pdcrt_obtener_local(ctx, m, 0)));
+    return pdcrt_devolver(ctx, m, 1);
+}
+
+
+#define PDCRT_TABLA_TAM_MINIMO 8 // Debe ser una potencia de 2 mayor a 1
+#define PDCRT_TABLA_OCUPACION_MAXIMA 3 // Máximo 300% de ocupación
+#define PDCRT_TABLA_OCUPACION_MINIMA 4 // Mínimo 1/4 de ocupación
+
+_Static_assert(PDCRT_TABLA_TAM_MINIMO > 1, "PDCRT_TABLA_TAM_MINIMO debe ser mayor a 1");
+_Static_assert(PDCRT_TABLA_OCUPACION_MAXIMA >= 1, "PDCRT_TABLA_OCUPACION_MAXIMA debe ser mayor a 100%");
+_Static_assert(PDCRT_TABLA_OCUPACION_MINIMA > 1, "PDCRT_TABLA_OCUPACION_MINIMA debe ser menor a 1");
+
+#define PDCRT_TABLA_NUM_MAX_BUCKETS (1LLU << ((sizeof(size_t) * 8LLU) - 1))
+
+static size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara)
+{
+    // Aunque parezca un error, la mascara solo tiene 63/31 bits por lo que es seguro.
+    return mascara + 1;
+}
+
+static void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len)
+{
+    for(size_t i = 0; i < len; i++)
+    {
+        arr[i] = (pdcrt_bucket) {
+            .activo = false,
+            .idc_colision = 0,
+            .tiene_colision = false,
+            .llave = pdcrt_objeto_nulo(),
+            .valor = pdcrt_objeto_nulo(),
+        };
+    }
+}
+
+static void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
+{
+    if(capacidad > PDCRT_TABLA_NUM_MAX_BUCKETS)
+        capacidad = PDCRT_TABLA_NUM_MAX_BUCKETS;
+    tbl->mascara = pdcrt_redondear_a_p2(capacidad) - 1;
+    if(tbl->mascara == 0 || capacidad < PDCRT_TABLA_TAM_MINIMO)
+        tbl->mascara = PDCRT_TABLA_TAM_MINIMO - 1;
+    tbl->buckets = pdcrt_alojar_ctx(ctx, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket));
+    if(!tbl->buckets)
+        pdcrt_enomem(ctx);
+    pdcrt_inicializar_buckets(tbl->buckets, pdcrt_tabla_num_buckets_hasheables(tbl->mascara));
+
+    tbl->num_colisiones = 0;
+    tbl->cap_colisiones = pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * (PDCRT_TABLA_OCUPACION_MAXIMA - 1) + 1;
+    tbl->colisiones = pdcrt_alojar_ctx(ctx, tbl->cap_colisiones * sizeof(pdcrt_bucket));
+    if(!tbl->colisiones)
+        pdcrt_enomem(ctx);
+
+    tbl->buckets_ocupados = 0;
+}
+
+static size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl)
+{
+    size_t total = (pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket)) + (tbl->cap_colisiones * sizeof(pdcrt_bucket));
+    pdcrt_desalojar_ctx(ctx, tbl->buckets, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket));
+    pdcrt_desalojar_ctx(ctx, tbl->colisiones, tbl->cap_colisiones * sizeof(pdcrt_bucket));
+    return total;
+}
+
+static void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear);
+
+static void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, size_t nueva_cap)
+{
+    (void) m;
+
+    if(nueva_cap <= tbl->buckets_ocupados)
+        // No redimensiones, resultaría en peor rendimiento
+        return;
+
+    if(nueva_cap > PDCRT_TABLA_NUM_MAX_BUCKETS)
+        nueva_cap = PDCRT_TABLA_NUM_MAX_BUCKETS;
+    nueva_cap = pdcrt_redondear_a_p2(nueva_cap);
+    if(nueva_cap < PDCRT_TABLA_TAM_MINIMO)
+        nueva_cap = PDCRT_TABLA_TAM_MINIMO;
+
+    size_t buckets_ocupados = tbl->buckets_ocupados;
+
+    pdcrt_bucket *nuevos_buckets = pdcrt_alojar_ctx(ctx, pdcrt_tabla_num_buckets_hasheables(nueva_cap) * sizeof(pdcrt_bucket));
+    if(!nuevos_buckets)
+        pdcrt_enomem(ctx);
+    pdcrt_inicializar_buckets(nuevos_buckets, nueva_cap);
+
+    size_t hasheables_viejos = pdcrt_tabla_num_buckets_hasheables(tbl->mascara);
+    pdcrt_bucket *viejos_buckets = tbl->buckets;
+    tbl->buckets = nuevos_buckets;
+    tbl->mascara = nueva_cap - 1;
+    tbl->buckets_ocupados = 0;
+
+    for(size_t i = 0; i < hasheables_viejos; i++)
+    {
+        pdcrt_bucket *b = &viejos_buckets[i];
+        if(b->activo)
+            pdcrt_tabla_fijar(ctx, m, tbl, b->llave, b->valor, false);
+    }
+
+    pdcrt_desalojar_ctx(ctx, viejos_buckets, hasheables_viejos * sizeof(pdcrt_bucket));
+
+    size_t num_cols = tbl->num_colisiones;
+    tbl->num_colisiones = 0;
+    for(size_t i = 0; i < num_cols; i++)
+    {
+        pdcrt_bucket b = tbl->colisiones[i];
+        if(b.activo)
+            pdcrt_tabla_fijar(ctx, m, tbl, b.llave, b.valor, false);
+    }
+
+    assert(tbl->num_colisiones <= (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap);
+
+    if(tbl->cap_colisiones > (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1)
+    {
+        pdcrt_bucket *nuevas_cols = pdcrt_realojar_ctx(ctx,
+                                                       tbl->colisiones,
+                                                       tbl->cap_colisiones * sizeof(pdcrt_bucket),
+                                                       (2 * nueva_cap + 1) * sizeof(pdcrt_bucket));
+        if(!nuevas_cols)
+            return;
+        tbl->colisiones = nuevas_cols;
+        tbl->cap_colisiones = (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1;
+    }
+
+    assert(tbl->buckets_ocupados == buckets_ocupados);
+}
+
+static void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear)
+{
+    (void) m;
+
+    if(!pdcrt_es_primitivo(ctx, llave))
+        pdcrt_error(ctx, u8"Se trató de agregar un valor no primitivo a una tabla primitiva");
+
+    pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
+    pdcrt_entero hash = pdcrt_hash(ctx, llave);
+    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
+    if(b->activo)
+    {
+        while(true)
+        {
+            assert(b->activo);
+
+            if(pdcrt_igualdad(ctx, b->llave, llave))
+            {
+                if(vh)
+                    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
+                b->valor = valor;
+                break;
+            }
+
+            if(!b->tiene_colision)
+            {
+                b->tiene_colision = true;
+                b->idc_colision = tbl->num_colisiones;
+
+                if(tbl->num_colisiones >= tbl->cap_colisiones)
+                {
+                    size_t nueva_cap = tbl->cap_colisiones * 2;
+                    tbl->colisiones = pdcrt_realojar_ctx(ctx,
+                                                         tbl->colisiones,
+                                                         tbl->cap_colisiones * sizeof(pdcrt_bucket),
+                                                         nueva_cap * sizeof(pdcrt_bucket));
+                    if(!tbl->colisiones)
+                        pdcrt_enomem(ctx);
+                    tbl->cap_colisiones = nueva_cap;
+                    assert(tbl->num_colisiones < tbl->cap_colisiones);
+                }
+
+                if(vh)
+                    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
+                tbl->colisiones[tbl->num_colisiones] = (pdcrt_bucket) {
+                    .activo = true,
+                    .idc_colision = 0,
+                    .tiene_colision = false,
+                    .llave = llave,
+                    .valor = valor,
+                };
+
+                tbl->num_colisiones += 1;
+                tbl->buckets_ocupados += 1;
+                assert(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
+                break;
+            }
+            else
+            {
+                b = &tbl->colisiones[b->idc_colision];
+            }
+        }
+    }
+    else
+    {
+        if(vh)
+            pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
+        *b = (pdcrt_bucket) {
+            .activo = true,
+            .idc_colision = 0,
+            .tiene_colision = false,
+            .llave = llave,
+            .valor = valor,
+        };
+
+        tbl->buckets_ocupados += 1;
+        assert(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
+    }
+
+    if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
+    {
+        pdcrt_tabla_rehashear(ctx, m, tbl, tbl->buckets_ocupados);
+    }
+    else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
+    {
+        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+    }
+}
+
+static bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor)
+{
+    (void) m;
+
+    if(!pdcrt_es_primitivo(ctx, llave))
+        return false;
+
+    pdcrt_entero hash = pdcrt_hash(ctx, llave);
+    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
+    if(b->activo)
+    {
+        bool iguales = false;
+        while(!((iguales = pdcrt_igualdad(ctx, b->llave, llave))) && b->tiene_colision)
+            b = &tbl->colisiones[b->idc_colision];
+
+        if(iguales)
+        {
+            *valor = b->valor;
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
+}
+
+static void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear)
+{
+    (void) m;
+
+    if(!pdcrt_es_primitivo(ctx, llave))
+        return;
+
+    pdcrt_entero hash = pdcrt_hash(ctx, llave);
+    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
+    if(b->activo)
+    {
+        if(pdcrt_igualdad(ctx, b->llave, llave))
+        {
+            b->activo = false;
+            tbl->buckets_ocupados -= 1;
+        }
+        else
+        {
+            pdcrt_bucket *anterior = NULL, *actual = b;
+            while(actual->tiene_colision)
+            {
+                anterior = actual;
+                actual = &tbl->colisiones[anterior->idc_colision];
+
+                if(pdcrt_igualdad(ctx, actual->llave, llave))
+                {
+                    size_t idc_actual = anterior->idc_colision;
+
+                    actual->activo = false;
+                    anterior->tiene_colision = actual->tiene_colision;
+                    anterior->idc_colision = actual->idc_colision;
+
+                    for(size_t i = 0; i < tbl->num_colisiones; i++)
+                    {
+                        pdcrt_bucket col = tbl->colisiones[i];
+                        if(col.tiene_colision && col.idc_colision > idc_actual)
+                        {
+                            col.idc_colision -= 1;
+                        }
+                        if(i > idc_actual)
+                        {
+                            tbl->colisiones[i - 1] = col;
+                            tbl->colisiones[i].activo = false;
+                        }
+                    }
+
+                    tbl->num_colisiones -= 1;
+                    tbl->buckets_ocupados -= 1;
+                    return;
+                }
+            }
+        }
+    }
+
+    if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
+    {
+        pdcrt_tabla_rehashear(ctx, m, tbl, tbl->buckets_ocupados);
+    }
+    else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
+    {
+        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+    }
+}
+
+
 
 pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o)
 {
@@ -1059,17 +1537,21 @@ static void pdcrt_gc_visitar_contenido(
         case PDCRT_TGC_TABLA:
         {
             pdcrt_tabla *tbl = (pdcrt_tabla *) h;
-            for(size_t i = 0; i < tbl->num_buckets; i++)
+            for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
             {
                 pdcrt_bucket *b = &tbl->buckets[i];
                 if(!b->activo)
                     continue;
-                while(b)
-                {
-                    f_obj(ctx, &b->llave, params);
-                    f_obj(ctx, &b->valor, params);
-                    b = b->siguiente_colision;
-                }
+                f_obj(ctx, &b->llave, params);
+                f_obj(ctx, &b->valor, params);
+            }
+            for(size_t i = 0; i < tbl->num_colisiones; i++)
+            {
+                pdcrt_bucket *col = &tbl->colisiones[i];
+                if(!col->activo)
+                    continue;
+                f_obj(ctx, &col->llave, params);
+                f_obj(ctx, &col->valor, params);
             }
             break;
         }
@@ -1343,7 +1825,7 @@ pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
     else if(h->tipo == PDCRT_TGC_TABLA)
     {
         pdcrt_tabla *tbl = (pdcrt_tabla *) h;
-        liberado += pdcrt_liberar_tabla(ctx, tbl->buckets, tbl->num_buckets);
+        liberado += pdcrt_tabla_desalojar(ctx, tbl);
     }
 
     if(!h->en_la_pila)
@@ -1527,7 +2009,7 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str,
     // recolector de basura. En ese caso, la lista de textos sobre la que
     // acabamos de buscar cambiaría, invalidando los índices que tenemos y
     // dañando todo. Para prevenir esto, llamo al recolector ahora mismo y lo
-    // desactivo al crear el texto. No debería fallar por memoria ya que de
+    // desactivo al crear el texto. No debería fallar por memoria, ya que de
     // faltar memoria esta llamada debería abrir espacio.
     pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, 0);
     pdcrt_intenta_invocar_al_recolector(ctx, m, params);
@@ -1592,8 +2074,7 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str,
 
 static bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b)
 {
-    return pdcrt_comparar_str(a->contenido, a->longitud,
-                              b->contenido, b->longitud) == 0;
+    return a == b;
 }
 
 // La mayoría de los tipos son fáciles de comparar (por igualdad). Sin embargo,
@@ -1668,33 +2149,6 @@ _Static_assert(sizeof(double) == 8, "double debe ser de 64 bits");
 
 // La cantidad de bits en un entero.
 #define PDCRT_ENTERO_BITS (sizeof(pdcrt_entero) * 8)
-
-enum pdcrt_comparacion
-{
-    //                              ABC
-    PDCRT_MENOR_QUE       = 1,  // 0001
-    PDCRT_MENOR_O_IGUAL_A = 3,  // 0011
-    PDCRT_MAYOR_QUE       = 4,  // 0100
-    PDCRT_MAYOR_O_IGUAL_A = 6,  // 0110
-    PDCRT_IGUAL_A         = 10  // 1010
-    // El bit A es si es "mayor que", el bit B es el bit "igual a", el bit C es
-    // el bit "menor que".
-};
-
-static inline bool pdcrt_es_menor_que(enum pdcrt_comparacion op)
-{
-    return op & 1;
-}
-
-static inline bool pdcrt_es_igual_a(enum pdcrt_comparacion op)
-{
-    return op & 2;
-}
-
-static inline bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
-{
-    return op & 4;
-}
 
 static bool pdcrt_comparar_floats(pdcrt_float a, pdcrt_float b, enum pdcrt_comparacion op)
 {
@@ -3602,24 +4056,8 @@ pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k)
     assert(0 && "sin implementar");
 }
 
-static pdcrt_k pdcrt_tabla_fijar_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_fijar_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_fijar_en_k3(pdcrt_ctx *ctx, pdcrt_marco *m);
-
-static pdcrt_k pdcrt_tabla_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
-
-static pdcrt_k pdcrt_tabla_rehashear_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
-
-static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
 
 static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-static pdcrt_k pdcrt_tabla_para_cada_par_k2(pdcrt_ctx *ctx, pdcrt_marco *m);
-
-static void pdcrt_tabla_inicializar_buckets(pdcrt_ctx *ctx, pdcrt_bucket *buckets, size_t tam);
-static void pdcrt_tabla_inicializar_con_capacidad(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
 
 pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {
@@ -3636,55 +4074,31 @@ pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
             pdcrt_error(ctx, "Tabla: fijarEn necesita 2 argumentos");
         pdcrt_obj llave = ctx->pila[argp];
         pdcrt_obj valor = ctx->pila[argp + 1];
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
-        pdcrt_fijar_local(ctx, m, 0, yo);
-        pdcrt_fijar_local(ctx, m, 1, llave);
-        pdcrt_fijar_local(ctx, m, 2, valor);
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(NULL));
+        pdcrt_tabla_fijar(ctx, k.marco, yo.tabla, llave, valor, true);
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar_nulo(ctx, k.marco);
         PDCRT_SACAR_PRELUDIO();
-        pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
-        pdcrt_empujar(ctx, llave);
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_fijar_en_k1);
+        return pdcrt_continuar(ctx, k);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.en))
     {
         if(args != 1)
             pdcrt_error(ctx, "Tabla: en necesita 1 argumento");
         pdcrt_obj llave = ctx->pila[argp];
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
-        pdcrt_fijar_local(ctx, m, 0, yo);
-        pdcrt_fijar_local(ctx, m, 1, llave);
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_booleano(false));
+        pdcrt_obj valor = pdcrt_objeto_nulo();
+        if(!pdcrt_tabla_en(ctx, k.marco, yo.tabla, llave, &valor))
+            pdcrt_error(ctx, "Llave no existe en la tabla primitiva");
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar(ctx, valor);
         PDCRT_SACAR_PRELUDIO();
-        pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
-        pdcrt_empujar(ctx, llave);
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_en_k1);
+        return pdcrt_continuar(ctx, k);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.longitud))
     {
         if(args != 0)
             pdcrt_error(ctx, "Tabla: longitud no necesita argumentos");
-        size_t l = 0;
-        for(size_t i = 0; i < yo.tabla->num_buckets; i++)
-        {
-            pdcrt_bucket *b = &yo.tabla->buckets[i];
-            if(b->activo)
-            {
-                l += 1;
-                while(b->siguiente_colision)
-                {
-                    b = b->siguiente_colision;
-                    l += 1;
-                }
-            }
-        }
         pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, l);
+        pdcrt_empujar_entero(ctx, k.marco, yo.tabla->buckets_ocupados);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
@@ -3697,45 +4111,23 @@ pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         if(!ok)
             pdcrt_error(ctx, "Tabla#rehashear: necesita un entero como argumento");
 
-        if(yo.tabla->num_buckets == 0)
-        {
-            pdcrt_tabla_inicializar_con_capacidad(ctx, yo.tabla, 1);
-            assert(yo.tabla->num_buckets > 0);
-        }
-
-        if(capacidad_adicional < 0 && (size_t) (-capacidad_adicional) >= yo.tabla->num_buckets)
+        if(capacidad_adicional < 0)
         {
             pdcrt_error(ctx, u8"Tabla#rehashear: Valor inválido para la capacidad adicional");
         }
 
-        size_t cap = yo.tabla->num_buckets + capacidad_adicional;
-        pdcrt_bucket *nuevos_buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * cap);
-        if(!nuevos_buckets)
-            pdcrt_enomem(ctx);
-        pdcrt_tabla_inicializar_buckets(ctx, nuevos_buckets, cap);
-
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 6, 0, 0, k);
-        pdcrt_fijar_local(ctx, m, 0, yo);
-        // bucket actual
-        pdcrt_fijar_local(ctx, m, 1, pdcrt_objeto_voidptr(&yo.tabla->buckets[0]));
-        // índice de bucket actual
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(0));
-        // Lista de buckets en proceso de creación
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(nuevos_buckets));
-        // Tamaño de la lista
-        pdcrt_fijar_local(ctx, m, 4, pdcrt_objeto_entero(cap));
-        // Buckets ocupados
-        pdcrt_fijar_local(ctx, m, 5, pdcrt_objeto_entero(0));
-
+        pdcrt_tabla_rehashear(ctx, k.marco, yo.tabla, yo.tabla->buckets_ocupados + capacidad_adicional);
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar_nulo(ctx, k.marco);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_tabla_rehashear_k1(ctx, m);
+        return pdcrt_continuar(ctx, k);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.capacidad))
     {
         if(args != 0)
             pdcrt_error(ctx, "Tabla: capacidad no necesita argumentos");
         pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, yo.tabla->num_buckets);
+        pdcrt_empujar_entero(ctx, k.marco, pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara));
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k);
     }
@@ -3744,533 +4136,39 @@ pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k)
         if(args != 1)
             pdcrt_error(ctx, "Tabla: contiene necesita 1 argumento");
         pdcrt_obj llave = ctx->pila[argp];
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
-        pdcrt_fijar_local(ctx, m, 0, yo);
-        pdcrt_fijar_local(ctx, m, 1, llave);
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_booleano(true));
+        pdcrt_obj valor = pdcrt_objeto_nulo();
+        bool contiene = pdcrt_tabla_en(ctx, k.marco, yo.tabla, llave, &valor);
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar_booleano(ctx, k.marco, contiene);
         PDCRT_SACAR_PRELUDIO();
-        pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
-        pdcrt_empujar(ctx, llave);
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_en_k1);
+        return pdcrt_continuar(ctx, k);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.eliminar))
     {
         if(args != 1)
             pdcrt_error(ctx, "Tabla: eliminar necesita 1 argumento");
         pdcrt_obj llave = ctx->pila[argp];
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
-        pdcrt_fijar_local(ctx, m, 0, yo);
-        pdcrt_fijar_local(ctx, m, 1, llave);
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(NULL));
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(NULL));
+        pdcrt_tabla_eliminar(ctx, k.marco, yo.tabla, llave, true);
+        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_empujar_nulo(ctx, k.marco);
         PDCRT_SACAR_PRELUDIO();
-        pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
-        pdcrt_empujar(ctx, llave);
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_eliminar_k1);
+        return pdcrt_continuar(ctx, k);
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.paraCadaPar))
     {
         if(args != 1)
             pdcrt_error(ctx, "Tabla: paraCadaPar necesita 1 argumento");
-        if(yo.tabla->num_buckets == 0)
-        {
-            PDCRT_SACAR_PRELUDIO();
-            return pdcrt_continuar(ctx, k);
-        }
-        else
-        {
-            pdcrt_obj iterador = pdcrt_cima(ctx);
-            pdcrt_marco *m = pdcrt_crear_marco(ctx, 4, 0, 0, k);
-            pdcrt_fijar_local(ctx, m, 0, yo);
-            pdcrt_fijar_local(ctx, m, 1, iterador);
-            pdcrt_fijar_local(ctx, m, 2,
-                              pdcrt_objeto_voidptr(&yo.tabla->buckets[0]));
-            pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(0));
-            PDCRT_SACAR_PRELUDIO();
-            return pdcrt_tabla_para_cada_par_k1(ctx, m);
-        }
+        pdcrt_obj iterador = pdcrt_cima(ctx);
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, 0, k);
+        pdcrt_fijar_local(ctx, m, 0, yo);
+        pdcrt_fijar_local(ctx, m, 1, iterador);
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(0));
+        PDCRT_SACAR_PRELUDIO();
+        pdcrt_empujar_nulo(ctx, m);
+        return pdcrt_tabla_para_cada_par_k1(ctx, m);
     }
 
     assert(0 && "sin implementar");
-}
-
-// Las tablas se rehashean al llegar a dos tercios de llenas
-#define PDCRT_TABLA_LIMITE(buckets) ((buckets) - ((buckets) / 3))
-
-static void pdcrt_tabla_inicializar_buckets(pdcrt_ctx *ctx, pdcrt_bucket *buckets, size_t tam)
-{
-    (void) ctx;
-    for(size_t i = 0; i < tam; i++)
-    {
-        pdcrt_bucket *b = &buckets[i];
-        b->activo = false;
-        b->siguiente_colision = NULL;
-        b->llave = b->valor = pdcrt_objeto_nulo();
-    }
-}
-
-static void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl)
-{
-    pdcrt_tabla_inicializar_buckets(ctx, tbl->buckets, tbl->num_buckets);
-}
-
-static void pdcrt_tabla_inicializar_con_capacidad(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
-{
-    assert(tbl->num_buckets == 0);
-    assert(tbl->buckets == NULL);
-    tbl->buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * capacidad);
-    if(!tbl->buckets)
-        pdcrt_enomem(ctx);
-    tbl->num_buckets = capacidad;
-    tbl->limite_de_ocupacion = PDCRT_TABLA_LIMITE(capacidad);
-    pdcrt_tabla_inicializar(ctx, tbl);
-}
-
-static size_t pdcrt_liberar_tabla(pdcrt_ctx *ctx, pdcrt_bucket *lista, size_t tam_lista)
-{
-    size_t liberado = 0;
-    for(size_t i = 0; i < tam_lista; i++)
-    {
-        pdcrt_bucket *b = &lista[i];
-        if(b->activo)
-        {
-            b = b->siguiente_colision;
-            while(b)
-            {
-                pdcrt_bucket *nb = b->siguiente_colision;
-                pdcrt_desalojar_ctx(ctx, b, sizeof(pdcrt_bucket));
-                liberado += sizeof(pdcrt_bucket);
-                b = nb;
-            }
-        }
-    }
-
-    size_t tam = sizeof(pdcrt_bucket) * tam_lista;
-    pdcrt_desalojar_ctx(ctx, lista, tam);
-    liberado += tam;
-    return liberado;
-}
-
-static pdcrt_k pdcrt_tabla_fijar_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_fijar_en_k1);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj valor = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj b = pdcrt_obtener_local(ctx, m, 3);
-    (void) b;
-    // [hash]
-    bool ok;
-    pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, "Tabla#fijarEn: El hash debe ser un entero");
-    (void) pdcrt_sacar(ctx);
-    // []
-    if(yo.tabla->num_buckets == 0)
-    {
-        pdcrt_tabla_inicializar_con_capacidad(ctx, yo.tabla, 1);
-        assert(yo.tabla->num_buckets > 0);
-    }
-
-    pdcrt_bucket *bucket = &yo.tabla->buckets[hash % yo.tabla->num_buckets];
-    if(!bucket->activo)
-    {
-        bucket->activo = true;
-        pdcrt_barrera_de_escritura(ctx, yo, llave);
-        bucket->llave = llave;
-        pdcrt_barrera_de_escritura(ctx, yo, valor);
-        bucket->valor = valor;
-        bucket->siguiente_colision = NULL;
-        yo.tabla->buckets_ocupados += 1;
-        if(yo.tabla->buckets_ocupados >= yo.tabla->limite_de_ocupacion)
-        {
-            pdcrt_extender_pila(ctx, m, 2);
-            pdcrt_empujar(ctx, yo);
-            pdcrt_empujar_entero(ctx, m, 1);
-            static const int proto[] = {0};
-            return pdcrt_enviar_mensaje(ctx, m, "rehashear", 9, proto, 1, &pdcrt_tabla_fijar_en_k3);
-        }
-        else
-        {
-            pdcrt_extender_pila(ctx, m, 1);
-            pdcrt_empujar_nulo(ctx, m);
-            // [NULO]
-            return pdcrt_devolver(ctx, m, 1);
-        }
-    }
-    else
-    {
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(bucket));
-        pdcrt_extender_pila(ctx, m, 3);
-        pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-        pdcrt_empujar(ctx, llave);
-        pdcrt_empujar(ctx, bucket->llave);
-        static const int proto[] = {0, 0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_fijar_en_k2);
-    }
-}
-
-static pdcrt_k pdcrt_tabla_fijar_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_fijar_en_k2);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj valor = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj b = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_bucket *bucket = b.pval;
-    // [eq]
-    bool ok;
-    bool eq = pdcrt_obtener_booleano(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, u8"Tabla#fijarEn: la función de igualdad debe devolver un booleano");
-    (void) pdcrt_sacar(ctx);
-    // []
-    if(eq)
-    {
-        pdcrt_barrera_de_escritura(ctx, yo, valor);
-        bucket->valor = valor;
-        pdcrt_extender_pila(ctx, m, 1);
-        pdcrt_empujar_nulo(ctx, m);
-        return pdcrt_devolver(ctx, m, 1);
-    }
-    else
-    {
-        if(!bucket->siguiente_colision)
-        {
-            pdcrt_bucket *nb = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket));
-            if(!bucket)
-                pdcrt_enomem(ctx);
-            nb->siguiente_colision = NULL;
-            pdcrt_barrera_de_escritura(ctx, yo, llave);
-            nb->llave = llave;
-            pdcrt_barrera_de_escritura(ctx, yo, valor);
-            nb->valor = valor;
-            nb->activo = true;
-            bucket->siguiente_colision = nb;
-            pdcrt_extender_pila(ctx, m, 1);
-            pdcrt_empujar_nulo(ctx, m);
-            return pdcrt_devolver(ctx, m, 1);
-        }
-        else
-        {
-            bucket = bucket->siguiente_colision;
-            pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(bucket));
-            pdcrt_extender_pila(ctx, m, 3);
-            pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-            pdcrt_empujar(ctx, llave);
-            pdcrt_empujar(ctx, bucket->llave);
-            static const int proto[] = { 0, 0 };
-            return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2,
-                                        &pdcrt_tabla_fijar_en_k2);
-        }
-    }
-}
-
-static pdcrt_k pdcrt_tabla_fijar_en_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_fijar_en_k3);
-    // [_]
-    (void) pdcrt_sacar(ctx);
-    pdcrt_empujar_nulo(ctx, m);
-    return pdcrt_devolver(ctx, m, 1);
-}
-
-static pdcrt_k pdcrt_tabla_en_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_en_k1);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj b = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj contiene = pdcrt_obtener_local(ctx, m, 3);
-    (void) b;
-    // [hash]
-    bool ok;
-    pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, "Tabla#en: El hash debe ser un entero");
-    (void) pdcrt_sacar(ctx);
-    if(yo.tabla->num_buckets == 0)
-        pdcrt_error(ctx, "Tabla#en: llave no encontrada");
-    pdcrt_bucket *bucket = &yo.tabla->buckets[hash % yo.tabla->num_buckets];
-    if(!bucket->activo)
-    {
-        if(contiene.bval)
-        {
-            pdcrt_empujar_booleano(ctx, m, false);
-            return pdcrt_devolver(ctx, m, 1);
-        }
-        else
-        {
-            pdcrt_error(ctx, "Tabla#en: la llave no existe en la tabla");
-        }
-    }
-    else
-    {
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-        pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-        pdcrt_empujar(ctx, llave);
-        pdcrt_empujar(ctx, bucket->llave);
-        static const int proto[] = {0, 0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_en_k2);
-    }
-}
-
-static pdcrt_k pdcrt_tabla_en_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_en_k2);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj b = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj contiene = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_bucket *bucket = b.pval;
-    // [eq]
-    bool ok;
-    bool eq = pdcrt_obtener_booleano(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, u8"Tabla#en: la función de igualdad debe devolver un booleano");
-    (void) pdcrt_sacar(ctx);
-    // []
-    if(eq)
-    {
-        if(contiene.bval)
-        {
-            pdcrt_empujar_booleano(ctx, m, true);
-            return pdcrt_devolver(ctx, m, 1);
-        }
-        else
-        {
-            pdcrt_empujar(ctx, bucket->valor);
-            return pdcrt_devolver(ctx, m, 1);
-        }
-    }
-    else
-    {
-        bucket = bucket->siguiente_colision;
-        if(!bucket)
-        {
-            if(contiene.bval)
-            {
-                pdcrt_empujar_booleano(ctx, m, false);
-                return pdcrt_devolver(ctx, m, 1);
-            }
-            else
-            {
-                pdcrt_error(ctx, "Tabla#en: llave no encontrada");
-            }
-        }
-
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-        pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-        pdcrt_empujar(ctx, llave);
-        pdcrt_empujar(ctx, bucket->llave);
-        static const int proto[] = {0, 0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_en_k2);
-    }
-}
-
-static pdcrt_k pdcrt_tabla_rehashear_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_rehashear_k1);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj olista = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_obj otam_lista = pdcrt_obtener_local(ctx, m, 4);
-    pdcrt_obj obuckets_ocupados = pdcrt_obtener_local(ctx, m, 5);
-    pdcrt_bucket *bucket = obucket.pval;
-    pdcrt_bucket *lista = olista.pval;
-    pdcrt_entero i = oi.ival;
-    pdcrt_entero tam_lista = otam_lista.ival;
-    pdcrt_entero buckets_ocupados = obuckets_ocupados.ival;
-
-loop:
-
-    if(bucket && bucket->activo)
-    {
-        pdcrt_fijar_local(ctx, m, 1, pdcrt_objeto_voidptr(bucket));
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(i));
-        pdcrt_extender_pila(ctx, m, 2);
-        pdcrt_empujar(ctx, yo.tabla->funcion_hash);
-        pdcrt_empujar(ctx, bucket->llave);
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 1, &pdcrt_tabla_rehashear_k2);
-    }
-    else if((size_t) i >= yo.tabla->num_buckets)
-    {
-        // Fin de la iteración
-        (void) pdcrt_liberar_tabla(ctx, yo.tabla->buckets, yo.tabla->num_buckets);
-        yo.tabla->buckets = lista;
-        yo.tabla->num_buckets = tam_lista;
-        yo.tabla->limite_de_ocupacion = PDCRT_TABLA_LIMITE(tam_lista);
-        yo.tabla->buckets_ocupados = buckets_ocupados;
-        pdcrt_empujar_nulo(ctx, m);
-        return pdcrt_devolver(ctx, m, 1);
-    }
-    else
-    {
-        i = i + 1;
-        if((size_t) i >= yo.tabla->num_buckets)
-        {
-            bucket = NULL;
-            goto loop;
-        }
-        else
-        {
-            bucket = &yo.tabla->buckets[i];
-            goto loop;
-        }
-    }
-}
-
-static pdcrt_k pdcrt_tabla_rehashear_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_rehashear_k2);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj olista = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_obj otam_lista = pdcrt_obtener_local(ctx, m, 4);
-    pdcrt_obj obuckets_ocupados = pdcrt_obtener_local(ctx, m, 5);
-    pdcrt_bucket *bucket = obucket.pval;
-    pdcrt_bucket *lista = olista.pval;
-    pdcrt_entero i = oi.ival;
-    pdcrt_entero tam_lista = otam_lista.ival;
-    pdcrt_entero buckets_ocupados = obuckets_ocupados.ival;
-    (void) i;
-    (void) yo;
-
-    // [hash]
-    bool ok;
-    pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, "Tabla#rehashear: El hash tiene que ser un entero");
-    (void) pdcrt_sacar(ctx);
-
-    pdcrt_bucket *b = &lista[hash % tam_lista];
-    if(b->activo)
-    {
-        while(b->siguiente_colision)
-        {
-            b = b->siguiente_colision;
-        }
-        pdcrt_bucket *nb = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket));
-        if(!nb)
-            pdcrt_enomem(ctx);
-        nb->activo = true;
-        nb->llave = bucket->llave;
-        nb->valor = bucket->valor;
-        nb->siguiente_colision = NULL;
-        b->siguiente_colision = nb;
-    }
-    else
-    {
-        b->activo = true;
-        b->llave = bucket->llave;
-        b->valor = bucket->valor;
-        b->siguiente_colision = NULL;
-        buckets_ocupados += 1;
-    }
-
-    bucket = bucket->siguiente_colision;
-    pdcrt_fijar_local(ctx, m, 1, pdcrt_objeto_voidptr(bucket));
-    pdcrt_fijar_local(ctx, m, 5, pdcrt_objeto_entero(buckets_ocupados));
-    return pdcrt_tabla_rehashear_k1(ctx, m);
-}
-
-static pdcrt_k pdcrt_tabla_eliminar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_eliminar_k1);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj obucket_anterior = pdcrt_obtener_local(ctx, m, 3);
-    (void) obucket;
-    (void) obucket_anterior;
-    // [hash]
-    bool ok;
-    pdcrt_entero hash = pdcrt_obtener_entero(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, "Tabla#eliminar: el hash de la llave debe ser un entero");
-    if(yo.tabla->num_buckets == 0)
-    {
-        pdcrt_empujar_nulo(ctx, m);
-        return pdcrt_devolver(ctx, m, 1);
-    }
-    pdcrt_bucket *bucket = &yo.tabla->buckets[hash % yo.tabla->num_buckets];
-    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-    if(!bucket->activo)
-    {
-        pdcrt_empujar_nulo(ctx, m);
-        return pdcrt_devolver(ctx, m, 1);
-    }
-
-    pdcrt_extender_pila(ctx, m, 3);
-    pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-    pdcrt_empujar(ctx, llave);
-    pdcrt_empujar(ctx, bucket->llave);
-    static const int proto[] = {0, 0};
-    return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_eliminar_k2);
-}
-
-static pdcrt_k pdcrt_tabla_eliminar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_eliminar_k2);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj llave = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj obucket_anterior = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_bucket *bucket = obucket.pval;
-    pdcrt_bucket *bucket_anterior = obucket_anterior.pval;
-    // [eq]
-    bool ok;
-    bool eq = pdcrt_obtener_booleano(ctx, -1, &ok);
-    if(!ok)
-        pdcrt_error(ctx, u8"Tabla#eliminar: la función de igualdad debe devolver un booleano");
-
-    if(eq)
-    {
-        if(bucket_anterior)
-        {
-            bucket_anterior->siguiente_colision = bucket->siguiente_colision;
-            pdcrt_desalojar_ctx(ctx, bucket, sizeof(bucket));
-        }
-        else
-        {
-            bucket->activo = false;
-            bucket->llave = bucket->valor = pdcrt_objeto_nulo();
-            bucket->siguiente_colision = NULL;
-            yo.tabla->buckets_ocupados -= 1;
-        }
-
-        pdcrt_empujar_nulo(ctx, m);
-        return pdcrt_devolver(ctx, m, 1);
-    }
-    else
-    {
-        bucket_anterior = bucket;
-        bucket = bucket->siguiente_colision;
-        if(!bucket)
-        {
-            pdcrt_empujar_nulo(ctx, m);
-            return pdcrt_devolver(ctx, m, 1);
-        }
-
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_voidptr(bucket_anterior));
-
-        pdcrt_extender_pila(ctx, m, 3);
-        pdcrt_empujar(ctx, yo.tabla->funcion_igualdad);
-        pdcrt_empujar(ctx, llave);
-        pdcrt_empujar(ctx, bucket->llave);
-        static const int proto[] = {0, 0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2, &pdcrt_tabla_eliminar_k2);
-
-    }
 }
 
 static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -4278,54 +4176,63 @@ static pdcrt_k pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     PDCRT_K(pdcrt_tabla_para_cada_par_k1);
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
     pdcrt_obj iterador = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_bucket *bucket = obucket.pval;
+    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 2);
     pdcrt_entero i = oi.ival;
 
-    if(!bucket || !bucket->activo)
+    // [nulo]
+    (void) pdcrt_sacar(ctx);
+
+    if(i < pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara))
     {
-        i += 1;
-        if((size_t) i >= yo.tabla->num_buckets)
+        pdcrt_extender_pila(ctx, m, 3);
+        yo = pdcrt_obtener_local(ctx, m, 0);
+        iterador = pdcrt_obtener_local(ctx, m, 1);
+        oi = pdcrt_obtener_local(ctx, m, 2);
+        i = oi.ival;
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(i + 1));
+
+        if(yo.tabla->buckets[i].activo)
+        {
+            pdcrt_empujar(ctx, iterador);
+            pdcrt_empujar(ctx, yo.tabla->buckets[i].llave);
+            pdcrt_empujar(ctx, yo.tabla->buckets[i].valor);
+            static const int proto[] = {0, 0};
+            return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2,
+                                        &pdcrt_tabla_para_cada_par_k1);
+        }
+        else
         {
             pdcrt_empujar_nulo(ctx, m);
-            return pdcrt_devolver(ctx, m, 1);
+            return pdcrt_tabla_para_cada_par_k1(ctx, m);
         }
-        bucket = &yo.tabla->buckets[i];
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-        pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(i));
-        return pdcrt_tabla_para_cada_par_k1(ctx, m);
+    }
+    else if(i - pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara) < yo.tabla->num_colisiones)
+    {
+        pdcrt_extender_pila(ctx, m, 3);
+        yo = pdcrt_obtener_local(ctx, m, 0);
+        iterador = pdcrt_obtener_local(ctx, m, 1);
+        oi = pdcrt_obtener_local(ctx, m, 2);
+        i = oi.ival;
+        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(i + 1));
+
+        size_t buckets = pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara);
+
+        assert(i - buckets < yo.tabla->num_colisiones);
+        assert(yo.tabla->colisiones[i - buckets].activo);
+
+        pdcrt_empujar(ctx, iterador);
+        pdcrt_empujar(ctx, yo.tabla->colisiones[i - buckets].llave);
+        pdcrt_empujar(ctx, yo.tabla->colisiones[i - buckets].valor);
+        static const int proto[] = {0, 0};
+        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2,
+                                    &pdcrt_tabla_para_cada_par_k1);
     }
     else
     {
-        pdcrt_extender_pila(ctx, m, 3);
-        pdcrt_empujar(ctx, iterador);
-        pdcrt_empujar(ctx, bucket->llave);
-        pdcrt_empujar(ctx, bucket->valor);
-        static const int proto[] = {0, 0};
-        return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, proto, 2,
-                                    &pdcrt_tabla_para_cada_par_k2);
+        pdcrt_extender_pila(ctx, m, 1);
+        pdcrt_empujar_nulo(ctx, m);
+        return pdcrt_devolver(ctx, m, 1);
     }
-}
-
-static pdcrt_k pdcrt_tabla_para_cada_par_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_tabla_para_cada_par_k2);
-    pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 0);
-    pdcrt_obj iterador = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj obucket = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_obj oi = pdcrt_obtener_local(ctx, m, 3);
-    pdcrt_bucket *bucket = obucket.pval;
-    pdcrt_entero i = oi.ival;
-    (void) yo;
-    (void) iterador;
-    (void) i;
-
-    // [res]
-    (void) pdcrt_sacar(ctx);
-    bucket = bucket->siguiente_colision;
-    pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_voidptr(bucket));
-    return pdcrt_tabla_para_cada_par_k1(ctx, m);
 }
 
 pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k)
@@ -5048,60 +4955,6 @@ pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k)
 }
 
 
-static pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
-{
-    switch(pdcrt_tipo_de_obj(o))
-    {
-        case PDCRT_TOBJ_ENTERO:
-            return o.ival;
-        case PDCRT_TOBJ_FLOAT:
-            return (pdcrt_entero) *(pdcrt_efloat *) &o.fval;
-        case PDCRT_TOBJ_TEXTO:
-            return (pdcrt_entero) o.texto;
-        case PDCRT_TOBJ_BOOLEANO:
-            return o.bval ? 0 : 1;
-        case PDCRT_TOBJ_NULO:
-            return 0;
-        default:
-            pdcrt_error(ctx, "No se puede hashear objeto de ese tipo");
-    }
-}
-
-
-static pdcrt_k pdcrt_funcion_igualdad_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
-
-static pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k)
-{
-    if(args != 2)
-        pdcrt_error(ctx, u8"FunciónIgualdad: se esperaban 2 argumentos");
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 2, 0, args, k);
-    pdcrt_fijar_local(ctx, m, 0, pdcrt_sacar(ctx));
-    pdcrt_fijar_local(ctx, m, 1, pdcrt_sacar(ctx));
-    pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, 0));
-    pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, 1));
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, "igualA", 6, proto, 1, &pdcrt_funcion_igualdad_k1);
-}
-
-static pdcrt_k pdcrt_funcion_igualdad_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
-{
-    PDCRT_K(pdcrt_funcion_igualdad_k1);
-    // [eq]
-    pdcrt_extender_pila(ctx, m, 1);
-    return pdcrt_devolver(ctx, m, 1);
-}
-
-static pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k)
-{
-    if(args != 1)
-        pdcrt_error(ctx, u8"FunciónHash: se esperaba 1 argumento");
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, args, k);
-    pdcrt_fijar_local(ctx, m, 0, pdcrt_sacar(ctx));
-    pdcrt_empujar_entero(ctx, m, pdcrt_hash(ctx, pdcrt_obtener_local(ctx, m, 0)));
-    return pdcrt_devolver(ctx, m, 1);
-}
-
-
 
 pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
 {
@@ -5301,19 +5154,7 @@ pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad
     pdcrt_tabla *tbl = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_TABLA, sizeof(pdcrt_tabla));
     if(!tbl)
         pdcrt_enomem(ctx);
-    tbl->num_buckets = capacidad;
-    tbl->buckets = NULL;
-    tbl->limite_de_ocupacion = PDCRT_TABLA_LIMITE(capacidad);
-    tbl->buckets_ocupados = 0;
-    tbl->funcion_igualdad = ctx->funcion_igualdad;
-    tbl->funcion_hash = ctx->funcion_hash;
-    if(capacidad > 0)
-    {
-        tbl->buckets = pdcrt_alojar_ctx(ctx, sizeof(pdcrt_bucket) * capacidad);
-        if(!tbl->buckets)
-            pdcrt_enomem(ctx);
-        pdcrt_tabla_inicializar(ctx, tbl);
-    }
+    pdcrt_tabla_inicializar(ctx, tbl, capacidad);
     return tbl;
 }
 
@@ -5849,21 +5690,18 @@ void pdcrt_negar(pdcrt_ctx *ctx)
     pdcrt_empujar(ctx, pdcrt_objeto_booleano(!cima.bval));
 }
 
-void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos)
-{
-    size_t rpos = pdcrt_stp_a_pos(ctx, pos);
-    size_t n = (ctx->tam_pila - rpos) - 1;
-    if(n > 0)
-        memmove(ctx->pila + rpos, ctx->pila + rpos + 1, n * sizeof(pdcrt_obj));
-    ctx->tam_pila -= 1;
-}
-
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt)
 {
-    for(; cnt > 0; cnt--)
-    {
-        pdcrt_eliminar_elemento(ctx, inic);
-    }
+    size_t rpos = pdcrt_stp_a_pos(ctx, inic);
+    size_t n = (ctx->tam_pila - rpos) - cnt;
+    if(n > 0)
+        memmove(ctx->pila + rpos, ctx->pila + rpos + cnt, n * sizeof(pdcrt_obj));
+    ctx->tam_pila -= cnt;
+}
+
+void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos)
+{
+    pdcrt_eliminar_elementos(ctx, pos, 1);
 }
 
 void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp i)
@@ -6206,15 +6044,12 @@ static pdcrt_k pdcrt_importar_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_importar_k3);
     // [valop, nom, mfunc]
-    pdcrt_obj nom = ctx->pila[pdcrt_stp_a_pos(ctx, -2)];
-    ctx->cnt += 1;
     return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, NULL, 0, &pdcrt_importar_k4);
 }
 
 static pdcrt_k pdcrt_importar_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_importar_k4);
-    ctx->cnt -= 1;
     // [valop, nom, NULO]
     (void) pdcrt_sacar(ctx);
     // [valop, nom]
@@ -6614,7 +6449,7 @@ static pdcrt_k pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_
 static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_cargar_dependencia_fijarEn_k1);
-    pdcrt_empujar_nulo(ctx, m);
+    // [nulo]
     return pdcrt_devolver(ctx, m, 1);
 }
 

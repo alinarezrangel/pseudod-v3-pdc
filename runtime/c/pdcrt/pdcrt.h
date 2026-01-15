@@ -132,6 +132,9 @@ typedef struct pdcrt_cabecera_gc
     // total: 24
 } pdcrt_cabecera_gc;
 
+_Static_assert(sizeof(void*) == 8 ? sizeof(pdcrt_cabecera_gc) == 24 : sizeof(pdcrt_cabecera_gc) == 16,
+               "sizeof(pdcrt_cabecera_gc) == 24 o 16");
+
 #define PDCRT_CABECERA_GC(v) ((pdcrt_cabecera_gc *) (v))
 #define PDCRT_CABECERA_GC_PTR(v) ((pdcrt_cabecera_gc **) (v))
 
@@ -233,19 +236,20 @@ typedef struct pdcrt_bucket pdcrt_bucket;
 struct pdcrt_tabla
 {
     pdcrt_cabecera_gc gc;
-    pdcrt_obj funcion_hash;
-    pdcrt_obj funcion_igualdad;
-    size_t num_buckets;
+
+    bool _bit : 1;
+    size_t mascara : sizeof(size_t) * 8 - 1;
     size_t buckets_ocupados;
-    size_t limite_de_ocupacion;
-    pdcrt_bucket *buckets;
+    pdcrt_bucket *buckets, *colisiones;
+    size_t num_colisiones, cap_colisiones;
 };
 
 struct pdcrt_bucket
 {
-    bool activo;
-    pdcrt_bucket *siguiente_colision;
     pdcrt_obj llave, valor;
+    bool activo : 1;
+    bool tiene_colision : 1;
+    size_t idc_colision : sizeof(void*) * 8 - 2;
 };
 
 struct pdcrt_valop
@@ -604,6 +608,7 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
 #endif
 #define pdcrt_sacar(ctx) (ctx)->pila[--(ctx)->tam_pila]
 #define pdcrt_cima(ctx) (ctx)->pila[(ctx)->tam_pila - 1]
+#define pdcrt_cima_en(ctx, n) (ctx)->pila[(ctx)->tam_pila - (1 + (n))]
 
 #define pdcrt_obtener_local(ctx, m, idx) ((m)->registros[(idx)])
 #define pdcrt_fijar_local(ctx, m, idx, v)                               \
@@ -772,12 +777,16 @@ pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k);
 #define pdcrt_objeto_instancia(instancia) ((pdcrt_obj) { .recv = &pdcrt_recv_instancia, .inst = (instancia) })
 #define pdcrt_objeto_reubicado(reub) ((pdcrt_obj) { .recv = &pdcrt_recv_reubicado, .reubicado = (reub) })
 
+// #define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
+//     alignas(alignof(pdcrt_cabecera_gc))                                 \
+//         char marco_en_pila[                                             \
+//             sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
+//     pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
+//     pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, num_capturas, args, k)
+
+// TODO
 #define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
-    alignas(alignof(pdcrt_cabecera_gc))                                 \
-        char marco_en_pila[                                             \
-            sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
-    pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
-    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, num_capturas, args, k)
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, num_capturas, args, k);
 
 // Esta macro debería aceptar cuanta pila necesitamos, en bytes. En su forma actual, aún podríamos causar
 // stack-overflows.

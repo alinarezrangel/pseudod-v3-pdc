@@ -238,6 +238,10 @@ metodo BaseDeDatosDeMódulos#buscarMódulo: paquete, nombre
     variable mod
     fijar mod a yo#intentaBuscarMódulo: paquete, nombre
     si EsNulo: mod
+        Escribir: (yo#tablaMódulos#buscarOrdenado: {paquete}, paquete, {módulo}, nombre)
+        yo#tablaMódulos#escaneoLineal: procedimiento: mod
+            Escribir: ({~t::~t}#formatear: mod#paquete, mod#módulo)
+        finprocedimiento
         __FallarConMensaje: ({No se encontró el módulo ~t::~t}#formatear: paquete, nombre)
     finsi
     devolver mod

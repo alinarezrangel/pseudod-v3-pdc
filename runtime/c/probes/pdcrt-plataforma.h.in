@@ -41,6 +41,7 @@ _Static_assert(sizeof(double) == 8, "double debe ser de 64 bits");
 // ================================================================ //
 
 typedef int64_t pdcrt_entero;
+typedef uint64_t pdcrt_uentero;
 
 #  define PDCRT_ENTERO_MAX INT64_MAX
 #  define PDCRT_ENTERO_MIN INT64_MIN
@@ -87,6 +88,7 @@ typedef uint64_t pdcrt_efloat;
 // ================================================================ //
 
 typedef int32_t pdcrt_entero;
+typedef uint32_t pdcrt_uentero;
 
 #  define PDCRT_ENTERO_MAX INT32_MAX
 #  define PDCRT_ENTERO_MIN INT32_MIN

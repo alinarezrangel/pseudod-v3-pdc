@@ -8,6 +8,8 @@ project(pdcrt
 
 set(CMAKE_C_STANDARD 11)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
 include(CPack)
@@ -22,8 +24,12 @@ option(PDCRT_UBSAN "Activa UBSan" OFF)
 add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt.c
         runtime/c/pdcrt/pdcrt.h
+        runtime/c/pdcrt/pdcrt_base.c
+        runtime/c/pdcrt/pdcrt_base.h
         runtime/c/pdcrt/pdffi.c
-        runtime/c/pdcrt/pdffi.h)
+        runtime/c/pdcrt/pdffi.h
+        runtime/c/pdcrt/pdcrt_hash.c
+        runtime/c/pdcrt/pdcrt_hash.h)
 
 target_link_libraries(pdcrt INTERFACE m)
 
