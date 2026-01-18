@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.30)
 project(pdcrt
   VERSION 1.0.0
   DESCRIPTION "El runtime de PseudoD"
@@ -127,7 +127,7 @@ set(PDCRT_RUNTIME_OUT "${CMAKE_CURRENT_BINARY_DIR}/runtime.c")
 
 add_custom_command(
   OUTPUT "${PDCRT_RUNTIME_OUT}"
-  COMMAND "${PDC}"
+  COMMAND ${PDC}
   --id-modulo pdcrt_runtime
   --paquete pdc
   --modulo runtime/c/runtime
@@ -141,28 +141,86 @@ add_custom_command(
 
 target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
 
-add_custom_command(
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/make-inner.sh"
-        --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
-        --binary-dir "${CMAKE_CURRENT_BINARY_DIR}"
-        --output "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
-        DEPENDS pdcrt
-        COMMENT "Compiling the inner PDC"
-        VERBATIM
-        USES_TERMINAL
+include("./PseudoD.cmake")
+
+add_pseudod_collection(src_bepd
+        PACKAGE bepd
+        SOURCES
+        bepd/algoritmos.pd
+        bepd/builtins.pd
+        bepd/builtinsImpl.pd
+        bepd/datos/caja.pd
+        bepd/datos/conjunto.pd
+        bepd/datos/diccionario.pd
+        bepd/datos/diccionario/alist.pd
+        bepd/datos/diccionario/hashmap.pd
+        bepd/datos/diccionario/interfaz.pd
+        bepd/datos/pila.pd
+        bepd/datos/resultado.pd
+        bepd/intrinsics.pd
+        bepd/utilidades/arreglo.pd
+        bepd/utilidades/iteración.pd
+        bepd/utilidades/texto.pd
+        bepd/utilidades/texto/ascii.pd
+        bepd/x/adhoc.pd
+        bepd/x/algebraico.pd
+        bepd/x/cli.pd
+        bepd/x/control.pd
+        bepd/x/datos.pd
+        bepd/x/datos2.pd
+        bepd/x/entorno.pd
+        bepd/x/enum.pd
+        bepd/x/json.pd
+        bepd/x/lazy.pd
+        bepd/x/logs.pd
+        bepd/x/puerto.pd
+        bepd/x/puerto/conPosición.pd
+        bepd/x/puerto/deArchivo.pd
+        bepd/x/sexpr.pd
+        bepd/x/sistemaDeArchivos/archivo.pd
+        bepd/x/sistemaDeArchivos/rutas.pd
+        bepd/x/utf8.pd
 )
 
-add_custom_target(
-        build_inner_pdc ALL
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+add_pseudod_collection(src_pdc
+        PACKAGE pdc
+        SOURCES
+        pdc/abstraer.pd
+        pdc/ast.pd
+        pdc/backend/c.pd
+        pdc/backend/c/ir.pd
+        pdc/backend/c/lowerer.pd
+        pdc/capturas.pd
+        pdc/catamorfismos.pd
+        pdc/combinadores.pd
+        pdc/compilador.pd
+        pdc/cst.pd
+        pdc/dependencias.pd
+        pdc/info.pd
+        pdc/inicio.pd
+        pdc/módulos.pd
+        pdc/nombres.pd
+        pdc/parser.pd
+        pdc/tabla.pd
+        pdc/tokenizador.pd
+        pdc/tokens.pd
+        pdc/validación.pd
 )
 
-add_executable(inner_pdc IMPORTED GLOBAL)
-set_target_properties(inner_pdc PROPERTIES
-        IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/inner-pdc.exe"
+add_pseudod_executable(inner_pdc
+        COLLECTIONS src_bepd src_pdc
+        ENTRY pdc/inicio
 )
-add_dependencies(inner_pdc build_inner_pdc)
+pseudod_target_cc_compile_options(inner_pdc PUBLIC -ggdb -O0)
+
+if(PDCRT_ASAN)
+  pseudod_target_cc_compile_options(inner_pdc PUBLIC -fsanitize=address)
+  pseudod_target_link_libraries(inner_pdc PUBLIC -fsanitize=address)
+endif()
+if(PDCRT_UBSAN)
+  pseudod_target_cc_compile_options(inner_pdc PUBLIC -fsanitize=undefined)
+  pseudod_target_link_libraries(inner_pdc PUBLIC -fsanitize=undefined)
+endif()
 
 # ============= CPack =============
 

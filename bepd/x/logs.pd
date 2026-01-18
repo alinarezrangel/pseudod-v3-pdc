@@ -1,0 +1,104 @@
+utilizar bepd/builtins
+
+utilizar bepd/x/json como Json
+utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/enum (Enum, EnumConValores)
+utilizar bepd/x/puerto (SalidaEstándar)
+utilizar bepd/utilidades/texto/ascii (LF)
+
+
+procedimiento Escapar: v
+    devolver Json#ComoTextoJSON: v#comoTexto
+finprocedimiento
+
+variable InfoNivelDeLogueo
+fijar InfoNivelDeLogueo a TipoDeDatos: {InfoNivelDeLogueo}, {texto}, {comoEntero}
+
+variable NivelDeLogueo
+fijar NivelDeLogueo a EnumConValores: {NivelDeLogueo},
+                                      {DEBUG}, (InfoNivelDeLogueo#crear: {DEBUG}, 0),
+                                      {INFO}, (InfoNivelDeLogueo#crear: {INFO}, 1),
+                                      {ADVERTENCIA}, (InfoNivelDeLogueo#crear: {WARN}, 2),
+                                      {ERROR}, (InfoNivelDeLogueo#crear: {ERROR}, 3)
+
+variable Formato
+fijar Formato a Enum: {Formato}, {TEXTO}, {JSON}
+
+variable Configuración
+fijar Configuración a TipoDeDatos: {Configuración},
+                                   {nivel},
+                                   {formato},
+                                   {puertoDeSalida}
+
+variable ConfiguraciónGlobal
+fijar ConfiguraciónGlobal a Configuración#crear: NivelDeLogueo#DEBUG,
+                                                 Formato#TEXTO,
+                                                 SalidaEstándar
+
+procedimiento ConfigurarGlobalmente: cfg
+    fijar ConfiguraciónGlobal a cfg
+finprocedimiento
+
+
+clase Logger
+    metodo estatico paraEsteMódulo
+
+    metodo debug: msj, ...pares
+    metodo info: msj, ...pares
+    metodo advertencia: msj, ...pares
+    metodo error: msj, ...pares
+finclase
+
+metodo estatico Logger#paraEsteMódulo
+    devolver yo#crear
+finmetodo
+
+metodo Logger#_loguear: nivel, msj, pares
+    necesitas EsPar: pares#longitud
+
+    si nivel#valor#comoEntero < ConfiguraciónGlobal#nivel#valor#comoEntero
+        devolver NULO
+    finsi
+
+    si ConfiguraciónGlobal#formato = Formato#TEXTO
+        ConfiguraciónGlobal#puertoDeSalida#escribirTexto: ({[~t] ~t}#formatear: nivel#valor#texto, (Escapar: msj))
+        ParaCadaNúmeroConPaso: 0, pares#longitud, 2, procedimiento: i
+            variables k, v
+            fijar k a pares#en: i
+            fijar v a pares#en: (i + 1)
+            ConfiguraciónGlobal#puertoDeSalida#escribirTexto: ({  ~t: ~t}#formatear: (Escapar: k), (Escapar: v))
+        finprocedimiento
+        ConfiguraciónGlobal#puertoDeSalida#escribirTexto: LF
+    sino
+        variable valores
+        fijar valores a Diccionario#vacío
+        ParaCadaNúmeroConPaso: 0, pares#longitud, 2, procedimiento: i
+            variables k, v
+            fijar k a pares#en: i
+            fijar v a pares#en: (i + 1)
+            valores#fijarEn: k#comoTexto, v#comoTexto
+        finprocedimiento
+        ConfiguraciónGlobal#puertoDeSalida#escribirTexto:
+                (Json#ComoTextoJSON:
+                        (Diccionario#desdePares: {nivel}, nivel#valor#texto,
+                                                 {mensaje}, msj,
+                                                 {valores}, valores))
+        ConfiguraciónGlobal#puertoDeSalida#escribirTexto: LF
+    finsi
+finmetodo
+
+metodo Logger#debug: msj, ...pares
+    yo#_loguear: NivelDeLogueo#DEBUG, msj, pares
+finmetodo
+
+metodo Logger#info: msj, ...pares
+    yo#_loguear: NivelDeLogueo#INFO, msj, pares
+finmetodo
+
+metodo Logger#advertencia: msj, ...pares
+    yo#_loguear: NivelDeLogueo#ADVERTENCIA, msj, pares
+finmetodo
+
+metodo Logger#error: msj, ...pares
+    yo#_loguear: NivelDeLogueo#ERROR, msj, pares
+finmetodo
