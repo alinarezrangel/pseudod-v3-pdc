@@ -38,8 +38,6 @@ del módulo.}
 @item{@code{compilado}: Objeto con todos los datos resultantes de la
 compilación. Su tipo específico depende del backend que compiló el módulo.}
 
-@item{@code{archivoConElCompilado}: Archivo con la salida de la compilación.}
-
 @item{@code{prefijosDeLosMódulosTransitivos}: Arreglo con los prefijos de todos
 los módulos que son dependencias de este. Es utilizado por el lowerer para
 precargar los módulos del programa.}
@@ -48,7 +46,7 @@ DOCUMENTA]
 variable Módulo
 fijar Módulo a CrearTipoDeRegistro: {Módulo},
     {id}, {paquete}, {módulo}, {exportaciones},
-    {prefijoDelMódulo}, {compilado}, {archivoConElCompilado},
+    {prefijoDelMódulo}, {compilado},
     {prefijosDeLosMódulosTransitivos},
     (Índice#ÚNICO: {id}),
     (Índice#ORDENADO: {paquete}),
@@ -62,11 +60,6 @@ Contiene la tabla de @pd{Módulo}s. Almacena, busca y guarda la base de datos.
 DOCUMENTA]
 clase BaseDeDatosDeMódulos
     [DOCUMENTA
-    @brief{Carga la base de datos desde un archivo.}
-    DOCUMENTA]
-    metodo estatico desdeArchivo: archivo
-
-    [DOCUMENTA
     @brief{Crea una base de datos vacía.}
     DOCUMENTA]
     metodo estatico enMemoria
@@ -77,29 +70,22 @@ clase BaseDeDatosDeMódulos
     metodo tablaMódulos
 
     [DOCUMENTA
-    @brief{Carga un archivo, agregando sus módulos a la base de datos.}
+    @brief{Carga una interfaz PseudoD desde un archivo, agregando su módulo a
+    la base de datos.}
     DOCUMENTA]
-    metodo cargarDesdeArchivo: archivo
+    metodo cargarDesdeArchivo: paquete, módulo, archivo
 
     [DOCUMENTA
-    @brief{Guarda la base de datos en un archivo.}
+    @brief{Guarda el módulo seleccionado en un archivo.}
     DOCUMENTA]
-    metodo guardarEnArchivo: archivo
-
-    [DOCUMENTA
-    @brief{Guarda los módulos seleccionados en un archivo.}
-
-    Similar a @code{#guardarEnArchivo} pero solo guarda los módulos @code{m}
-    para los que @pd{%filtro: m} devuelva @pd{VERDADERO}.
-    DOCUMENTA]
-    metodo guardarSeleccionadosEnArchivo: archivo, filtro
+    metodo guardarEnArchivo: paquete, módulo, archivo
 
     [DOCUMENTA
     @brief{Agrega un nuevo módulo a la base de datos.}
 
     Construye un @pd{Módulo} con los argumentos dados.
     DOCUMENTA]
-    metodo agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado, prefijosDeLosMódulosTransitivos
+    metodo agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, prefijosDeLosMódulosTransitivos
 
     [DOCUMENTA
     @brief{Intenta buscar un módulo en base a su paquete y nombre.}
@@ -118,13 +104,6 @@ finclase
 
 atributo BaseDeDatosDeMódulos#tablaMódulos, BaseDeDatosDeMódulos#_contadorId
 
-metodo estatico BaseDeDatosDeMódulos#desdeArchivo: archivo
-    variable inst
-    fijar inst a yo#enMemoria
-    inst#cargarDesdeArchivo: archivo
-    devolver inst
-finmetodo
-
 metodo estatico BaseDeDatosDeMódulos#enMemoria
     devolver yo#crear: (Tabla#vacíaConEsquema: Módulo)
 finmetodo
@@ -134,7 +113,7 @@ metodo BaseDeDatosDeMódulos#inicializar: tabla
     fijar yo#_contadorId a 0
 finmetodo
 
-metodo BaseDeDatosDeMódulos#cargarDesdeArchivo: archivo
+metodo BaseDeDatosDeMódulos#cargarDesdeArchivo: paquete, módulo, archivo
     variables puerto, json, v
     fijar puerto a PuertoDeArchivoDeLectura#desdeArchivo: archivo
     fijar json a DesdeJSON: puerto
@@ -144,62 +123,45 @@ metodo BaseDeDatosDeMódulos#cargarDesdeArchivo: archivo
     fijar json a json#valor
     fijar v a json#en: {versión}
     si v = 1
-        yo#_cargarDesdeArchivoV1: json
+        yo#_cargarDesdeArchivoV1: paquete, módulo, json
     sino
         __FallarConMensaje: ({No se pudo cargar la base de datos con la versión ~t}#formatear: v)
     finsi
 finmetodo
 
-metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: json
-    variable módulos
-    fijar módulos a json#en: "módulos"
-    ParaCadaElemento: módulos, procedimiento: módulo
-        variable paquete, nombre, exportaciones, prefijo, archivo, prefijos
-        fijar paquete a módulo#en: {paquete}
-        fijar nombre a módulo#en: {módulo}
-        fijar exportaciones a Mapear: (módulo#en: {exportaciones}), funcion: exp
-            devolver Exportación#crear: (exp#en: {nombre}), (exp#en: {esAutoejecutable})
-        finfuncion
-        fijar prefijo a módulo#en: {prefijoDelMódulo}
-        fijar archivo a módulo#en: {archivoConElCompilado}
-        fijar prefijos a módulo#en: {prefijosDeLosMódulosTransitivos}
-        yo#agregarMódulo: paquete, nombre, exportaciones, prefijo, NULO, archivo, prefijos
-    finprocedimiento
+metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: paquete, módulo, json
+    variable exportaciones, prefijo, prefijos
+    fijar exportaciones a Mapear: (json#en: {exportaciones}), funcion: exp
+        devolver Exportación#crear: (exp#en: {nombre}), (exp#en: {esAutoejecutable})
+    finfuncion
+    fijar prefijo a json#en: {prefijoDelMódulo}
+    fijar prefijos a json#en: {prefijosDeLosMódulosTransitivos}
+    yo#agregarMódulo: paquete, módulo, exportaciones, prefijo, NULO, prefijos
 finmetodo
 
-metodo BaseDeDatosDeMódulos#guardarEnArchivo: archivo
-    yo#guardarSeleccionadosEnArchivo: archivo, funcion: m devolver VERDADERO finfuncion
-finmetodo
-
-metodo BaseDeDatosDeMódulos#guardarSeleccionadosEnArchivo: archivo, filtro
-    variables puerto, mods, res
+metodo BaseDeDatosDeMódulos#guardarEnArchivo: paquete, módulo, archivo
+    variables puerto, modJson, res
     fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
-    fijar mods a Arreglo#vacio
+    fijar modJson a Diccionario#desdePares: {versión}, 1
     yo#tablaMódulos#escaneoLineal: procedimiento: mod
-        si no %filtro: mod
+        si (no (mod#paquete = paquete)) || (no (mod#módulo = módulo))
             devolver NULO
         finsi
-        mods#agregarAlFinal: (Diccionario#desdePares:
-            {paquete}, mod#paquete,
-            {módulo}, mod#módulo,
-            {exportaciones}, (Mapear: mod#exportaciones, funcion: exp
-                    devolver Diccionario#desdePares:
-                        {nombre}, exp#nombre,
-                        {esAutoejecutable}, exp#esAutoejecutable
-                finfuncion),
-            {prefijoDelMódulo}, mod#prefijoDelMódulo,
-            {archivoConElCompilado}, mod#archivoConElCompilado,
-            {prefijosDeLosMódulosTransitivos}, mod#prefijosDeLosMódulosTransitivos)
+        modJson#fijarEn: {exportaciones}, (Mapear: mod#exportaciones, funcion: exp
+            devolver Diccionario#desdePares:
+                    {nombre}, exp#nombre,
+                    {esAutoejecutable}, exp#esAutoejecutable
+        finfuncion)
+        modJson#fijarEn: {prefijoDelMódulo}, mod#prefijoDelMódulo
+        modJson#fijarEn: {prefijosDeLosMódulosTransitivos}, mod#prefijosDeLosMódulosTransitivos
     finprocedimiento
-    fijar res a ComoJSON: puerto, (Diccionario#desdePares:
-        {versión}, 1,
-        {módulos}, mods)
+    fijar res a ComoJSON: puerto, modJson
     si res#esError
         __FallarConMensaje: res#error
     finsi
 finmetodo
 
-metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, archivoConElCompilado, prefijosDeLosMódulosTransitivos
+metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, prefijosDeLosMódulosTransitivos
     variable módulos
     fijar módulos a yo#tablaMódulos#buscarOrdenado: {paquete}, paquete, {módulo}, módulo
     si módulos#longitud > 0
@@ -214,7 +176,6 @@ metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, pr
                        exportaciones,
                        prefijoDelMódulo,
                        compilado,
-                       archivoConElCompilado,
                        prefijosDeLosMódulosTransitivos)
     devolver id
 finmetodo

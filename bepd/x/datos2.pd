@@ -1,0 +1,232 @@
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/arreglo (Únicos)
+
+utilizar bepd/utilidades/texto (Unir)
+
+
+funcion CrearEstructura: nombre, ...campos
+    clase Tipo
+        metodo estatico Crear: ...valores
+    finclase
+
+    fijar Tipo#nombre a nombre
+
+    metodo estatico Tipo#Crear: ...valores
+        devolver yo#crear: ...valores
+    finmetodo
+
+    metodo Tipo#inicializar: ...valores
+        necesitas valores#longitud = campos#longitud
+        ParaCadaElementoConÍndice: campos, procedimiento: campo, i
+            EnviarMensaje: yo, ({fijar__}#concatenar: campo), (valores#en: i)
+        finprocedimiento
+    finmetodo
+
+    ParaCadaElemento: campos, procedimiento: campo
+        variable atr
+        fijar atr a {_}#concatenar: campo
+
+        Tipo#agregarAtributo: atr
+
+        Tipo#agregarMetodoEstatico: campo, metodo: inst
+            devolver EnviarMensaje: inst, atr
+        finmetodo
+
+        Tipo#agregarMetodoEstatico: ({Fijar}#concatenar: campo), metodo: inst, valor
+            devolver EnviarMensaje: inst, ({fijar_}#concatenar: atr), valor
+        finmetodo
+    finprocedimiento
+
+    metodo Tipo#comoTexto
+        variable res
+        fijar res a {(~t }#formatear: nombre
+        ParaCadaElemento: campos, procedimiento: campo
+            variable atr
+            fijar atr a {_}#concatenar: campo
+            fijar res a res#concatenar: atr
+            fijar res a res#concatenar: {: }
+            fijar res a res#concatenar: (EnviarMensaje: yo, atr)#comoTexto
+            fijar res a res#concatenar: {, }
+        finprocedimiento
+        devolver res#concatenar: {)}
+    finmetodo
+
+    metodo estatico Tipo#Es: inst
+        devolver EsInstancia: inst, yo
+    finmetodo
+
+    devolver Tipo
+finfuncion
+
+
+
+variable AlternativaImpl
+fijar AlternativaImpl a CrearEstructura: {AlternativaImpl},
+    {Nombre}, {Campos}
+
+funcion Alternativa: nombre, ...campos
+    necesitas (Únicos: campos)#longitud = campos#longitud
+    devolver AlternativaImpl#Crear: nombre, campos
+finfuncion
+
+variable númAtributo
+fijar númAtributo a 0
+procedimiento GenerarAtributo
+    fijar númAtributo a númAtributo + 1
+    devolver {_atr~t}#formatear: númAtributo
+finprocedimiento
+
+funcion CrearAlgebraico: nombre, ...alternativas
+    variables camposPorTipo, atributosReales, númMaxCampos, mapeoDeCampos
+    fijar camposPorTipo a Diccionario#vacío
+    fijar atributosReales a Arreglo#vacio
+    fijar númMaxCampos a 0
+    fijar mapeoDeCampos a Diccionario#vacío
+
+    ParaCadaElemento: alternativas, procedimiento: alt
+        variables altNombre, altCampos
+        fijar altNombre a AlternativaImpl#Nombre: alt
+        fijar altCampos a AlternativaImpl#Campos: alt
+
+        si camposPorTipo#contiene: altNombre
+            __FallarConMensaje: ({TipoAlgebraico ~t: alternativa ~t duplicada}#formatear: nombre, altNombre)
+        finsi
+
+        camposPorTipo#fijarEn: altNombre, altCampos
+
+        ParaCadaElementoConÍndice: altCampos, procedimiento: campo, i
+            variable subdic
+            si mapeoDeCampos#contiene: campo
+                fijar subdic a mapeoDeCampos#en: campo
+            sino
+                fijar subdic a Diccionario#vacío
+                mapeoDeCampos#fijarEn: campo, subdic
+            finsi
+            subdic#fijarEn: altNombre, i
+        finprocedimiento
+
+        fijar númMaxCampos a Max: númMaxCampos, altCampos#longitud
+    finprocedimiento
+
+    ParaCadaNúmero: 0, númMaxCampos, procedimiento: _i
+        atributosReales#agregarAlFinal: GenerarAtributo
+    finprocedimiento
+
+    clase Algebraico
+        metodo comoTexto
+    finclase
+
+    atributo Algebraico#_tipo
+
+    fijar Algebraico#nombre a nombre
+    ParaCadaElemento: atributosReales, procedimiento: atr
+        Algebraico#agregarAtributo: atr
+    finprocedimiento
+
+    ParaCadaElemento: alternativas, procedimiento: alt
+        variables altNombre, altCampos
+        fijar altNombre a AlternativaImpl#Nombre: alt
+        fijar altCampos a AlternativaImpl#Campos: alt
+
+        Algebraico#agregarMetodoEstatico: altNombre, metodo: ...valores
+            necesitas valores#longitud = altCampos#longitud
+            variable inst
+            fijar inst a yo#_crear
+            fijar inst#_tipo a altNombre
+            ParaCadaElementoConÍndice: altCampos, procedimiento: campo, i
+                EnviarMensaje: inst, ({fijar_}#concatenar: (atributosReales#en: i)), (valores#en: i)
+            finprocedimiento
+            devolver inst
+        finmetodo
+
+        Algebraico#agregarMetodoEstatico: ({Es}#concatenar: altNombre), metodo: inst
+            devolver inst#_tipo = altNombre
+        finmetodo
+    finprocedimiento
+
+    mapeoDeCampos#paraCadaPar: procedimiento: campo, subdic
+        Algebraico#agregarMetodoEstatico: campo, metodo: inst
+            si no subdic#contiene: yo#_tipo
+                __FallarConMensaje: ({~t#~t no contiene el campo ~t}#formatear: nombre, inst#_tipo, campo)
+            finsi
+            variable i
+            fijar i a subdic#en: inst#_tipo
+            devolver EnviarMensaje: inst, (atributosReales#en: i)
+        finmetodo
+    finprocedimiento
+
+    metodo Algebraico#comoTexto
+        variable campos
+        fijar campos a Mapear: (camposPorTipo#en: yo#_tipo), funcion: campo
+            devolver (EnviarMensaje: yo, campo)#comoTexto
+        finfuncion
+        devolver {(~t#~t: ~t)}#formatear: nombre, yo#_tipo, (Unir: campos, {, })
+    finmetodo
+
+    metodo estatico Algebraico#Es: inst
+        devolver EsInstancia: inst, yo
+    finmetodo
+
+    devolver Algebraico
+finfuncion
+
+
+
+variable númLlave
+fijar númLlave a 0
+procedimiento GenerarLlave: modelo, nombre
+    fijar númLlave a númLlave + 1
+    devolver {_llave~t__~t#~t}#formatear: númLlave, modelo, nombre
+finprocedimiento
+
+funcion CrearModelo: nombre, ...campos
+    clase Tipo
+        metodo estatico Crear: ...valores
+    finclase
+
+    fijar Tipo#nombre a nombre
+
+    ParaCadaElemento: campos, procedimiento: campo
+        variable atr
+        fijar atr a GenerarLlave: nombre, campo
+
+        Tipo#agregarMetodoEstatico: campo, metodo: ...r
+            si r#longitud = 0
+                devolver atr
+            sino
+                si r#longitud = 1
+                    devolver Modelo#En: (r#en: 0), atr
+                sino
+                    necesitas r#longitud = 2
+                    devolver Modelo#IntentaEn: (r#en: 0), atr, (r#en: 1)
+                finsi
+            finsi
+        finmetodo
+    finprocedimiento
+
+    devolver Tipo
+finfuncion
+
+clase Modelo
+finclase
+
+metodo estatico Modelo#Crear: ...pares
+    devolver Diccionario#desdePares: ...pares
+finmetodo
+
+metodo estatico Modelo#Vacío
+    devolver Diccionario#vacío
+finmetodo
+
+metodo estatico Modelo#En: inst, llave
+    devolver inst#en: llave
+finmetodo
+
+metodo estatico Modelo#IntentaEn: inst, llave, predet
+    devolver inst#intentaEn: llave, predet
+finmetodo
+
+metodo estatico Modelo#Contiene: inst, llave
+    devolver inst#contiene: llave
+finmetodo

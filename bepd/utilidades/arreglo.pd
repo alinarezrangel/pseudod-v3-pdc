@@ -104,3 +104,10 @@ procedimiento EliminarElemento: arreglo, índice
     finprocedimiento
     arreglo#redimensionar: (arreglo#longitud - 1)
 finprocedimiento
+
+[ TODO: Documentar ]
+procedimiento Extender: arr, valores
+    ParaCadaElemento: valores, procedimiento: el
+        arr#agregarAlFinal: el
+    finprocedimiento
+finprocedimiento

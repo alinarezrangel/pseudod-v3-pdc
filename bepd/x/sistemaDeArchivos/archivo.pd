@@ -56,3 +56,39 @@ procedimiento EscribirArchivo: nombre, contenido
     pt#escribirTexto: contenido
     pt#cerrar
 finprocedimiento
+
+[ TODO: Documentar ]
+procedimiento CrearDirectorio: nombre
+    si __Impl = {Lua Bootstrap}
+        __Lua: «function(name)
+           local stat = require 'posix.sys.stat'
+           local errno = require 'posix.errno'
+           local ok, errmsg, errnum = stat.mkdir(name)
+           assert(ok or errnum == errno.EEXIST, errmsg)
+        end», nombre
+    sino
+        __FallarConMensaje: {No se pueden crear directorios}
+    finsi
+finprocedimiento
+
+procedimiento BorrarArchivo: nombre
+    si __Impl = {Lua Bootstrap}
+        __Lua: «function(name)
+           local unistd = require 'posix.unistd'
+           assert(unistd.unlink(name))
+        end», nombre
+    sino
+        __FallarConMensaje: {No se pueden borrar archivos}
+    finsi
+finprocedimiento
+
+procedimiento BorrarDirectorio: nombre
+    si __Impl = {Lua Bootstrap}
+        __Lua: «function(name)
+           local unistd = require 'posix.unistd'
+           assert(unistd.rmdir(name))
+        end», nombre
+    sino
+        __FallarConMensaje: {No se pueden borrar directorios}
+    finsi
+finprocedimiento

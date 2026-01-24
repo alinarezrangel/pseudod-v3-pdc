@@ -80,9 +80,12 @@ funcion EnumConValores: nombre, ...camposYValores
         metodo valor
 
         metodo estatico comoTexto
+        metodo estatico intentaDesdeNombre: nombre
+        metodo estatico intentaDesdeValor: valor
         metodo estatico desdeNombre: nombre
         metodo estatico desdeValor: valor
         metodo estatico metodoNoEncontrado: mensaje, argumentos
+        metodo estatico paraCadaEnum: proc
     finclase
 
     atributos Enumeración#_nombre, Enumeración#_valor
@@ -103,26 +106,46 @@ funcion EnumConValores: nombre, ...camposYValores
         devolver {Clase ~t}#formatear: nombre
     finmetodo
 
-    metodo estatico Enumeración#desdeNombre: nombre'
+    metodo estatico Enumeración#intentaDesdeNombre: nombre'
         devolver LlamarConEC: procedimiento: dev
             dic#paraCadaPar: procedimiento: llave, valor
                 si llave = nombre'
                     %dev: (yo#crear: llave, valor)
                 finsi
             finprocedimiento
-            __FallarConMensaje: ({No hay enumeración de ~t (~t) con el nombre ~t}#formatear: (TipoDe: yo), nombre, nombre')
+            devolver NULO
         finprocedimiento
     finmetodo
 
-    metodo estatico Enumeración#desdeValor: valor
+    metodo estatico Enumeración#intentaDesdeValor: valor
         devolver LlamarConEC: procedimiento: dev
             dic#paraCadaPar: procedimiento: llave, valor'
                 si valor' = valor
                     %dev: (yo#crear: llave, valor')
                 finsi
             finprocedimiento
-            __FallarConMensaje: ({No hay enumeración de ~t (~t) con el valor ~t}#formatear: (TipoDe: yo), nombre, valor)
+            devolver NULO
         finprocedimiento
+    finmetodo
+
+    metodo estatico Enumeración#desdeNombre: nombre'
+        variable res
+        fijar res a yo#intentaDesdeNombre: nombre'
+        si EsNulo: res
+            __FallarConMensaje: ({No hay enumeración de ~t (~t) con el nombre ~t}#formatear: (TipoDe: yo), nombre, nombre')
+        sino
+            devolver res
+        finsi
+    finmetodo
+
+    metodo estatico Enumeración#desdeValor: valor
+        variable res
+        fijar res a yo#intentaDesdeValor: valor
+        si EsNulo: res
+            __FallarConMensaje: ({No hay enumeración de ~t (~t) con el valor ~t}#formatear: (TipoDe: yo), nombre, valor)
+        sino
+            devolver res
+        finsi
     finmetodo
 
     metodo estatico Enumeración#metodoNoEncontrado: mensaje, argumentos
@@ -139,6 +162,10 @@ funcion EnumConValores: nombre, ...camposYValores
             devolver __ClonarObjeto: yo
         finsi
         __FallarConMensaje: ({Método ~t no encontrado en la instancia de ~t (~t)}#formatear: mensaje, yo, nombre)
+    finmetodo
+
+    metodo estatico Enumeración#paraCadaEnum: proc
+        dic#paraCadaPar: proc
     finmetodo
 
     devolver Enumeración

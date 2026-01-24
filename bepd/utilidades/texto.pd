@@ -276,3 +276,41 @@ funcion AjustarALaDerecha: texto, relleno, longitud
     finmientras
     devolver texto
 finfuncion
+
+[ TODO: Documentar ]
+clase Corte
+    atributos antes, después
+finclase
+
+metodo Corte#comoTexto
+    devolver {(Corte [~t] | [~t])}#formatear: yo#antes, yo#después
+finmetodo
+
+[ TODO: Documentar ]
+funcion CortarONulo: texto, parte
+    variables p, corte
+    fijar p a texto#buscar: 0, parte
+    si EsNulo: p
+        devolver NULO
+    sino
+        fijar corte a Corte#crear
+        fijar corte#antes a texto#subTexto: 0, p
+        fijar corte#después a texto#subTexto: (p + 1), texto#longitud
+        devolver corte
+    finsi
+finfuncion
+
+[ TODO: Documentar ]
+funcion CortarOTodo: texto, parte
+    variables p, corte
+    fijar corte a Corte#crear
+    fijar p a texto#buscar: 0, parte
+    si EsNulo: p
+        fijar corte#antes a texto
+        fijar corte#después a {}
+    sino
+        fijar corte#antes a texto#subTexto: 0, p
+        fijar corte#después a texto#subTexto: (p + 1), texto#longitud
+    finsi
+    devolver corte
+finfuncion

@@ -1,3 +1,4 @@
 outputs/
 scratch/
 .pseudod-build/
+.pdc-build/

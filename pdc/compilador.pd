@@ -6,16 +6,18 @@ utilizar bepd/datos/diccionario (Diccionario)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (LeerTodo, EntradaEstándar, SalidaEstándar)
 utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
-utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo)
-utilizar bepd/utilidades/arreglo (Únicos)
-utilizar bepd/utilidades/texto (TextoContiene)
-utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal)
-utilizar bepd/x/enum (Enum)
+utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo, CrearDirectorio, BorrarDirectorio, BorrarArchivo, Existe como ArchivoExiste)
+utilizar bepd/utilidades/arreglo (Únicos, Extender)
+utilizar bepd/utilidades/texto (TextoContiene, Partir, EsPrefijo, CortarONulo, CortarOTodo)
+utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal, LF, CR, HT)
+utilizar bepd/x/enum (Enum, EnumConValores)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (SalidaEstándar)
 utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/datos2 (Modelo, CrearModelo)
 utilizar bepd/x/algebraico (Alternativa, TipoAlgebraico)
 utilizar bepd/x/cli (Opción, CLI como ProcesarCLI)
+utilizar bepd/x/entorno (ObtenerVariableDeEntorno)
 
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
@@ -33,6 +35,7 @@ utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 utilizar pdc/backend/c (Emisor, EstadoDeEmisión)
 utilizar pdc/info como Info
+utilizar pdc/subproceso como Subproceso
 
 
 clase BaseDeDatosDeCompilación
@@ -102,13 +105,9 @@ finfuncion
 variable RegistrarBuiltin
 fijar RegistrarBuiltin a TipoDeDatos: {RegistrarBuiltin}, {nombre}, {builtin}, {esAutoejecutable}
 
-variables BUILTINS_SOLO_RT, TODOS_LOS_BUILTINS
-
-fijar BUILTINS_SOLO_RT a Arreglo#crearCon:
-    (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO)
-
+variable TODOS_LOS_BUILTINS
 fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
-    ...BUILTINS_SOLO_RT,
+    (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO),
     (RegistrarBuiltin#crear: {__Impl}, {__Impl}, FALSO),
     (RegistrarBuiltin#crear: {VERDADERO}, {rt:VERDADERO}, FALSO),
     (RegistrarBuiltin#crear: {FALSO}, {rt:FALSO}, FALSO),
@@ -138,16 +137,10 @@ fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO),
     (RegistrarBuiltin#crear: {__Argv}, {rt:__Argv}, FALSO)
 
-variable AgregarBuiltins
-fijar AgregarBuiltins a Enum: {AgregarBuiltins},
-    {NINGÚN_BUILTIN},
-    {SOLO_RT},
-    {TODOS_LOS_BUILTINS}
-
-procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, agregarBuiltins, salidaCompilado
+procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, builtins, salidaCompilado, necesitaDependencia
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
               tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
-              parchesAbstraer, ámbito, builtins, exportaciones, dependencias,
+              parchesAbstraer, ámbito, exportaciones, dependencias,
               prefijoDelMódulo, bdComp, prefijosTransitivos, prefijosTransitivos'
 
     fijar tablaNombres a Tabla#vacíaConEsquema: NombreResuelto
@@ -178,18 +171,11 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar ámbito a Ámbito#inicial: tablaNombres
 
     fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
+    ParaCadaElemento: dependencias, procedimiento: dep
+        %necesitaDependencia: dep#paquete, dep#módulo
+    finprocedimiento
 
-    variable builtinsPorAgregar
-    fijar builtinsPorAgregar a Arreglo#vacio
-
-    si agregarBuiltins = AgregarBuiltins#TODOS_LOS_BUILTINS
-        fijar builtinsPorAgregar a TODOS_LOS_BUILTINS
-    finsi
-    si agregarBuiltins = AgregarBuiltins#SOLO_RT
-        fijar builtinsPorAgregar a BUILTINS_SOLO_RT
-    finsi
-
-    ParaCadaElemento: builtinsPorAgregar, procedimiento: builtin
+    ParaCadaElemento: builtins, procedimiento: builtin
         variables binding
         fijar binding a (ámbito#crear: builtin#nombre, builtin#esAutoejecutable)#binding
         tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: binding, builtin#builtin)
@@ -274,14 +260,27 @@ fijar OpcionesDeCompilación a TipoDeDatos: {OpcionesDeCompilación},
     {mostrarVersión}, [ MostrarVersión ]
     {verboso}, [ Verbosidad ]
     {experimentos}, [ Diccionario de Textos a VERDADERO | Texto ]
-    {salida}, [ SalidaAArchivo | SALIDA_A_SALIDA | IGNORAR_SALIDA ]
-    {entrada}, [ (EntradaDesdeArchivo | EntradaDesdeTexto | ENTRADA_DESDE_ENTRADA) o NULO si no se especificó ]
-    {guardarBaseDeDatos}, [ Texto o NULO ]
-    {guardarMódulo}, [ Boole ]
-    {cargarBasesDeDatos}, [ Arreglo de Textos ]
-    {nombreDelPaquete}, [ Texto ]
-    {nombreDelMódulo}, [ Texto ]
-    {identificadorDelMódulo} [ Texto ]
+    {salidas}, [ Salidas ]
+    {entradas}, [ Arreglo de Entrada ]
+    {guardarInterfaces}, [ Arreglo de SalidaInterfáz ]
+    {emitirFormato}, [ EmitirFormato ]
+    {pic}, [ Boole ]
+    {pie}, [ Boole ]
+    {main}, [ Boole ]
+    {ubsan}, [ Boole ]
+    {asan}, [ Boole ]
+    {noBuiltins}, [ Arreglo de Textos ]
+    {cIncludes}, [ CIncludes ]
+    {rutasDeEnlace}, [ Arreglo de Textos ]
+    {enlaces}, [ Arreglo de Enlace ]
+    {rutasDeBibliotecasPseudoD}, [ Arreglo de Textos ]
+    {usaBibliotecasPseudoD}, [ Arreglo de UsoBibliotecaPseudoD ]
+    {prefijoHerramientas}, [ Texto ]
+    {depuración}, [ TipoDepuración ]
+    {opcionesAdicionales}, [ OpcionesAdicionales ]
+    {optimización}, [ Optimización ]
+    {macros}, [ Arreglo de InstrucciónMacro ]
+    {paqueteAGuardarEnLaBibliotecaPseudoD} [ Texto o NULO ]
 
 metodo estatico OpcionesDeCompilación#predeterminado
     devolver yo#crear:
@@ -289,15 +288,130 @@ metodo estatico OpcionesDeCompilación#predeterminado
         MostrarVersión#NO,
         Verbosidad#NINGUNA,
         Diccionario#vacío,
-        IGNORAR_SALIDA,
-        NULO,
-        NULO,
+        (Salidas#crear: NULO, NULO),
+        Arreglo#vacio,
+        Arreglo#vacio,
+        EmitirFormato#EJECUTABLE,
+        VERDADERO,
+        FALSO,
+        VERDADERO,
+        FALSO,
         FALSO,
         Arreglo#vacio,
-        {demo},
-        {ejemplo},
-        {demo_ejemplo}
+        (CIncludes#crear: Arreglo#vacio,
+                          Arreglo#vacio,
+                          Arreglo#vacio,
+                          (Arreglo#crearCon: {/usr/local/include}, {/usr/include}),
+                          Arreglo#vacio),
+        Arreglo#vacio,
+        Arreglo#vacio,
+        Arreglo#vacio,
+        Arreglo#vacio,
+        NULO,
+        TipoDepuración#NINGUNA,
+        (OpcionesAdicionales#crear: Arreglo#vacio,
+                                    Arreglo#vacio,
+                                    Arreglo#vacio,
+                                    Arreglo#vacio),
+        Optimización#NINGUNA,
+        Arreglo#vacio,
+        NULO
 finmetodo
+
+variable InstrucciónMacro
+fijar InstrucciónMacro a TipoAlgebraico: {InstrucciónMacro},
+    (Alternativa: {define}, {nombre}, {valor}),
+    (Alternativa: {undefine}, {nombre}),
+    (Alternativa: {incluye}, {ruta})
+
+variable Optimización
+fijar Optimización a Enum: {Optimización},
+                           {NINGUNA},
+                           {VEL_NORMAL}, {VEL_AGRESIVA}, {VEL_MUY_AGRESIVA},
+                           {TAM_NORMAL}, {TAM_AGRESIVA},
+                           {DEPURACIÓN}
+
+variable OpcionesAdicionales
+fijar OpcionesAdicionales a TipoDeDatos: {OpcionesAdicionales},
+    {cc},
+    {ld},
+    {cpp},
+    {asm}
+
+variable TipoDepuración
+fijar TipoDepuración a Enum: {TipoDepuración}, {NINGUNA}, {NORMAL}, {GDB}
+
+variable SalidaInterfáz
+fijar SalidaInterfáz a TipoDeDatos: {SalidaInterfáz},
+    {paquete}, {módulo}, {rutaAlArchivo}
+
+variable Salidas
+fijar Salidas a TipoDeDatos: {Salidas}, {salidaGeneral}, {salidaCódigo}
+
+variable Entrada
+fijar Entrada a TipoAlgebraico: {Entrada},
+    (Alternativa: {archivo}, {lenguaje}, {rutaAlArchivo}, {identificadorDelMódulo}),
+    (Alternativa: {módulo}, {lenguaje}, {paquete}, {módulo}, {rutaAlArchivo}, {identificadorDelMódulo})
+
+variable Lenguaje
+fijar Lenguaje a EnumConValores: {Lenguaje},
+                                 {C}, {c},
+                                 {CABECERA_C}, {c-header},
+                                 {C_PREPROCESADO}, {cpp-output},
+                                 {ENSAMBLADOR}, {assembler},
+                                 {ENSAMBLADOR_CON_PREPROCESADOR}, {assembler-with-cpp},
+                                 {PSEUDOD}, {pseudod},
+                                 {INTERFAZ_PSEUDOD}, {pd-ipd},
+                                 {OBJETO_PSEUDOD}, {pd-opd},
+                                 {BIBLIOTECA_PSEUDOD}, {pd-bpd},
+                                 {OBJETO_PARA_EL_ENLAZADOR}, {ld}
+
+variable UsoBibliotecaPseudoD
+fijar UsoBibliotecaPseudoD a TipoDeDatos: {UsoBibliotecaPseudoD}, {paquete}, {enlace}
+
+variable EnlaceBibliotecaPseudoD
+fijar EnlaceBibliotecaPseudoD a TipoAlgebraico: {EnlaceBibliotecaPseudoD},
+    (Alternativa: {biblioteca}, {nombre}),
+    (Alternativa: {archivo}, {ruta})
+
+variable Enlace
+fijar Enlace a TipoAlgebraico: {Enlace},
+    (Alternativa: {biblioteca}, {nombre}),
+    (Alternativa: {archivo}, {ruta})
+
+variable CIncludes
+fijar CIncludes a TipoDeDatos: {CIncludes},
+                               {iquote},
+                               {i},
+                               {isystem},
+                               {rutasEstándares},
+                               {idirafter}
+
+variable DatosDeFormato
+fijar DatosDeFormato a TipoDeDatos: {DatosDeFormato}, {soportaMúltiplesEntradas}, {idcMatriz}
+
+variable EmitirFormato
+fijar EmitirFormato a EnumConValores: {EmitirFormato},
+    {C}, (DatosDeFormato#crear: FALSO, 0),
+    {OBJETO}, (DatosDeFormato#crear: FALSO, 1),
+    {OBJETO_PSEUDOD}, (DatosDeFormato#crear: FALSO, 2),
+    {ENSAMBLADOR}, (DatosDeFormato#crear: FALSO, 3),
+    {OBJETO_DINÁMICO}, (DatosDeFormato#crear: VERDADERO, 4),
+    {EJECUTABLE}, (DatosDeFormato#crear: VERDADERO, 5),
+    {EJECUTABLE_PIE}, (DatosDeFormato#crear: VERDADERO, 6),
+    {BIBLIOTECA_PSEUDOD}, (DatosDeFormato#crear: VERDADERO, 7)
+
+variable MatrizPredecesiónFormato
+fijar MatrizPredecesiónFormato a Diccionario#desdePares:
+        [ $llave está antes de $valores ]
+        {C}, (Conjunto#crearCon: {ENSAMBLADOR}, {OBJETO}, {OBJETO_DINÁMICO}, {EJECUTABLE}, {EJECUTABLE_PIE}),
+        {OBJETO}, (Conjunto#crearCon: {OBJETO_DINÁMICO}, {EJECUTABLE}, {EJECUTABLE_PIE}),
+        {OBJETO_PSEUDOD}, (Conjunto#crearCon: {ENSAMBLADOR}, {OBJETO}, {OBJETO_DINÁMICO}, {EJECUTABLE}, {EJECUTABLE_PIE}, {BIBLIOTECA_PSEUDOD}),
+        {ENSAMBLADOR}, (Conjunto#crearCon: {OBJETO}, {OBJETO_DINÁMICO}, {EJECUTABLE}, {EJECUTABLE_PIE}),
+        {OBJETO_DINÁMICO}, Conjunto#vacío,
+        {EJECUTABLE}, Conjunto#vacío,
+        {EJECUTABLE_PIE}, Conjunto#vacío,
+        {BIBLIOTECA_PSEUDOD}, Conjunto#vacío
 
 variable MostrarVersión
 fijar MostrarVersión a Enum: {MostrarVersión},
@@ -308,24 +422,9 @@ fijar MostrarVersión a Enum: {MostrarVersión},
 variable Verbosidad
 fijar Verbosidad a Enum: {Verbosidad},
     {NINGUNA},
-    {PEQUEÑA},
-    {MEDIANA},
-    {GRANDE}
-
-variables SalidaAArchivo, SalidaASalida, IgnorarSalida
-fijar SalidaAArchivo a TipoDeDatos: {SalidaAArchivo}, {nombreDelArchivo}
-fijar SalidaASalida a TipoDeDatos: {SalidaASalida}
-fijar IgnorarSalida a TipoDeDatos: {IgnorarSalida}
-variables SALIDA_A_SALIDA, IGNORAR_SALIDA
-fijar SALIDA_A_SALIDA a SalidaASalida#crear
-fijar IGNORAR_SALIDA a IgnorarSalida#crear
-
-variables EntradaDesdeArchivo, EntradaDesdeTexto, EntradaDesdeEntrada
-fijar EntradaDesdeArchivo a TipoDeDatos: {EntradaDesdeArchivo}, {nombreDelArchivo}
-fijar EntradaDesdeTexto a TipoDeDatos: {EntradaDesdeTexto}, {código}
-fijar EntradaDesdeEntrada a TipoDeDatos: {EntradaDesdeEntrada}
-variable ENTRADA_DESDE_ENTRADA
-fijar ENTRADA_DESDE_ENTRADA a EntradaDesdeEntrada#crear
+    {COMANDOS},
+    {INFORMATIVA},
+    {DEPURACIÓN}
 
 variable ResultadoCli
 fijar ResultadoCli a TipoAlgebraico: {ResultadoCli},
@@ -333,152 +432,594 @@ fijar ResultadoCli a TipoAlgebraico: {ResultadoCli},
     (Alternativa: {okConOpciones}, {opciones}),
     (Alternativa: {okYSalir})
 
-funcion ProcesarCLIDelCompilador: argumentosDelCLI
-    variable opciones
+funcion FormatoPrecedeA: formato1, formato2
+    devolver (formato1 = formato2) || (MatrizPredecesiónFormato#en: formato1#nombre)#contiene: formato2#nombre
+finfuncion
+
+procedimiento ParaCadaArgumentoDelCli: cli, proc
+    variable i
+    fijar i a 0
+    mientras i < cli#longitud
+        variable arg
+        fijar arg a cli#en: i
+        %proc: arg, procedimiento
+            fijar i a i + 1
+            si i >= cli#longitud
+                __FallarConMensaje: ({Se esperaba un argumento para la opción ~t}#formatear: arg)
+            finsi
+            devolver cli#en: i
+        finprocedimiento
+        fijar i a i + 1
+    finmientras
+finprocedimiento
+
+funcion ComienzaCon: prefijo, txt
+    [ TODO: Reemplazar ]
+    devolver EsPrefijo: txt, prefijo
+finfuncion
+
+funcion PartirOpcionesDeArchivo: txtOpciones
+    variables cli, buf, estado, buf?
+    fijar cli a Arreglo#vacio
+    fijar buf a {}
+    fijar buf? a FALSO
+    fijar estado a {palabra}
+
+    ParaCadaElemento: txtOpciones, procedimiento: c
+        si (estado = {'}) || (estado = {"})
+            necesitas buf?
+            si c = estado
+                fijar estado a {palabra}
+            sino
+                fijar buf a buf#concatenar: c
+            finsi
+            devolver NULO
+        finsi
+
+        necesitas estado = {palabra}
+
+        si (c = LF) || (c = CR) || (c = HT) || (c = { })
+            si buf?
+                cli#agregarAlFinal: buf
+            finsi
+            fijar buf a {}
+            fijar buf? a FALSO
+            devolver NULO
+        finsi
+
+        fijar buf? a VERDADERO
+        si (c = {'}) || (c = {"})
+            fijar estado a c
+        sino
+            fijar buf a buf#concatenar: c
+        finsi
+    finprocedimiento
+
+    si buf?
+        cli#agregarAlFinal: buf
+    finsi
+
+    devolver cli
+finfuncion
+
+funcion FragmentosDeMódulo: nombre
+    variable c
+    fijar c a CortarONulo: nombre, {/}
+    si EsNulo: c
+        devolver NULO
+    sino
+        si (c#antes#longitud = 0) || (c#después#longitud = 0)
+            devolver NULO
+        finsi
+        devolver ObjetoAdHoc: {paquete}, c#antes, {módulo}, c#después
+    finsi
+finfuncion
+
+variable LenguajesDeExtensiones
+fijar LenguajesDeExtensiones a Diccionario#desdePares:
+        {c}, Lenguaje#C,
+        {h}, Lenguaje#CABECERA_C,
+        {i}, Lenguaje#C_PREPROCESADO,
+        {s}, Lenguaje#ENSAMBLADOR,
+        {S}, Lenguaje#ENSAMBLADOR_CON_PREPROCESADOR,
+        {sx}, Lenguaje#ENSAMBLADOR_CON_PREPROCESADOR,
+        {pd}, Lenguaje#PSEUDOD,
+        {psd}, Lenguaje#PSEUDOD,
+        {pseudo}, Lenguaje#PSEUDOD,
+        {pseudod}, Lenguaje#PSEUDOD,
+        {ipd}, Lenguaje#INTERFAZ_PSEUDOD,
+        {opd}, Lenguaje#OBJETO_PSEUDOD,
+        {bpd}, Lenguaje#BIBLIOTECA_PSEUDOD
+
+funcion AdivinaLenguajeDeLaExtensión: nombreDelArchivo
+    variables partes, ext, lenguaje
+    fijar partes a Partir: nombreDelArchivo, {.}
+    fijar ext a ÚltimoElemento: partes
+    fijar lenguaje a LenguajesDeExtensiones#intentaEn: ext, NULO
+    si EsNulo: lenguaje
+        devolver Lenguaje#OBJETO_PARA_EL_ENLAZADOR
+    sino
+        devolver lenguaje
+    finsi
+finfuncion
+
+funcion ProcesarCli: cli
+    variables opciones, soloArchivos, lenguaje, identificadorDelMódulo
     fijar opciones a OpcionesDeCompilación#predeterminado
-
-    procedimiento Almacenar: campo, valor
-        devolver procedimiento: opt, ...valores
-            EnviarMensaje: opciones, ({fijar_}#concatenar: campo), valor
-        finprocedimiento
-    finprocedimiento
-
-    procedimiento ManejarVerboso: opt, ...valores
-        si valores#longitud = 1
-            fijar opciones#verboso a Verbosidad#PEQUEÑA
-        finsi
-        si valores#longitud = 2
-            fijar opciones#verboso a Verbosidad#MEDIANA
-        finsi
-        si valores#longitud >= 3
-            fijar opciones#verboso a Verbosidad#GRANDE
-        finsi
-    finprocedimiento
-
-    procedimiento Fijar: campo
-        devolver procedimiento: opt, ...valores
-            si (opt#númArgumentos =< 1) && (no opt#acumular)
-                EnviarMensaje: opciones, ({fijar_}#concatenar: campo), (valores#en: 0)
-            sino
-                EnviarMensaje: opciones, ({fijar_}#concatenar: campo), valores
-            finsi
-        finprocedimiento
-    finprocedimiento
-
-    procedimiento ManejarSalida: opt, archivo
-        fijar opciones#salida a SalidaAArchivo#crear: archivo
-    finprocedimiento
-
-    procedimiento ManejarEntradaDesdeTexto: opt, código
-        fijar opciones#entrada a EntradaDesdeTexto#crear: código
-    finprocedimiento
-
-    procedimiento ManejarCargarBD: opt, ...valores
-        ParaCadaElemento: valores, procedimiento: valor
-            opciones#cargarBasesDeDatos#agregarAlFinal: valor
-        finprocedimiento
-    finprocedimiento
-
-    procedimiento ManejarExperimentos: opt, ...valores
-        variable dic
-        fijar dic a Diccionario#vacío
-        ParaCadaElemento: valores, procedimiento: experimento
-            si TextoContiene: experimento, {:}
-                variable i
-                fijar i a experimento#buscar: 0, {:}
-                dic#fijarEn: (experimento#parteDelTexto: 0, i), (experimento#parteDelTexto: (i + 1), experimento#longitud)
-            sino
-                dic#fijarEn: experimento, VERDADERO
-            finsi
-        finprocedimiento
-        fijar opciones#experimentos a dic
-    finprocedimiento
-
-    procedimiento ManejarInspeccionar: salir
-        devolver procedimiento: opt, var
-            si var = {backends}
-                Escribir: {cc}
-                %salir: (ResultadoCli#okYSalir)
-            finsi
-
-            si var = {experimentos}
-                Escribir: {Builtins}
-                Escribir: {Builtins:no}
-                Escribir: {Builtins:RT}
-                %salir: (ResultadoCli#okYSalir)
-            finsi
-
-            si var = {variables}
-                Escribir: {backends}
-                Escribir: {experimentos}
-                %salir: (ResultadoCli#okYSalir)
-            finsi
-
-            __FallarConMensaje: ({Variable a inspeccionar inválida: ~t}#formatear: var)
-        finprocedimiento
-    finprocedimiento
+    fijar soloArchivos a FALSO
+    fijar lenguaje a NULO
+    fijar identificadorDelMódulo a NULO
 
     devolver LlamarConEC: procedimiento: salir
-        variable opts
-        fijar opts a Arreglo#crearCon:
-            [ ===== Ayuda e información ===== ]
-            (Opción#crear: {h},  {help},                 0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
-            (Opción#crear: {a},  {ayuda},                0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
-            (Opción#crear: {?},  NULO,                   0, FALSO,     (Almacenar: {mostrarAyuda}, VERDADERO)),
+        funcion ProcesarEntrada: arg
+            variables leng, idMod
+            fijar idMod a identificadorDelMódulo
+            fijar identificadorDelMódulo a NULO
 
-            (Opción#crear: {v},  {version},              0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#VERSIÓN_Y_NOMBRE)),
-            (Opción#crear: NULO, {solo-version},         0, FALSO,     (Almacenar: {mostrarVersión}, MostrarVersión#SOLO_VERSIÓN)),
-
-            (Opción#crear: {V},  {verboso},              0, VERDADERO, &ManejarVerboso),
-
-            (Opción#crear: {I},  {inspeccionar},         1, FALSO,     (ManejarInspeccionar: salir)),
-
-            [ ===== Experimentos ===== ]
-            (Opción#crear: {X},  {experimento},          1, VERDADERO, &ManejarExperimentos),
-
-            [ ===== Entrada, salida y archivos temporales ===== ]
-            (Opción#crear: {o},  {salida},               1, FALSO,     &ManejarSalida),
-            (Opción#crear: NULO, {escribir-salida},      0, FALSO,     (Almacenar: {salida}, SALIDA_A_SALIDA)),
-            (Opción#crear: NULO, {ignorar-salida},       0, FALSO,     (Almacenar: {salida}, IGNORAR_SALIDA)),
-            (Opción#crear: NULO, {leer-entrada},         0, FALSO,     (Almacenar: {entrada}, ENTRADA_DESDE_ENTRADA)),
-            (Opción#crear: {c},  {codigo},               1, FALSO,     &ManejarEntradaDesdeTexto),
-            (Opción#crear: NULO, {código},               1, FALSO,     &ManejarEntradaDesdeTexto),
-
-            [ ===== Base de datos de módulos ===== ]
-            (Opción#crear: NULO, {guardar-db},           1, FALSO,     (Fijar: {guardarBaseDeDatos})),
-            (Opción#crear: NULO, {guardar-solo-modulo},  0, FALSO,     (Almacenar: {guardarMódulo}, VERDADERO)),
-            (Opción#crear: NULO, {cargar-db},            1, VERDADERO, &ManejarCargarBD),
-
-            [ ===== Compilación ===== ]
-            (Opción#crear: NULO, {id-modulo},            1, FALSO,     (Fijar: {identificadorDelMódulo})),
-            (Opción#crear: NULO, {paquete},              1, FALSO,     (Fijar: {nombreDelPaquete})),
-            (Opción#crear: NULO, {modulo},               1, FALSO,     (Fijar: {nombreDelMódulo}))
-
-        variables opcs, pos
-        fijar pos a ProcesarCLI: opts, NULO, argumentosDelCLI, procedimiento: error
-            devolver %salir: (ResultadoCli#error: error)
-        finprocedimiento
-        si pos#longitud > 1
-            devolver ResultadoCli#error: {Se especificaron múltiples archivos de entrada}
-        finsi
-        si pos#longitud = 1
-            si EsNulo: opciones#entrada
-                fijar opciones#entrada a EntradaDesdeArchivo#crear: (pos#en: 0)
-            sino
-                devolver ResultadoCli#error: {Se especificaron múltiples archivos de entrada}
+            si (ComienzaCon: {./}, arg) || (ComienzaCon: {../}, arg) || (ComienzaCon: {/}, arg)
+                si EsNulo: lenguaje
+                    fijar leng a AdivinaLenguajeDeLaExtensión: arg
+                sino
+                    fijar leng a lenguaje
+                finsi
+                opciones#entradas#agregarAlFinal: (Entrada#archivo: leng, arg, idMod)
+                devolver NULO
             finsi
-        finsi
+
+            variable c
+            fijar c a CortarONulo: arg, {:}
+            si no EsNulo: c
+                variables nombre, ruta, paquete, módulo
+                fijar nombre a c#antes
+                fijar ruta a c#después
+                si EsNulo: lenguaje
+                    fijar leng a AdivinaLenguajeDeLaExtensión: ruta
+                sino
+                    fijar leng a lenguaje
+                finsi
+                fijar c a FragmentosDeMódulo: nombre
+                si no EsNulo: c
+                    opciones#entradas#agregarAlFinal:
+                            (Entrada#módulo: leng, c#paquete, c#módulo, ruta, idMod)
+                    devolver NULO
+                finsi
+            finsi
+
+            devolver %salir: (ResultadoCli#error: ({Entrada inválida: ~t}#formatear: arg))
+        finfuncion
+
+        procedimiento ParsearArgumentos: cli
+            ParaCadaArgumentoDelCli: cli, procedimiento: arg, avanzar
+                si soloArchivos
+                    ProcesarEntrada: arg
+                    devolver NULO
+                finsi
+
+                si arg = {--}
+                    fijar soloArchivos a VERDADERO
+                    devolver NULO
+                finsi
+                si (arg = {-h}) || (arg = {-help}) || (arg = {--help}) || (arg = {-?}) || (arg = {--ayuda})
+                    fijar opciones#mostrarAyuda a VERDADERO
+                    devolver NULO
+                finsi
+                si (arg = {-version}) || (arg = {--version})
+                    fijar opciones#mostrarVersión a MostrarVersión#VERSIÓN_Y_NOMBRE
+                    devolver NULO
+                finsi
+                si arg = {--solo-version}
+                    fijar opciones#mostrarVersión a MostrarVersión#SOLO_VERSIÓN
+                    devolver NULO
+                finsi
+                si ComienzaCon: {@}, arg
+                    si arg = {@}
+                        devolver %salir: (ResultadoCli#error: ({Opción inválida: ~t}#formatear: arg))
+                    finsi
+                    ParsearArgumentos: (PartirOpcionesDeArchivo: (LeerArchivo: (arg#subTexto: 1, arg#longitud)))
+                    devolver NULO
+                finsi
+                si arg = {-x}
+                    variables leng, enm
+                    fijar leng a %avanzar
+                    si leng = {none}
+                        fijar lenguaje a NULO
+                    sino
+                        fijar enm a Lenguaje#intentaDesdeValor: leng
+                        si EsNulo: enm
+                            devolver %salir: (ResultadoCli#error: ({Lenguaje inválido: ~t}#formatear: leng))
+                        sino
+                            fijar lenguaje a enm
+                        finsi
+                    finsi
+                finsi
+
+                si arg = {-v}
+                    fijar opciones#verboso a Verbosidad#COMANDOS
+                    devolver NULO
+                finsi
+                si arg = {-vv}
+                    fijar opciones#verboso a Verbosidad#INFORMATIVA
+                    devolver NULO
+                finsi
+                si arg = {-vvv}
+                    fijar opciones#verboso a Verbosidad#DEPURACIÓN
+                    devolver NULO
+                finsi
+
+                si arg = {-c}
+                    fijar opciones#emitirFormato a EmitirFormato#OBJETO
+                    devolver NULO
+                finsi
+                si arg = {-b}
+                    fijar opciones#emitirFormato a EmitirFormato#OBJETO_PSEUDOD
+                    devolver NULO
+                finsi
+                si arg = {-S}
+                    fijar opciones#emitirFormato a EmitirFormato#ENSAMBLADOR
+                    devolver NULO
+                finsi
+                si arg = {-Sc}
+                    fijar opciones#emitirFormato a EmitirFormato#C
+                    devolver NULO
+                finsi
+
+                si arg = {-shared}
+                    fijar opciones#pic a VERDADERO
+                    fijar opciones#emitirFormato a EmitirFormato#OBJETO_DINÁMICO
+                    devolver NULO
+                finsi
+                si arg = {-pie}
+                    fijar opciones#pie a VERDADERO
+                    fijar opciones#emitirFormato a EmitirFormato#EJECUTABLE_PIE
+                    devolver NULO
+                finsi
+                si arg = {-no-pie}
+                    fijar opciones#emitirFormato a EmitirFormato#EJECUTABLE
+                    devolver NULO
+                finsi
+
+                si arg = {-I}
+                    opciones#cIncludes#i#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-I}, arg
+                    opciones#cIncludes#i#agregarAlFinal: (arg#subTexto: 2, arg#longitud)
+                    devolver NULO
+                finsi
+                si arg = {-iquote}
+                    opciones#cIncludes#iquote#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si arg = {-isystem}
+                    opciones#cIncludes#isystem#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si arg = {-idirafter}
+                    opciones#cIncludes#idirafter#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si (arg = {-D}) || (ComienzaCon: {-D}, arg)
+                    variables def, c
+                    si arg = {-D}
+                        fijar def a %avanzar
+                    sino
+                        fijar def a arg#subTexto: 2, arg#longitud
+                    finsi
+                    fijar c a CortarOTodo: def, {=}
+                    opciones#macros#agregarAlFinal:
+                            (InstrucciónMacro#define: c#antes, c#después)
+                    devolver NULO
+                finsi
+                si (arg = {-U}) || (ComienzaCon: {-U}, arg)
+                    variables def, p
+                    si arg = {-U}
+                        fijar def a %avanzar
+                    sino
+                        fijar def a arg#subTexto: 2, arg#longitud
+                    finsi
+                    opciones#macros#agregarAlFinal: (InstrucciónMacro#undefine: def)
+                    devolver NULO
+                finsi
+                si arg = {-include}
+                    opciones#macros#agregarAlFinal: (InstrucciónMacro#incluye: (%avanzar))
+                    devolver NULO
+                finsi
+
+                si (arg = {-L}) || (ComienzaCon: {-L}, arg)
+                    variable ruta
+                    si arg = {-L}
+                        fijar ruta a %avanzar
+                    sino
+                        fijar ruta a arg#subTexto: 2, arg#longitud
+                    finsi
+                    opciones#rutasDeEnlace#agregarAlFinal: ruta
+                    devolver NULO
+                finsi
+                si (arg = {-l}) || (ComienzaCon: {-l}, arg)
+                    variable bib
+                    si arg = {-l}
+                        fijar bib a %avanzar
+                    sino
+                        fijar bib a arg#subTexto: 2, arg#longitud
+                    finsi
+                    si ComienzaCon: {:}, bib
+                        fijar bib a bib#subTexto: 1, bib#longitud
+                        opciones#enlaces#agregarAlFinal: (Enlace#archivo: bib)
+                    sino
+                        opciones#enlaces#agregarAlFinal: (Enlace#biblioteca: bib)
+                    finsi
+                    devolver NULO
+                finsi
+
+                si (arg = {-K}) || (ComienzaCon: {-K}, arg)
+                    variable bib
+                    si arg = {-K}
+                        fijar bib a %avanzar
+                    sino
+                        fijar bib a arg#subTexto: 2, arg#longitud
+                    finsi
+                    opciones#rutasDeBibliotecasPseudoD#agregarAlFinal: bib
+                    devolver NULO
+                finsi
+                si (arg = {-k}) || (ComienzaCon: {-k}, arg)
+                    variables bib, paquete, ruta, c
+                    si arg = {-k}
+                        fijar bib a %avanzar
+                    sino
+                        fijar bib a arg#subTexto: 2, arg#longitud
+                    finsi
+
+                    fijar c a CortarONulo: bib, {:}
+                    si EsNulo: c
+                        devolver %salir: (ResultadoCli#error: ({Opción inválida: -k ~t}#formatear: bib))
+                    finsi
+
+                    fijar paquete a c#antes
+                    fijar ruta a c#después
+
+                    si TextoContiene: ruta, {/}
+                        opciones#usaBibliotecasPseudoD#agregarAlFinal:
+                                (UsoBibliotecaPseudoD#crear: paquete, (EnlaceBibliotecaPseudoD#archivo: ruta))
+                    sino
+                        opciones#usaBibliotecasPseudoD#agregarAlFinal:
+                                (UsoBibliotecaPseudoD#crear: paquete, (EnlaceBibliotecaPseudoD#biblioteca: ruta))
+                    finsi
+                    devolver NULO
+                finsi
+
+                si (arg = {-o}) || (ComienzaCon: {-o}, arg)
+                    variable ruta
+                    si arg = {-o}
+                        fijar ruta a %avanzar
+                    sino
+                        fijar ruta a arg#subTexto: 2, arg#longitud
+                    finsi
+                    fijar opciones#salidas#salidaGeneral a ruta
+                    devolver NULO
+                finsi
+                si (arg = {-Zco}) || (arg = {-Zcode-output})
+                    fijar opciones#salidas#salidaCódigo a (%avanzar)
+                    devolver NULO
+                finsi
+                si (arg = {-q}) || (ComienzaCon: {-q}, arg)
+                    variables salida, c, nombre, ruta, frag
+                    si arg = {-q}
+                        fijar salida a %avanzar
+                    sino
+                        fijar salida a arg#subTexto: 2, arg#longitud
+                    finsi
+
+                    fijar c a CortarONulo: salida, {:}
+
+                    si EsNulo: c
+                        devolver %salir: (ResultadoCli#error: ({Opción inválida: -q ~t}#formatear: arg))
+                    finsi
+
+                    fijar nombre a c#antes
+                    fijar ruta a c#después
+                    fijar frag a FragmentosDeMódulo: nombre
+                    si EsNulo: frag
+                        devolver %salir: (ResultadoCli#error: ({Opción inválida: -q ~t}#formatear: arg))
+                    finsi
+                    opciones#guardarInterfaces#agregarAlFinal:
+                            (SalidaInterfáz#crear: frag#paquete, frag#módulo, ruta)
+
+                    devolver NULO
+                finsi
+
+                si (arg = {-Y}) || (ComienzaCon: {-Y}, arg)
+                    variable paquete
+                    si arg = {-Y}
+                        fijar paquete a %avanzar
+                    sino
+                        fijar paquete a arg#subTexto: 2, arg#longitud
+                    finsi
+
+                    fijar opciones#emitirFormato a EmitirFormato#BIBLIOTECA_PSEUDOD
+                    fijar opciones#paqueteAGuardarEnLaBibliotecaPseudoD a paquete
+                    devolver NULO
+                finsi
+
+                si arg = {-g}
+                    fijar opciones#depuración a TipoDepuración#NORMAL
+                    devolver NULO
+                finsi
+                si arg = {-ggdb}
+                    fijar opciones#depuración a TipoDepuración#GDB
+                    devolver NULO
+                finsi
+
+                si (arg = {-fpic}) || (arg = {-fPIC})
+                    fijar opciones#pic a VERDADERO
+                    devolver NULO
+                finsi
+                si (arg = {-fno-pic}) || (arg = {-fno-PIC})
+                    fijar opciones#pic a FALSO
+                    devolver NULO
+                finsi
+                si (arg = {-fpie}) || (arg = {-fPIE})
+                    fijar opciones#pie a VERDADERO
+                    devolver NULO
+                finsi
+                si (arg = {-fno-pie}) || (arg = {-fno-PIE})
+                    fijar opciones#pie a FALSO
+                    devolver NULO
+                finsi
+
+                si arg = {-fmain}
+                    fijar opciones#main a VERDADERO
+                    devolver NULO
+                finsi
+                si arg = {-fno-main}
+                    fijar opciones#main a FALSO
+                    devolver NULO
+                finsi
+
+                si ComienzaCon: {-fsanitize=}, arg
+                    variable san
+                    fijar san a arg#subTexto: {-fsanitize=}#longitud, arg#longitud
+                    si san = {undefined}
+                        fijar opciones#ubsan a VERDADERO
+                    finsi
+                    si san = {address}
+                        fijar opciones#asan a VERDADERO
+                    finsi
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-fno-sanitize=}, arg
+                    variable san
+                    fijar san a arg#subTexto: {-fno-sanitize=}#longitud, arg#longitud
+                    si san = {undefined}
+                        fijar opciones#ubsan a FALSO
+                    finsi
+                    si san = {address}
+                        fijar opciones#asan a FALSO
+                    finsi
+                    devolver NULO
+                finsi
+
+                si arg = {-fno-builtin}
+                    fijar opciones#noBuiltins a Mapear: TODOS_LOS_BUILTINS, (MétodoComoFunción: {nombre})
+                    devolver NULO
+                finsi
+                si arg = {-fbuiltin}
+                    fijar opciones#noBuiltins a Arreglo#vacio
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-fno-builtin-}, arg
+                    variable builtin
+                    fijar builtin a arg#subTexto: {-fno-builtin-}#longitud, arg#longitud
+                    opciones#noBuiltins#agregarAlFinal: builtin
+                finsi
+                si ComienzaCon: {-fbuiltin-}, arg
+                    variable builtin
+                    fijar builtin a arg#subTexto: {-fbuiltin-}#longitud, arg#longitud
+                    fijar opciones#noBuiltins a Filtrar: opciones#noBuiltins, funcion: b
+                        devolver no (b = builtin)
+                    finfuncion
+                finsi
+
+                si arg = {-Xpreprocessor}
+                    opciones#opcionesAdicionales#cpp#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si arg = {-Xassembler}
+                    opciones#opcionesAdicionales#asm#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si arg = {-Xlinker}
+                    opciones#opcionesAdicionales#ld#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si arg = {-Xcdriver}
+                    opciones#opcionesAdicionales#cc#agregarAlFinal: (%avanzar)
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-Wl,}, arg
+                    Extender: opciones#opcionesAdicionales#cpp, (Partir: (%avanzar), {,})
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-Wa,}, arg
+                    Extender: opciones#opcionesAdicionales#asm, (Partir: (%avanzar), {,})
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-Wl,}, arg
+                    Extender: opciones#opcionesAdicionales#ld, (Partir: (%avanzar), {,})
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-Wc,}, arg
+                    Extender: opciones#opcionesAdicionales#cc, (Partir: (%avanzar), {,})
+                    devolver NULO
+                finsi
+
+                si (arg = {-T}) || (ComienzaCon: {-T}, arg)
+                    variable guión
+                    si arg = {-T}
+                        fijar guión a %avanzar
+                    sino
+                        fijar guión a arg#subTexto: 2, arg#longitud
+                    finsi
+                    opciones#opcionesAdicionales#ld#agregarAlFinal: {-T}
+                    opciones#opcionesAdicionales#ld#agregarAlFinal: guión
+                    devolver NULO
+                finsi
+
+                si (arg = {-O}) || (arg = {-O1})
+                    fijar opciones#optimización a Optimización#VEL_NORMAL
+                    devolver NULO
+                finsi
+                si arg = {-O0}
+                    fijar opciones#optimización a Optimización#NINGUNA
+                    devolver NULO
+                finsi
+                si arg = {-O2}
+                    fijar opciones#optimización a Optimización#VEL_AGRESIVA
+                    devolver NULO
+                finsi
+                si arg = {-O3}
+                    fijar opciones#optimización a Optimización#VEL_MUY_AGRESIVA
+                    devolver NULO
+                finsi
+                si arg = {-Og}
+                    fijar opciones#optimización a Optimización#DEPURACIÓN
+                    devolver NULO
+                finsi
+                si arg = {-Os}
+                    fijar opciones#optimización a Optimización#TAM_NORMAL
+                    devolver NULO
+                finsi
+                si arg = {-Oz}
+                    fijar opciones#optimización a Optimización#TAM_AGRESIVA
+                    devolver NULO
+                finsi
+
+                si arg = {-Zid}
+                    fijar identificadorDelMódulo a %avanzar
+                    devolver NULO
+                finsi
+
+                si arg = {-B}
+                    fijar opciones#prefijoHerramientas a %avanzar
+                    devolver NULO
+                finsi
+                si ComienzaCon: {-B}, arg
+                    fijar opciones#prefijoHerramientas a arg#subTexto: 2, arg#longitud
+                    devolver NULO
+                finsi
+
+                si ComienzaCon: {-}, arg
+                    devolver %salir: (ResultadoCli#error: ({Opción inválida: ~t}#formatear: arg))
+                finsi
+
+                ProcesarEntrada: arg
+            finprocedimiento
+        finprocedimiento
+
+        ParsearArgumentos: cli
 
         devolver ResultadoCli#okConOpciones: opciones
     finprocedimiento
 finfuncion
-
-clase SalidaDevNull
-    metodo escribirTexto: txt
-finclase
-
-metodo SalidaDevNull#escribirTexto: txt
-finmetodo
 
 procedimiento MostrarAyuda
     Escribir: {TODO TODO}
@@ -490,14 +1031,83 @@ finprocedimiento
 
 procedimiento MostrarVersiónYNombre
     MostrarSoloVersión
-    Escribir: ({Implementa PseudoD v~t}#formatear: Info#VERSIÓN_LENGUAGE)
+    Escribir: ({Implementa PseudoD v~t}#formatear: Info#VERSIÓN_LENGUAJE)
+finprocedimiento
+
+procedimiento ParaCadaElementoDeRuta: ruta, proc
+    ParaCadaElemento: (Partir: ruta, {:}), proc
+finprocedimiento
+
+procedimiento BuscarPrograma: base, nombre
+    devolver LlamarConEC: procedimiento: salir
+        si no EsNulo: base
+            variable prog
+            fijar prog a {~t/~t}#formatear: base, nombre
+            si ArchivoExiste: prog
+                devolver prog
+            finsi
+        finsi
+
+        ParaCadaElementoDeRuta: (ObtenerVariableDeEntorno: {PATH}), procedimiento: parte
+            variable prog
+            fijar prog a {~t/~t}#formatear: parte, nombre
+            si ArchivoExiste: prog
+                devolver %salir: prog
+            finsi
+        finprocedimiento
+
+        devolver NULO
+    finprocedimiento
+finprocedimiento
+
+procedimiento InferirIdentificadorDelMódulo: rutaAlArchivo
+    NoImplementado
+finprocedimiento
+
+variable PasoDeCompilación
+fijar PasoDeCompilación a TipoAlgebraico: {PasoDeCompilación},
+    (Alternativa: {compilarPd},
+                  {completado},
+                  {paquete},
+                  {módulo},
+                  {identificador},
+                  {archivoEntradaPd},
+                  {archivoSalidaC},
+                  {agregarALosMódulos}),
+    (Alternativa: {compilarC},
+                  {completado},
+                  {estáPreprocesado},
+                  {pdcrtMain},
+                  {archivoEntradaC},
+                  {archivoSalidaAsm}),
+    (Alternativa: {compilarAsm}, {completado}, {archivoEntradaAsm}, {archivoSalidaObj}),
+    (Alternativa: {compilarObjsAEjecutable},
+                  {completado},
+                  {esPie},
+                  {archivosEntradasObjs},
+                  {archivoSalidaExe}),
+    (Alternativa: {compilarObjsAObjDinámico},
+                  {completado},
+                  {archivosEntradasObjs},
+                  {archivoSalidaSo})
+
+variable Programas
+fijar Programas a TipoDeDatos: {Programas}, {cc}, {ld}
+
+variables PROGRAMAS_CC, PROGRAMAS_LD
+fijar PROGRAMAS_CC a Arreglo#crearCon: {cc}, {gcc}, {clang}, {tcc}
+fijar PROGRAMAS_LD a Arreglo#crearCon: {ld}, {lld}
+
+procedimiento Ejecutar: programa, argumentos, opciones
+    Escribir: {RUN}, (ArregloConFinal: programa, argumentos)
+    devolver Subproceso#Ejecutar: programa, argumentos, opciones
 finprocedimiento
 
 procedimiento EjecutarCompilador: cli
     variable rOpciones
-    fijar rOpciones a ProcesarCLIDelCompilador: cli
+    fijar rOpciones a ProcesarCli: cli
     si rOpciones#esError
-        __FallarConMensaje: rOpciones#error
+        __FallarConMensaje: rOpciones#mensaje
     finsi
     si rOpciones#esOkYSalir
         devolver NULO
@@ -519,84 +1129,528 @@ procedimiento EjecutarCompilador: cli
         devolver NULO
     finsi
 
-    si EsNulo: opciones#entrada
-        __FallarConMensaje: {Se debe especificar una entrada}
+    si EsNulo: opciones#salidas#salidaCódigo
+        fijar opciones#salidas#salidaCódigo a opciones#salidas#salidaGeneral
     finsi
 
-    variables código, archivo, bdMod, salida, archivoSalida, res, prefijosTransitivos
-    si EsInstancia: opciones#entrada, EntradaDesdeArchivo
-        fijar archivo a opciones#entrada#nombreDelArchivo
-        fijar código a LeerArchivo: archivo
-    finsi
-    si EsInstancia: opciones#entrada, EntradaDesdeEntrada
-        fijar archivo a {/dev/stdin}
-        fijar código a LeerTodo: EntradaEstándar
-    finsi
-    si EsInstancia: opciones#entrada, EntradaDesdeTexto
-        fijar archivo a {-c}
-        fijar código a opciones#entrada#código
+    si opciones#entradas#longitud = 0
+        __FallarConMensaje: {Se debe especificar al menos una entrada}
     finsi
 
-    si EsInstancia: opciones#salida, SalidaAArchivo
-        fijar archivoSalida a opciones#salida#nombreDelArchivo
-        fijar salida a PuertoDeArchivoDeEscritura#abrir: archivoSalida
-    finsi
-    si EsInstancia: opciones#salida, SalidaASalida
-        fijar archivoSalida a {/dev/stdout}
-        fijar salida a SalidaEstándar
-    finsi
-    si EsInstancia: opciones#salida, IgnorarSalida
-        fijar archivoSalida a {/dev/null}
-        fijar salida a SalidaDevNull#crear
+    si (no opciones#emitirFormato#valor#soportaMúltiplesEntradas) && (opciones#entradas#longitud > 1)
+        __FallarConMensaje: ({No se puede emitir el formato ~t cuando hay múltiples entradas}#formatear: opciones#emitirFormato#nombre)
     finsi
 
+    si (opciones#emitirFormato = EmitirFormato#OBJETO_PSEUDOD)
+    || (opciones#emitirFormato = EmitirFormato#BIBLIOTECA_PSEUDOD)
+        NoImplementado
+    finsi
+
+    variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo
     fijar bdMod a BaseDeDatosDeMódulos#enMemoria
-    ParaCadaElemento: opciones#cargarBasesDeDatos, procedimiento: archivo
-        bdMod#cargarDesdeArchivo: (__AbrirArchivo: archivo, 10)
+    fijar idcPasoPdPorMódulo a Diccionario#vacío
+    fijar entradasCompiladas a Diccionario#vacío
+    fijar dirTmp a {.pdc-build}
+    fijar limpiar a Arreglo#vacio
+    fijar pasos a Arreglo#vacio
+
+    procedimiento AgregaInstrucciónLimpiar: proc
+        limpiar#agregarAlFinal: proc
     finprocedimiento
 
-    variables agregarBuiltins, exBuiltins
-    fijar exBuiltins a opciones#experimentos#intentaEn: {Builtins}, VERDADERO
-    si no (Conjunto#crearCon: {no}, {RT}, VERDADERO)#contiene: exBuiltins
-        __FallarConMensaje: ({Valor inválido para la extensión Builtins: ~t}#formatear: exBuiltins)
-    finsi
-    fijar agregarBuiltins a AgregarBuiltins#TODOS_LOS_BUILTINS
-    si exBuiltins = {no}
-        fijar agregarBuiltins a AgregarBuiltins#NINGÚN_BUILTIN
-    finsi
-    si exBuiltins = {RT}
-        fijar agregarBuiltins a AgregarBuiltins#SOLO_RT
-    finsi
+    CrearDirectorio: dirTmp
+    AgregaInstrucciónLimpiar: procedimiento
+        BorrarDirectorio: dirTmp
+    finprocedimiento
 
-    fijar res a Compilar: opciones#nombreDelPaquete,
-                          opciones#nombreDelMódulo,
-                          opciones#identificadorDelMódulo,
-                          bdMod,
-                          código,
-                          archivo,
-                          agregarBuiltins,
-                          salida
-    bdMod#agregarMódulo: opciones#nombreDelPaquete,
-                         opciones#nombreDelMódulo,
-                         res#exportaciones,
-                         res#prefijoDelMódulo,
-                         res#compilado,
-                         archivoSalida,
-                         res#compilado#prefijosTransitivos
+    variables objetos, objetosEntrada
+    fijar objetos a Arreglo#vacio
+    fijar objetosEntrada a Arreglo#vacio
 
-    si no EsNulo: opciones#guardarBaseDeDatos
-        variable archivo
-        fijar archivo a __AbrirArchivo: opciones#guardarBaseDeDatos, 11
-        si no opciones#guardarMódulo
-            bdMod#guardarEnArchivo: archivo
-        sino
-            bdMod#guardarSeleccionadosEnArchivo: archivo, funcion: mod
-                devolver (mod#prefijoDelMódulo = opciones#identificadorDelMódulo)
-                      && (mod#paquete = opciones#nombreDelPaquete)
-                      && (mod#módulo = opciones#nombreDelMódulo)
-            finfuncion
+    ParaCadaElementoConÍndice: opciones#entradas, procedimiento: entrada, i
+        si (entrada#lenguaje = Lenguaje#OBJETO_PSEUDOD)
+        || (entrada#lenguaje = Lenguaje#BIBLIOTECA_PSEUDOD)
+            NoImplementado
         finsi
+
+        variable prefijoEntrada
+        fijar prefijoEntrada a {~t/_n~t}#formatear: dirTmp, i
+
+        si entrada#lenguaje = Lenguaje#INTERFAZ_PSEUDOD
+            si no entrada#esMódulo
+                __FallarConMensaje: ({Las interfáces PseudoD siempre deben tener un módulo especificado: ~t}#formatear: entrada#rutaAlArchivo)
+            finsi
+            variable arch
+            fijar arch a __AbrirArchivo: entrada#rutaAlArchivo, 10
+            bdMod#cargarDesdeArchivo: entrada#paquete, entrada#módulo, arch
+            arch#cerrar
+            idcPasoPdPorMódulo#fijarEn: ({~t/~t}#formatear: entrada#paquete, entrada#módulo), NULO
+        finsi
+
+        si entrada#lenguaje = Lenguaje#PSEUDOD
+            variables paquete, módulo, idMod
+            si entrada#esMódulo
+                fijar paquete a entrada#paquete
+                fijar módulo a entrada#módulo
+            sino
+                fijar paquete a {temp}
+                fijar módulo a {inicio}
+            finsi
+
+            fijar idMod a entrada#identificadorDelMódulo
+            si EsNulo: idMod
+                fijar idMod a InferirIdentificadorDelMódulo: entrada#rutaAlArchivo
+            finsi
+
+            variables genC, genAsm, genObj, parar
+            fijar genC a {~t.c}#formatear: prefijoEntrada
+            fijar genAsm a {~t.s}#formatear: prefijoEntrada
+            fijar genObj a {~t.o}#formatear: prefijoEntrada
+
+            fijar parar a 3
+            si opciones#emitirFormato = EmitirFormato#C
+                fijar genC a opciones#salidas#salidaCódigo
+                fijar parar a 0
+            finsi
+            si opciones#emitirFormato = EmitirFormato#ENSAMBLADOR
+                fijar genAsm a opciones#salidas#salidaCódigo
+                fijar parar a 1
+            finsi
+            si opciones#emitirFormato = EmitirFormato#OBJETO
+                fijar genObj a opciones#salidas#salidaCódigo
+                fijar parar a 2
+            finsi
+
+            si entrada#esMódulo
+                idcPasoPdPorMódulo#fijarEn: ({~t/~t}#formatear: paquete, módulo), pasos#longitud
+            finsi
+            pasos#agregarAlFinal:
+                    (PasoDeCompilación#compilarPd: (Caja#crear: FALSO),
+                                                   paquete, módulo, idMod,
+                                                   entrada#rutaAlArchivo,
+                                                   genC,
+                                                   entrada#esMódulo)
+            si parar > 0
+                AgregaInstrucciónLimpiar: procedimiento
+                                              BorrarArchivo: genC
+                                          finprocedimiento
+                pasos#agregarAlFinal:
+                        (PasoDeCompilación#compilarC: (Caja#crear: FALSO), FALSO, (opciones#main && (i = 0)), genC, genAsm)
+            finsi
+            si parar > 1
+                AgregaInstrucciónLimpiar: procedimiento
+                                              BorrarArchivo: genAsm
+                                          finprocedimiento
+                pasos#agregarAlFinal:
+                        (PasoDeCompilación#compilarAsm: (Caja#crear: FALSO), genAsm, genObj)
+            finsi
+            si parar > 2
+                objetos#agregarAlFinal: genObj
+            finsi
+        finsi
+
+        si entrada#lenguaje = Lenguaje#CABECERA_C
+            [ No hagas nada: las cabeceras precompiladas no están implementadas ]
+        finsi
+
+        si (entrada#lenguaje = Lenguaje#C) || (entrada#lenguaje = Lenguaje#C_PREPROCESADO)
+            si FormatoPrecedeA: opciones#emitirFormato, EmitirFormato#C
+                NoImplementado
+            finsi
+
+            variables genAsm, genObj, parar
+            fijar genAsm a {~t.s}#formatear: prefijoEntrada
+            fijar genObj a {~t.o}#formatear: prefijoEntrada
+
+            fijar parar a 2
+            si opciones#emitirFormato = EmitirFormato#ENSAMBLADOR
+                fijar genAsm a opciones#salidas#salidaCódigo
+                fijar parar a 0
+            finsi
+            si opciones#emitirFormato = EmitirFormato#OBJETO
+                fijar genObj a opciones#salidas#salidaCódigo
+                fijar parar a 1
+            finsi
+
+            pasos#agregarAlFinal:
+                    (PasoDeCompilación#compilarC: (Caja#crear: FALSO),
+                                                  (entrada#lenguaje = Lenguaje#C_PREPROCESADO),
+                                                  entrada#rutaAlArchivo,
+                                                  genAsm)
+            si parar > 0
+                AgregaInstrucciónLimpiar: procedimiento
+                                              BorrarArchivo: genAsm
+                                          finprocedimiento
+                pasos#agregarAlFinal:
+                        (PasoDeCompilación#compilarAsm: (Caja#crear: FALSO), genAsm, genObj)
+            finsi
+            si parar > 1
+                objetos#agregarAlFinal: genObj
+            finsi
+        finsi
+
+        si entrada#lenguaje = Lenguaje#ENSAMBLADOR
+            si FormatoPrecedeA: opciones#emitirFormato, EmitirFormato#ENSAMBLADOR
+                NoImplementado
+            finsi
+
+            variables genObj, parar
+            fijar genObj a {~t.o}#formatear: prefijoEntrada
+
+            fijar parar a 1
+            si opciones#emitirFormato = EmitirFormato#OBJETO
+                fijar genObj a opciones#salidas#salidaCódigo
+                fijar parar a 0
+            finsi
+
+            pasos#agregarAlFinal:
+                    (PasoDeCompilación#compilarAsm: (Caja#crear: FALSO),
+                                                    entrada#rutaAlArchivo,
+                                                    genObj)
+            si parar > 0
+                objetos#agregarAlFinal: genObj
+            finsi
+        finsi
+
+        si entrada#lenguaje = Lenguaje#OBJETO_PARA_EL_ENLAZADOR
+            objetosEntrada#agregarAlFinal: entrada#rutaAlArchivo
+        finsi
+    finprocedimiento
+
+    si opciones#emitirFormato = EmitirFormato#EJECUTABLE
+        AgregaInstrucciónLimpiar: procedimiento
+                                      ParaCadaElemento: objetos, &BorrarArchivo
+                                  finprocedimiento
+        pasos#agregarAlFinal:
+                (PasoDeCompilación#compilarObjsAEjecutable: (Caja#crear: FALSO),
+                                                            FALSO,
+                                                            (Concatenar: objetos, objetosEntrada),
+                                                            opciones#salidas#salidaCódigo)
     finsi
+    si opciones#emitirFormato = EmitirFormato#EJECUTABLE_PIE
+        AgregaInstrucciónLimpiar: procedimiento
+                                      ParaCadaElemento: objetos, &BorrarArchivo
+                                  finprocedimiento
+        pasos#agregarAlFinal:
+                (PasoDeCompilación#compilarObjsAEjecutable: (Caja#crear: FALSO),
+                                                            VERDADERO,
+                                                            (Concatenar: objetos, objetosEntrada),
+                                                            opciones#salidas#salidaCódigo)
+    finsi
+    si opciones#emitirFormato = EmitirFormato#OBJETO_DINÁMICO
+        AgregaInstrucciónLimpiar: procedimiento
+                                      ParaCadaElemento: objetos, &BorrarArchivo
+                                  finprocedimiento
+        pasos#agregarAlFinal:
+                (PasoDeCompilación#compilarObjsAObjDinámico: (Caja#crear: FALSO),
+                                                             (Concatenar: objetos, objetosEntrada),
+                                                             opciones#salidas#salidaCódigo)
+    finsi
+
+    variables programas, opcionesCcAntes, opcionesCcDespués, opcionesLdAntes, opcionesLdDespués, opcionesCcLdAntes, opcionesCcLdDespués
+    fijar programas a Programas#crear: NULO, NULO
+    fijar opcionesCcAntes a Arreglo#vacio
+    fijar opcionesCcDespués a Arreglo#vacio
+    fijar opcionesLdAntes a Arreglo#vacio
+    fijar opcionesLdDespués a Arreglo#vacio
+    fijar opcionesCcLdAntes a Arreglo#vacio
+    fijar opcionesCcLdDespués a Arreglo#vacio
+
+    si opciones#pic
+        opcionesCcAntes#agregarAlFinal: {-fPIC}
+    finsi
+    si opciones#pie
+        opcionesCcAntes#agregarAlFinal: {-fPIE}
+    finsi
+
+    si opciones#ubsan
+        opcionesCcAntes#agregarAlFinal: {-fsanitize=undefined}
+        opcionesCcLdAntes#agregarAlFinal: {-fsanitize=undefined}
+    finsi
+    si opciones#asan
+        opcionesCcAntes#agregarAlFinal: {-fsanitize=address}
+        opcionesCcLdAntes#agregarAlFinal: {-fsanitize=address}
+    finsi
+
+    ParaCadaElemento: opciones#cIncludes#iquote, procedimiento: ruta
+        opcionesCcAntes#agregarAlFinal: {-iquote}
+        opcionesCcAntes#agregarAlFinal: ruta
+    finprocedimiento
+    ParaCadaElemento: opciones#cIncludes#i, procedimiento: ruta
+        opcionesCcAntes#agregarAlFinal: {-I}
+        opcionesCcAntes#agregarAlFinal: ruta
+    finprocedimiento
+    ParaCadaElemento: opciones#cIncludes#isystem, procedimiento: ruta
+        opcionesCcAntes#agregarAlFinal: {-isystem}
+        opcionesCcAntes#agregarAlFinal: ruta
+    finprocedimiento
+    ParaCadaElemento: opciones#cIncludes#idirafter, procedimiento: ruta
+        opcionesCcAntes#agregarAlFinal: {-idirafter}
+        opcionesCcAntes#agregarAlFinal: ruta
+    finprocedimiento
+
+    ParaCadaElemento: opciones#rutasDeEnlace, procedimiento: ruta
+        opcionesLdAntes#agregarAlFinal: {-L}
+        opcionesLdAntes#agregarAlFinal: ruta
+    finprocedimiento
+
+    ParaCadaElemento: opciones#enlaces, procedimiento: enlace
+        si enlace#esBiblioteca
+            opcionesLdDespués#agregarAlFinal: ({-l~t}#formatear: enlace#nombre)
+        sino
+            opcionesLdDespués#agregarAlFinal: ({-l:~t}#formatear: enlace#ruta)
+        finsi
+    finprocedimiento
+
+    si opciones#depuración = TipoDepuración#NORMAL
+        opcionesCcAntes#agregarAlFinal: {-g}
+    finsi
+    si opciones#depuración = TipoDepuración#GDB
+        opcionesCcAntes#agregarAlFinal: {-ggdb}
+    finsi
+
+    si opciones#optimización = Optimización#NINGUNA
+        opcionesCcAntes#agregarAlFinal: {-O0}
+    finsi
+    si opciones#optimización = Optimización#VEL_NORMAL
+        opcionesCcAntes#agregarAlFinal: {-O1}
+    finsi
+    si opciones#optimización = Optimización#VEL_AGRESIVA
+        opcionesCcAntes#agregarAlFinal: {-O2}
+    finsi
+    si opciones#optimización = Optimización#VEL_MUY_AGRESIVA
+        opcionesCcAntes#agregarAlFinal: {-O3}
+    finsi
+    si opciones#optimización = Optimización#TAM_NORMAL
+        opcionesCcAntes#agregarAlFinal: {-Os}
+    finsi
+    si opciones#optimización = Optimización#TAM_AGRESIVA
+        opcionesCcAntes#agregarAlFinal: {-Oz}
+    finsi
+    si opciones#optimización = Optimización#DEPURACIÓN
+        opcionesCcAntes#agregarAlFinal: {-Og}
+    finsi
+
+    ParaCadaElemento: opciones#macros, procedimiento: macroInstr
+        si macroInstr#esDefine
+            si macroInstr#valor = {}
+                opcionesCcAntes#agregarAlFinal: ({-D~t}#formatear: macroInstr#nombre)
+            sino
+                opcionesCcAntes#agregarAlFinal: ({-D~t=~t}#formatear: macroInstr#nombre, macroInstr#valor)
+            finsi
+        finsi
+        si macroInstr#esUndefine
+            opcionesCcAntes#agregarAlFinal: ({-U~t}#formatear: macroInstr#nombre)
+        finsi
+        si macroInstr#esIncluye
+            opcionesCcAntes#agregarAlFinal: {-include}
+            opcionesCcAntes#agregarAlFinal: macroInstr#ruta
+        finsi
+    finprocedimiento
+
+    Extender: opcionesCcAntes, opciones#opcionesAdicionales#cc
+    ParaCadaElemento: opciones#opcionesAdicionales#ld, procedimiento: opt
+        opcionesCcAntes#agregarAlFinal: {-Xpreprocessor}
+        opcionesCcAntes#agregarAlFinal: opt
+    finprocedimiento
+    ParaCadaElemento: opciones#opcionesAdicionales#asm, procedimiento: opt
+        opcionesCcAntes#agregarAlFinal: {-Xassembler}
+        opcionesCcAntes#agregarAlFinal: opt
+    finprocedimiento
+    Extender: opcionesLdAntes, opciones#opcionesAdicionales#ld
+
+    procedimiento ObtenerPrograma: nombre
+        si nombre = {cc}
+            si no EsNulo: programas#cc
+                devolver programas#cc
+            finsi
+
+            devolver LlamarConEC: procedimiento: salir
+                ParaCadaElemento: PROGRAMAS_CC, procedimiento: nombre
+                    fijar programas#cc a BuscarPrograma: opciones#prefijoHerramientas, nombre
+                    si no EsNulo: programas#cc
+                        devolver %salir: programas#cc
+                    finsi
+                finprocedimiento
+
+                __FallarConMensaje: {No se encontró un compilador de C instalado}
+            finprocedimiento
+        finsi
+
+        si nombre = {ld}
+            si no EsNulo: programas#ld
+                devolver programas#ld
+            finsi
+
+            devolver LlamarConEC: procedimiento: salir
+                ParaCadaElemento: PROGRAMAS_LD, procedimiento: nombre
+                    fijar programas#ld a BuscarPrograma: opciones#prefijoHerramientas, nombre
+                    si no EsNulo: programas#ld
+                        devolver %salir: programas#ld
+                    finsi
+                finprocedimiento
+
+                __FallarConMensaje: {No se encontró un enlazador instalado}
+            finprocedimiento
+        finsi
+
+        Inalcanzable
+    finprocedimiento
+
+    procedimiento ProcesarPaso: paso
+        si paso#completado#valor
+            devolver NULO
+        finsi
+        fijar paso#completado#valor a VERDADERO
+
+        si paso#esCompilarPd
+            variables código, paquete, módulo, idMod, builtins, salida, res
+            fijar código a LeerArchivo: paso#archivoEntradaPd
+            fijar paquete a paso#paquete
+            fijar módulo a paso#módulo
+            fijar idMod a paso#identificador
+
+            fijar builtins a Filtrar: TODOS_LOS_BUILTINS, funcion: b
+                devolver no Contiene: opciones#noBuiltins, b#nombre
+            finfuncion
+
+            fijar salida a PuertoDeArchivoDeEscritura#abrir: paso#archivoSalidaC
+
+            fijar res a Compilar: paquete,
+                                  módulo,
+                                  idMod,
+                                  bdMod,
+                                  código,
+                                  paso#archivoEntradaPd,
+                                  builtins,
+                                  salida,
+                                  &ProcesarMódulo
+
+            salida#cerrar
+
+            si paso#agregarALosMódulos
+                bdMod#agregarMódulo: paquete,
+                                     módulo,
+                                     res#exportaciones,
+                                     res#prefijoDelMódulo,
+                                     res#compilado,
+                                     res#compilado#prefijosTransitivos
+            finsi
+        finsi
+
+        si paso#esCompilarC
+            variables res, estado, pdcrtMain
+            si paso#pdcrtMain
+                fijar pdcrtMain a Arreglo#crearCon: {-DPDCRT_MAIN}
+            sino
+                fijar pdcrtMain a Arreglo#vacio
+            finsi
+            fijar res a Ejecutar: (ObtenerPrograma: {cc}),
+                                  (Arreglo#crearCon: {-S},
+                                                     ...opcionesCcAntes,
+                                                     ...pdcrtMain,
+                                                     {-x}, (paso#estáPreprocesado#escoger: {cpp-output}, {c}),
+                                                     paso#archivoEntradaC,
+                                                     {-x}, {none},
+                                                     ...opcionesCcDespués,
+                                                     {-o}, paso#archivoSalidaAsm),
+                                  Modelo#Crear
+            fijar estado a Subproceso#ResultadoEjecutar#CódigoDeEstado: res
+            si no (estado = 0)
+                __FallarConMensaje: ({No se pudo compilar ~t}#formatear: paso#archivoEntradaC)
+            finsi
+        finsi
+
+        si paso#esCompilarAsm
+            variables res, estado
+            fijar res a Ejecutar: (ObtenerPrograma: {cc}),
+                                  (Arreglo#crearCon: {-c},
+                                                     ...opcionesCcAntes,
+                                                     {-x}, {assembler},
+                                                     paso#archivoEntradaAsm,
+                                                     {-x}, {none},
+                                                     ...opcionesCcDespués,
+                                                     {-o}, paso#archivoSalidaObj),
+                                  Modelo#Crear
+            fijar estado a Subproceso#ResultadoEjecutar#CódigoDeEstado: res
+            si no (estado = 0)
+                __FallarConMensaje: ({No se pudo ensamblar ~t}#formatear: paso#archivoEntradaAsm)
+            finsi
+        finsi
+
+        si paso#esCompilarObjsAEjecutable
+            funcion OpcionesDeLdACc: ld
+                devolver Aplanar: (Mapear: ld, funcion: opt
+                    devolver Arreglo#crearCon: {-Xlinker}, opt
+                finfuncion)
+            finfuncion
+
+            variables res, estado, pie
+            si paso#esPie
+                fijar pie a Arreglo#crearCon: {-pie}
+            sino
+                fijar pie a Arreglo#vacio
+            finsi
+            fijar res a Ejecutar: (ObtenerPrograma: {cc}),
+                                  (Arreglo#crearCon: ...opcionesCcLdAntes,
+                                                     ...(OpcionesDeLdACc: opcionesLdAntes),
+                                                     ...pie,
+                                                     ...(paso#archivosEntradasObjs),
+                                                     ...(OpcionesDeLdACc: opcionesLdDespués),
+                                                     ...opcionesCcLdDespués,
+                                                     {-o}, paso#archivoSalidaExe),
+                                  Modelo#Crear
+            fijar estado a Subproceso#ResultadoEjecutar#CódigoDeEstado: res
+            si no (estado = 0)
+                __FallarConMensaje: ({No se pudo enlazar ~t}#formatear: paso#archivosEntradasObjs)
+            finsi
+        finsi
+
+        si paso#esCompilarObjsAObjDinámico
+            funcion OpcionesDeLdACc: ld
+                devolver Aplanar: (Mapear: ld, funcion: opt
+                    devolver Arreglo#crearCon: {-Xlinker}, opt
+                finfuncion)
+            finfuncion
+
+            variables res, estado
+            fijar res a Ejecutar: (ObtenerPrograma: {cc}),
+                                  (Arreglo#crearCon: {-shared},
+                                                     ...opcionesCcLdAntes,
+                                                     ...(OpcionesDeLdACc: opcionesLdAntes),
+                                                     ...(paso#archivosEntradasObjs),
+                                                     ...(OpcionesDeLdACc: opcionesLdDespués),
+                                                     ...opcionesCcLdDespués,
+                                                     {-o}, paso#archivoSalidaSo),
+                                  Modelo#Crear
+            fijar estado a Subproceso#ResultadoEjecutar#CódigoDeEstado: res
+            si no (estado = 0)
+                __FallarConMensaje: ({No se pudo enlazar ~t}#formatear: paso#archivosEntradasObjs)
+            finsi
+        finsi
+    finprocedimiento
+
+    procedimiento ProcesarMódulo: paquete, módulo
+        variables nombre, idc
+        fijar nombre a {~t/~t}#formatear: paquete, módulo
+        fijar idc a idcPasoPdPorMódulo#en: nombre
+        si EsNulo: idc
+            devolver NULO
+        sino
+            ProcesarPaso: (pasos#en: idc)
+        finsi
+    finprocedimiento
+
+    ParaCadaElemento: pasos, &ProcesarPaso
+
+    ParaCadaElemento: opciones#guardarInterfaces, procedimiento: salidaInterfaz
+        variable archivo
+        fijar archivo a __AbrirArchivo: salidaInterfaz#rutaAlArchivo, 11
+        bdMod#guardarEnArchivo: salidaInterfaz#paquete, salidaInterfaz#módulo, archivo
+        archivo#cerrar
+    finprocedimiento
+
+    ParaCadaElementoEnReversa: limpiar, (MétodoComoFunción: {llamar})
 finprocedimiento
 
 EjecutarCompilador: __Argv
