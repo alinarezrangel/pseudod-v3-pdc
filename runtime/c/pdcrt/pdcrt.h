@@ -486,6 +486,8 @@ struct pdcrt_ctx
     bool hay_un_manejador_de_errores;
     jmp_buf salir_del_trampolin;
     bool hay_una_salida_del_trampolin;
+    jmp_buf continuar;
+    bool hay_un_continuar;
 
     struct
     {
@@ -723,6 +725,13 @@ void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  size_t espacio);
 
 bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
+PDCRT_INLINE _Noreturn pdcrt_k pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_k k)
+{
+    if(!ctx->hay_un_continuar)
+        pdcrt_error(ctx, u8"No se inicializó el trampolín");
+    ctx->continuacion_actual = k;
+    longjmp(ctx->continuar, 1);
+}
 
 void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
 void pdcrt_inspeccionar_texto(pdcrt_texto *txt);
@@ -794,7 +803,7 @@ pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k);
         if(pdcrt_stack_lleno(ctx))                         \
         {                                                  \
             pdcrt_recolectar_basura_por_pila(ctx, &m);     \
-            return (pdcrt_k) { .kf = nombre, .marco = m }; \
+            return pdcrt_trampolin(ctx, (pdcrt_k) { .kf = nombre, .marco = m }); \
         }                                                  \
     }                                                      \
     while(0)

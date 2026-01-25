@@ -201,10 +201,12 @@ static void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
     }
 }
 
+_Noreturn pdcrt_k pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_k k);
+
 PDCRT_INLINE static pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k)
 {
 #ifdef PDCRT_DBG_NO_K
-    return k;
+    return k; // No usamos el trampolín dado que NO_K hace que la pila nunca esté muy llena
 #else
     return k.kf(ctx, k.marco);
 #endif
@@ -2293,7 +2295,7 @@ static bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pd
     if(pdcrt_stack_lleno(ctx))                          \
     {                                                   \
         pdcrt_recolectar_basura_por_pila(ctx, &m);      \
-        return (pdcrt_k) { .kf = &func, .marco = m };   \
+        return pdcrt_trampolin(ctx, (pdcrt_k) { .kf = &func, .marco = m }); \
     }
 
 #define PDCRT_CALC_INICIO() (ctx->tam_pila - args) - 2;
@@ -5280,6 +5282,8 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->hay_una_salida_del_trampolin = false;
     ctx->continuacion_actual = (pdcrt_k) { .kf = NULL, .marco = NULL };
 
+    ctx->hay_un_continuar = false;
+
     pdcrt_marco *m = NULL;
 
 #define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = NULL;
@@ -6354,10 +6358,13 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     volatile size_t tam_pila = ctx->tam_pila;
     volatile jmp_buf viejo_s;
     volatile jmp_buf viejo_e;
+    volatile jmp_buf viejo_c;
     memcpy((jmp_buf *) &viejo_s, &ctx->salir_del_trampolin, sizeof(jmp_buf));
     memcpy((jmp_buf *) &viejo_e, &ctx->manejador_de_errores, sizeof(jmp_buf));
+    memcpy((jmp_buf *) &viejo_c, &ctx->continuar, sizeof(jmp_buf));
     volatile bool habia_s = ctx->hay_una_salida_del_trampolin;
     volatile bool habia_e = ctx->hay_un_manejador_de_errores;
+    volatile bool habia_c = ctx->hay_un_continuar;
     volatile uintptr_t viejo_sp = ctx->inicio_del_stack;
 
     if(ctx->inicio_del_stack == 0)
@@ -6372,8 +6379,10 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     {                                                                   \
         memcpy(&ctx->salir_del_trampolin, (jmp_buf *) &viejo_s, sizeof(jmp_buf)); \
         memcpy(&ctx->manejador_de_errores, (jmp_buf *) &viejo_e, sizeof(jmp_buf)); \
+        memcpy(&ctx->continuar, (jmp_buf *) &viejo_c, sizeof(jmp_buf)); \
         ctx->hay_una_salida_del_trampolin = habia_s;                    \
         ctx->hay_un_manejador_de_errores = habia_e;                     \
+        ctx->hay_un_continuar = habia_c;                                \
         ctx->inicio_del_stack = viejo_sp;                               \
     }                                                                   \
     while(0)
@@ -6396,7 +6405,13 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     }
 
     ctx->hay_una_salida_del_trampolin = true;
-    ctx->continuacion_actual = f(ctx, args, k);
+
+    if(setjmp(ctx->continuar) == 0)
+    {
+        ctx->hay_un_continuar = true;
+        ctx->continuacion_actual = f(ctx, args, k);
+    }
+
     do
     {
         ctx->continuacion_actual = (*ctx->continuacion_actual.kf)(ctx, ctx->continuacion_actual.marco);
