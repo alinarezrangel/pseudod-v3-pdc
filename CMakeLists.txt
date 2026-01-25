@@ -69,6 +69,7 @@ endif()
 
 option(PDCRT_DBG "Activa la depuración del runtime" OFF)
 cmake_dependent_option(PDCRT_DBG_GC "Activa la depuración del recolector de basura" ON PDCRT_DBG OFF)
+cmake_dependent_option(PDCRT_DBG_NO_K "Desactiva el uso de continuaciones" ON PDCRT_DBG OFF)
 cmake_dependent_option(PDCRT_EMP_INTR "Activa la intercepción de las operaciones de la pila" OFF PDCRT_DBG OFF)
 
 option(PDCRT_LOG "Activa el sistema de logging del runtime" OFF)
@@ -128,12 +129,12 @@ set(PDCRT_RUNTIME_OUT "${CMAKE_CURRENT_BINARY_DIR}/runtime.c")
 add_custom_command(
   OUTPUT "${PDCRT_RUNTIME_OUT}"
   COMMAND ${PDC}
-  --id-modulo pdcrt_runtime
-  --paquete pdc
-  --modulo runtime/c/runtime
-  -X Builtins:RT
-  -o "${PDCRT_RUNTIME_OUT}"
-  "${PDCRT_RUNTIME}"
+        -Sc
+        -Zid pdcrt_runtime
+        -fno-builtin
+        -fbuiltin-__RT
+        "pdc/runtime/c/runtime:${PDCRT_RUNTIME}"
+        -o "${PDCRT_RUNTIME_OUT}"
   DEPENDS "${PDCRT_RUNTIME}"
   COMMENT "Compiling the PseudoD-side of the runtime"
   VERBATIM
@@ -205,6 +206,7 @@ add_pseudod_collection(src_pdc
         pdc/tokenizador.pd
         pdc/tokens.pd
         pdc/validación.pd
+        pdc/subproceso.pd
 )
 
 add_pseudod_executable(inner_pdc

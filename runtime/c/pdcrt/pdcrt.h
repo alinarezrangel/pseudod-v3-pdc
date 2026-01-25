@@ -454,9 +454,6 @@ struct pdcrt_ctx
     pdcrt_gc gc;
     pdcrt_k continuacion_actual;
 
-    pdcrt_marco *primer_marco_activo;
-    pdcrt_marco *ultimo_marco_activo;
-
     unsigned int cnt;
 
     pdcrt_texto **textos;
@@ -777,16 +774,17 @@ pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k);
 #define pdcrt_objeto_instancia(instancia) ((pdcrt_obj) { .recv = &pdcrt_recv_instancia, .inst = (instancia) })
 #define pdcrt_objeto_reubicado(reub) ((pdcrt_obj) { .recv = &pdcrt_recv_reubicado, .reubicado = (reub) })
 
-// #define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
-//     alignas(alignof(pdcrt_cabecera_gc))                                 \
-//         char marco_en_pila[                                             \
-//             sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
-//     pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
-//     pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, num_capturas, args, k)
-
-// TODO
+#ifdef PDCRT_DBG_NO_K
 #define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
     pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, num_capturas, args, k);
+#else
+#define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
+    alignas(alignof(pdcrt_cabecera_gc))                                 \
+        char marco_en_pila[                                             \
+            sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
+    pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
+    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, num_capturas, args, k)
+#endif
 
 // Esta macro debería aceptar cuanta pila necesitamos, en bytes. En su forma actual, aún podríamos causar
 // stack-overflows.

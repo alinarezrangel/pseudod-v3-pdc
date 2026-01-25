@@ -12,6 +12,7 @@
 
 #cmakedefine PDCRT_DBG
 #cmakedefine PDCRT_DBG_GC
+#cmakedefine PDCRT_DBG_NO_K
 #cmakedefine PDCRT_EMP_INTR
 
 #cmakedefine PDCRT_LOG

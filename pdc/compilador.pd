@@ -910,6 +910,7 @@ funcion ProcesarCli: cli
                     variable builtin
                     fijar builtin a arg#subTexto: {-fno-builtin-}#longitud, arg#longitud
                     opciones#noBuiltins#agregarAlFinal: builtin
+                    devolver NULO
                 finsi
                 si ComienzaCon: {-fbuiltin-}, arg
                     variable builtin
@@ -917,6 +918,7 @@ funcion ProcesarCli: cli
                     fijar opciones#noBuiltins a Filtrar: opciones#noBuiltins, funcion: b
                         devolver no (b = builtin)
                     finfuncion
+                    devolver NULO
                 finsi
 
                 si arg = {-Xpreprocessor}
@@ -1137,7 +1139,12 @@ procedimiento EjecutarCompilador: cli
         __FallarConMensaje: {Se debe especificar al menos una entrada}
     finsi
 
-    si (no opciones#emitirFormato#valor#soportaMúltiplesEntradas) && (opciones#entradas#longitud > 1)
+    funcion EntradaGeneraCódigo: entrada
+        devolver (no (entrada#lenguaje = Lenguaje#INTERFAZ_PSEUDOD))
+        && (no (entrada#lenguaje = Lenguaje#CABECERA_C))
+    finfuncion
+
+    si (no opciones#emitirFormato#valor#soportaMúltiplesEntradas) && ((Filtrar: opciones#entradas, &EntradaGeneraCódigo)#longitud > 1)
         __FallarConMensaje: ({No se puede emitir el formato ~t cuando hay múltiples entradas}#formatear: opciones#emitirFormato#nombre)
     finsi
 
@@ -1150,7 +1157,7 @@ procedimiento EjecutarCompilador: cli
     fijar bdMod a BaseDeDatosDeMódulos#enMemoria
     fijar idcPasoPdPorMódulo a Diccionario#vacío
     fijar entradasCompiladas a Diccionario#vacío
-    fijar dirTmp a {.pdc-build}
+    fijar dirTmp a {.pdc-build-~t}#formatear: Subproceso#ObtenerPid
     fijar limpiar a Arreglo#vacio
     fijar pasos a Arreglo#vacio
 

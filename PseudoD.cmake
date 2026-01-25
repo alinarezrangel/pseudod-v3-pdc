@@ -107,7 +107,7 @@ function(add_pseudod_executable pdtarget)
             endif()
 
             file(MAKE_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}/${package}")
-            set(ifile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.bdm.json")
+            set(ifile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.ipd")
             set(cfile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.c")
             set(tcfile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.c.bkp")
 
@@ -117,9 +117,9 @@ function(add_pseudod_executable pdtarget)
             set(deps_args "")
             foreach(direct_dep IN LISTS direct_deps)
                 string(REGEX REPLACE "\\.(pd|psd|pseudo|pseudod)$" "" path_no_ext "${direct_dep}")
-                set(iface_dep "${PSEUDOD_CURRENT_BINARY_DIR}/${path_no_ext}.bdm.json")
+                set(iface_dep "${PSEUDOD_CURRENT_BINARY_DIR}/${path_no_ext}.ipd")
                 list(APPEND interface_deps "${iface_dep}")
-                list(APPEND deps_args --cargar-db "${iface_dep}")
+                list(APPEND deps_args "${path_no_ext}:${iface_dep}")
             endforeach()
 
             file(SHA1 "${sfile}" module_id)
@@ -128,20 +128,18 @@ function(add_pseudod_executable pdtarget)
                     OUTPUT "${ifile}" "${cfile}"
                     BYPRODUCTS "${tcfile}"
                     COMMAND ${PDC_EXECUTABLE}
-                        --id-modulo "pdh${module_id}"
-                        --paquete "${package}"
-                        --modulo "${module}"
+                        -Sc
+                        -Zid "pdh${module_id}"
+                        "${package}/${module}:${sfile}"
                         -o "${tcfile}"
-                        --guardar-db "${ifile}"
-                        --guardar-solo-modulo
+                        -q "${package}/${module}:${ifile}"
                         ${deps_args}
                         ${PSEUDOD_COMPILE_OPTIONS}
                         "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_COMPILE_OPTIONS>"
-                        "${sfile}"
                     COMMAND ${CMAKE_COMMAND} -E rename "${tcfile}" "${cfile}"
                     COMMAND ${CMAKE_COMMAND} -E touch "${tcfile}"
                     DEPENDS "${sfile}" ${interface_deps}
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
                     COMMENT "Compiling PseudoD module ${package}/${module}"
                     VERBATIM
                     COMMAND_EXPAND_LISTS

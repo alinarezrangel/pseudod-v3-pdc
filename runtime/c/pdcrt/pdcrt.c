@@ -203,8 +203,11 @@ static void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
 
 PDCRT_INLINE static pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k)
 {
-    //return k.kf(ctx, k.marco); // TODO
+#ifdef PDCRT_DBG_NO_K
     return k;
+#else
+    return k.kf(ctx, k.marco);
+#endif
 }
 
 
@@ -5244,8 +5247,6 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->gc.tam_heap = 10 * 1024 * 1024; // 10MiB
 
     ctx->gc.num_recolecciones = 0;
-
-    ctx->primer_marco_activo = ctx->ultimo_marco_activo = NULL;
 
     ctx->cnt = 0;
 

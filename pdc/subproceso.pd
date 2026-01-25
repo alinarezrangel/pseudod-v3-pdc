@@ -38,3 +38,14 @@ procedimiento Ejecutar: ejecutable, argumentos, opciones
         __FallarConMensaje: {No se pueden ejecutar subprocesos}
     finsi
 finprocedimiento
+
+procedimiento ObtenerPid
+    si __Impl = {Lua Bootstrap}
+        devolver __Lua: «function(exe, args, argv0)
+               local unistd = require 'posix.unistd'
+               return assert(unistd.getpid())
+            end»
+    sino
+        __FallarConMensaje: {No se puede obtener el process-id actual}
+    finsi
+finprocedimiento
