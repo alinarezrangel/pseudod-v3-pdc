@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "pdcrt-plataforma.h"
 
@@ -53,15 +54,6 @@ void *pdcrt_realojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual, size_t tam_
 void pdcrt_desalojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual);
 
 pdcrt_aloj* pdcrt_alojador_malloc(void);
-
-typedef struct pdcrt_aloj_basico_cfg_v1
-{
-    size_t tam_pagina;
-    size_t num_inicial_de_paginas;
-} pdcrt_aloj_basico_cfg_v1;
-
-pdcrt_aloj* pdcrt_alojador_basico(pdcrt_aloj* base, pdcrt_aloj_basico_cfg_v1* cfg, size_t tam_cfg);
-void pdcrt_desalojar_alojador_basico(pdcrt_aloj* basico);
 
 pdcrt_aloj* pdcrt_alojador_con_estadisticas(pdcrt_aloj* base);
 size_t pdcrt_alojador_con_estadisticas_obtener_usado(pdcrt_aloj* yo);
