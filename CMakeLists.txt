@@ -36,7 +36,9 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/vios/vio_linux.h
         runtime/c/pdcrt/pdcrt_gc.c
         runtime/c/pdcrt/pdcrt_tabla.c
-        runtime/c/pdcrt/pdcrt_impls.c)
+        runtime/c/pdcrt/pdcrt_impls.c
+        runtime/c/pdcrt/pdcrt_ops.c
+        runtime/c/pdcrt/pdcrt_ops.h)
 
 target_link_libraries(pdcrt INTERFACE m)
 

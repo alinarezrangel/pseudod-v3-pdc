@@ -142,4 +142,7 @@ void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...);
 #define PDCRT_BUG_SI_FUERA_DE_MASCARA(mask, val, msg) \
     PDCRT_BUG(((~(mask)) & (val)) != 0, msg)
 
+// La cantidad de bits en un entero.
+#define PDCRT_ENTERO_BITS (sizeof(pdcrt_entero) * 8)
+
 #endif //PDCRT_BASE_H
