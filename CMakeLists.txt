@@ -29,7 +29,11 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdffi.c
         runtime/c/pdcrt/pdffi.h
         runtime/c/pdcrt/pdcrt_hash.c
-        runtime/c/pdcrt/pdcrt_hash.h)
+        runtime/c/pdcrt/pdcrt_hash.h
+        runtime/c/pdcrt/pdcrt_vio.c
+        runtime/c/pdcrt/pdcrt_vio.h
+        runtime/c/pdcrt/vios/vio_linux.c
+        runtime/c/pdcrt/vios/vio_linux.h)
 
 target_link_libraries(pdcrt INTERFACE m)
 

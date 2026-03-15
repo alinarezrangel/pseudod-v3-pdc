@@ -14,61 +14,7 @@
 
 #include "pdcrt-plataforma.h"
 
-
-#ifdef __has_attribute
-#  if __has_attribute(always_inline)
-#    define PDCRT_INLINE __attribute__((always_inline)) inline
-#  else
-#    define PDCRT_INLINE inline
-#  endif
-#  if __has_attribute(noinline)
-#    define PDCRT_NOINLINE __attribute__((noinline))
-#  else
-#    define PDCRT_NOINLINE
-#  endif
-#else
-#  define PDCRT_INLINE inline
-#  define PDCRT_NOINLINE
-#endif
-
-struct pdcrt_ctx;
-typedef struct pdcrt_ctx pdcrt_ctx;
-
-typedef struct pdcrt_aloj_exts
-{
-    uint32_t version;
-    uint32_t tam_bytes;
-    char resto[];
-} pdcrt_aloj_exts;
-
-
-typedef struct pdcrt_aloj
-{
-    void *(*alojar)(void *yo, size_t bytes);
-    void *(*realojar)(void *yo, void *ptr, size_t tam_actual, size_t tam_nuevo);
-    void (*desalojar)(void *yo, void *ptr, size_t tam_actual);
-    pdcrt_aloj_exts *(*obtener_extensiones)(void *yo);
-} pdcrt_aloj;
-
-void *pdcrt_alojar(pdcrt_aloj *aloj, size_t bytes);
-void *pdcrt_realojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual, size_t tam_nuevo);
-void pdcrt_desalojar(pdcrt_aloj *aloj, void *ptr, size_t tam_actual);
-
-pdcrt_aloj* pdcrt_alojador_malloc(void);
-
-typedef struct pdcrt_aloj_basico_cfg_v1
-{
-    size_t tam_pagina;
-    size_t num_inicial_de_paginas;
-} pdcrt_aloj_basico_cfg_v1;
-
-pdcrt_aloj* pdcrt_alojador_basico(pdcrt_aloj* base, pdcrt_aloj_basico_cfg_v1* cfg, size_t tam_cfg);
-void pdcrt_desalojar_alojador_basico(pdcrt_aloj* basico);
-
-pdcrt_aloj* pdcrt_alojador_con_estadisticas(pdcrt_aloj* base);
-size_t pdcrt_alojador_con_estadisticas_obtener_usado(pdcrt_aloj* yo);
-void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
-
+#include "pdcrt_base.h"
 
 #ifdef PDCRT_INTERNO
 
