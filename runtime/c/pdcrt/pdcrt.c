@@ -1,8 +1,5 @@
 #include <stdio.h>
-#include <limits.h>
 #include <time.h>
-#include <stddef.h>
-#include <stdarg.h>
 
 #include "pdcrt-plataforma.h"
 #include "pdcrt_hash.h"
@@ -267,9 +264,9 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str,
     pdcrt_texto *txt = pdcrt_crear_nuevo_texto(ctx, m, str, len);
     if(gc_activo)
         pdcrt_activar_recolector_de_basura(ctx);
-    for(ssize_t i = ctx->tam_textos - 1; i >= (ssize_t) exp_ind; i--)
+    for(size_t i = ctx->tam_textos; i > exp_ind; i--)
     {
-        ctx->textos[i + 1] = ctx->textos[i];
+        ctx->textos[i] = ctx->textos[i - 1];
     }
     ctx->textos[exp_ind] = txt; // #1
     ctx->tam_textos += 1;
@@ -391,6 +388,7 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
 {
     if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS) // (1)
     {
+        // ReSharper disable once CppDFAUnreachableCode
         return pdcrt_comparar_floats((pdcrt_float) e, f, op);
     }
 
@@ -404,8 +402,11 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
     }
 
     // Debido a (1), sabemos que PDCRT_FLOAT_DIG_SIG < PDCRT_ENTERO_BITS
-    static const pdcrt_entero max_entero_repr_float = (1ULL << PDCRT_FLOAT_MANT_DIG) - 1U;
-    static const pdcrt_entero min_entero_repr_float = -(1ULL << PDCRT_FLOAT_MANT_DIG);
+    static const pdcrt_entero max_entero_repr_float = (1ULL << (unsigned long long) PDCRT_FLOAT_MANT_DIG) - 1ULL;
+    // Esto se ve mal: ¿No se supone que MAX siempre tiene la forma 2**N - 1 y MIN 2**N?
+    // Pero recuerda que los floats no utilizan el complemento a dos en su mantisa, solo
+    // en su exponente.
+    static const pdcrt_entero min_entero_repr_float = -max_entero_repr_float;
 
     if((e >= min_entero_repr_float) && (e <= max_entero_repr_float))
     {
@@ -430,8 +431,8 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
     // Ahora sabemos que `e` y `f` tienen el mismo signo (ambos positivos o
     // ambos negativos).
 
-    pdcrt_float f_ent, f_floor;
-    f_floor = PDCRT_FLOAT_FLOOR(f);
+    pdcrt_float f_ent;
+    pdcrt_float f_floor = PDCRT_FLOAT_FLOOR(f);
     if(f_floor == f)
     {
         // `f` es un "float entero" (por ejemplo: 3.0)
@@ -457,6 +458,8 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
             // `e < f` => `e < ceil(f)`
             f_ent = PDCRT_FLOAT_CEIL(f);
             break;
+        default:
+            PDCRT_INALCANZABLE();
         }
     }
 
@@ -480,7 +483,7 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
         // Ahora sabemos que tienen cantidades comparables de bits, hay que
         // comparar sus magnitudes.
 
-        // Este cast es seguro (no hará overflow), ya que sabemos que f tiene la
+        // Este cast es seguro (no hará overflow), ya que sabemos que `f` tiene la
         // misma cantidad de bits *en su parte entera*.
         return pdcrt_comparar_enteros(e, (pdcrt_entero) f_ent, op);
     }
@@ -706,6 +709,7 @@ void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
 
 pdcrt_obj pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj mod)
 {
+    (void) m;
     pdcrt_debe_tener_tipo(ctx, mod, PDCRT_TOBJ_TABLA);
     return pdcrt_objeto_espacio_de_nombres(mod.tabla);
 }
@@ -756,13 +760,14 @@ bool pdcrt_son_identicos(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj x, pdcrt_obj 
     else
     {
         // HACK: Debería haber una forma de comparar los "datos" de dos
-        //  objetos, pero como no hay comparamos en cambio sus enteros.
+        //  objetos, pero como no la hay, comparamos sus enteros.
         return x.ival == y.ival;
     }
 }
 
 pdcrt_obj pdcrt_obtener_espacio_de_nombres_del_runtime(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
+    (void) m;
     return ctx->espacio_de_nombres_runtime;
 }
 
@@ -880,11 +885,11 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
         ctx->continuacion_actual = f(ctx, args, k);
     }
 
-    do
+    // ReSharper disable once CppDFAEndlessLoop
+    while(1)
     {
         ctx->continuacion_actual = (*ctx->continuacion_actual.kf)(ctx, ctx->continuacion_actual.marco);
     }
-    while(1);
 }
 
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f)
@@ -982,9 +987,9 @@ void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx)
             break;
         case PDCRT_TOBJ_TEXTO:
             printf("texto <");
-            for(size_t i = 0; i < o.texto->longitud; i++)
+            for(size_t c = 0; c < o.texto->longitud; c++)
             {
-                putchar(o.texto->contenido[i]);
+                putchar(o.texto->contenido[c]);
             }
             printf(">\n");
             break;

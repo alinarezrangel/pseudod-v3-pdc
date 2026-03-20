@@ -304,6 +304,7 @@ pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
         PDCRT_FLOAT_FREXP(o.fval, &exp);
         if(exp > 0) // El float no tiene parte decimal
         {
+            // ReSharper disable once CppDFAUnreachableCode
             if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS)
             {
                 // Cualquier entero es representable dentro de un float:
@@ -345,8 +346,9 @@ pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
         else
         {
             // No todos los enteros son representables como floats
+            // NOTA: Mantener sincronizado con `pdcrt_comparar_entero_y_float()`
             static const pdcrt_entero max_entero_repr_float = (1ULL << PDCRT_FLOAT_MANT_DIG) - 1U;
-            static const pdcrt_entero min_entero_repr_float = -(1ULL << PDCRT_FLOAT_MANT_DIG);
+            static const pdcrt_entero min_entero_repr_float = -max_entero_repr_float;
             if(o.ival >= min_entero_repr_float && o.ival <= max_entero_repr_float)
             {
                 *ok = true;
@@ -817,7 +819,6 @@ static pdcrt_k pdcrt_importar_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_importar_k2);
     // [valop, nom, ns]
-    pdcrt_obj nom = ctx->pila[pdcrt_stp_a_pos(ctx, -2)];
     pdcrt_insertar(ctx, -3);
     // [ns, valop, nom]
     bool ok;

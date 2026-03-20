@@ -5,6 +5,7 @@
 #define PDCRT_INTERNO
 #include "pdcrt.h"
 #include "pdcrt_base.h"
+#include "pdcrt_ops.h"
 
 #define PDCRT_CALC_INICIO() (ctx->tam_pila - args) - 2;
 // 2 elementos: yo + el mensaje.

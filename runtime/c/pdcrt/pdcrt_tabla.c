@@ -5,6 +5,7 @@
 #define PDCRT_INTERNO
 #include "pdcrt.h"
 #include "pdcrt_base.h"
+#include "pdcrt_ops.h"
 
 pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k)
 {

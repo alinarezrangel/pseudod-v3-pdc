@@ -71,6 +71,11 @@ void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
 #  else
 #    error clz needed
 #  endif
+#  if __has_builtin(__builtin_unreachable)
+#    define PDCRT_INALCANZABLE() __builtin_unreachable()
+#  else
+#    define PDCRT_INALCANZABLE() abort()
+#  endif
 #else
 #  error builtins needed
 #endif
