@@ -1,0 +1,16 @@
+<toolSet name="External Tools">
+  <tool name="rm" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="false" showConsoleOnStdErr="false" synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="rm" />
+      <option name="PARAMETERS" value=".pseudod-build/compilado/pdc/inicio.exe" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/Mega/MEGAsync/PRogramacion-nuevo/pseudod/new-new" />
+    </exec>
+  </tool>
+  <tool name="pd build" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="true" showConsoleOnStdErr="true" synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="lua" />
+      <option name="PARAMETERS" value="scripts/build/build.lua compilar pdc" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/Mega/MEGAsync/PRogramacion-nuevo/pseudod/new-new" />
+    </exec>
+  </tool>
+</toolSet>

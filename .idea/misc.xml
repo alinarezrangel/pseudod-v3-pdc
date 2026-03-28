@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Black">
+    <option name="sdkName" value="Python 3.13 (2)" />
+  </component>
+  <component name="CMakePythonSetting">
+    <option name="pythonIntegrationState" value="NO" />
+  </component>
+  <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
+  <component name="CidrRootsConfiguration">
+    <excludeRoots>
+      <file path="$PROJECT_DIR$/.pdc-build" />
+      <file path="$PROJECT_DIR$/.pseudod-build" />
+      <file path="$PROJECT_DIR$/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/outputs" />
+      <file path="$PROJECT_DIR$/scratch" />
+    </excludeRoots>
+  </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="WestSettings"><![CDATA[{}]]></component>
+</project>
