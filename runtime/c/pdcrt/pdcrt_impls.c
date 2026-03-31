@@ -7,9 +7,8 @@
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
 
-#define PDCRT_CALC_INICIO() (ctx->tam_pila - args) - 2;
-// 2 elementos: yo + el mensaje.
-#define PDCRT_SACAR_PRELUDIO() pdcrt_eliminar_elementos(ctx, inic, 2 + args);
+#define PDCRT_CALC_ARGS() (ctx->tam_pila - (args < 8 ? 0 : args - 8));
+#define PDCRT_SACAR_PRELUDIO() do { if(args >= 8) pdcrt_eliminar_elementos(ctx, argp, args - 8); } while(0)
 
 typedef enum pdcrt_clase
 {
@@ -21,21 +20,27 @@ typedef enum pdcrt_clase
     PDCRT_CLASE_TEXTO,
 } pdcrt_clase;
 
-static pdcrt_k pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_tk pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
-static pdcrt_k pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k, pdcrt_clase clase)
+static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k, pdcrt_clase clase, PDCRT_F_IMM)
 {
-    size_t inic = PDCRT_CALC_INICIO();
-    size_t argp = inic + 2;
-    pdcrt_obj yo = ctx->pila[inic];
-    pdcrt_obj msj = ctx->pila[inic + 1];
+    size_t argp = PDCRT_CALC_ARGS();
 
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 5, 0, args, k);
+    pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
+
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 10, 0, args, k);
     pdcrt_fijar_local(ctx, m, 0, pdcrt_objeto_entero(clase));
-    pdcrt_fijar_local(ctx, m, 1, yo);
-    pdcrt_fijar_local(ctx, m, 2, msj);
-    pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(inic));
-    pdcrt_fijar_local(ctx, m, 4, pdcrt_objeto_entero(argp));
+    pdcrt_fijar_local(ctx, m, 1, pdcrt_obj_desde_xmm(yo));
+    pdcrt_fijar_local(ctx, m, 2, omsj);
+    pdcrt_fijar_local(ctx, m, 3, pdcrt_objeto_entero(argp));
+    pdcrt_extender_pila(ctx, m, 6);
+    memmove(ctx->pila + argp + 6, ctx->pila + argp, 6 * sizeof(pdcrt_obj));
+    pdcrt_fijar_pila(ctx, argp + 0, pdcrt_obj_desde_xmm(a1));
+    pdcrt_fijar_pila(ctx, argp + 1, pdcrt_obj_desde_xmm(a2));
+    pdcrt_fijar_pila(ctx, argp + 2, pdcrt_obj_desde_xmm(a3));
+    pdcrt_fijar_pila(ctx, argp + 3, pdcrt_obj_desde_xmm(a4));
+    pdcrt_fijar_pila(ctx, argp + 4, pdcrt_obj_desde_xmm(a5));
+    pdcrt_fijar_pila(ctx, argp + 5, pdcrt_obj_desde_xmm(a6));
 
     pdcrt_extender_pila(ctx, m, 2);
 
@@ -63,273 +68,255 @@ static pdcrt_k pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k, 
     pdcrt_obj obj_clase = pdcrt_cima(ctx);
     if(pdcrt_tipo_de_obj(obj_clase) == PDCRT_TOBJ_NULO)
     {
-        pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
-        pdcrt_inspeccionar_texto(msj.texto);
+        pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+        pdcrt_inspeccionar_texto(omsj.texto);
         pdcrt_error(ctx, "Método no encontrado");
     }
 
-    pdcrt_empujar(ctx, msj);
+    pdcrt_empujar(ctx, omsj);
 
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, u8"_obtenerMétodoDeInstancia", 26, proto, 1,
-        &pdcrt_recv_fallback_a_clase_k1);
+    a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar1(ctx, m, &pdcrt_recv_fallback_a_clase_k1,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.obtener_metodo_de_instancia), a1);
 }
 
-static pdcrt_k pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+static pdcrt_tk pdcrt_recv_fallback_a_clase_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
     pdcrt_entero clase = pdcrt_obtener_local(ctx, m, 0).ival;
     pdcrt_obj yo = pdcrt_obtener_local(ctx, m, 1);
-    pdcrt_obj msj = pdcrt_obtener_local(ctx, m, 2);
-    pdcrt_entero inic = pdcrt_obtener_local(ctx, m, 3).ival;
+    pdcrt_obj omsj = pdcrt_obtener_local(ctx, m, 2);
     pdcrt_entero argp = pdcrt_obtener_local(ctx, m, 4).ival;
 
     (void) clase;
     (void) yo;
     (void) argp;
 
-    // [yo, msj, args..., metodo o nulo]
-    pdcrt_obj metodo = pdcrt_cima(ctx);
+    // [args...]
+    pdcrt_obj metodo = pdcrt_obj_desde_xmm(res);
     if(pdcrt_tipo_de_obj(metodo) == PDCRT_TOBJ_NULO)
     {
-        pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
-        pdcrt_inspeccionar_texto(msj.texto);
+        pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+        pdcrt_inspeccionar_texto(omsj.texto);
         pdcrt_error(ctx, "Método no encontrado");
     }
     else
     {
-        pdcrt_eliminar_elemento(ctx, inic + 1);
-        // [yo, args..., metodo o nulo]
-        pdcrt_insertar(ctx, inic);
-        // [metodo o nulo, yo, args...]
-        return pdcrt_enviar_mensaje(ctx, m->k.marco, "llamar", 6, NULL, m->args + 1, m->k.kf);
+        // [args...]
+        return pdcrt_llamarn(ctx, m->k.marco, m->k.kf, m->args,
+                             res, PDCRT_XMM_TEXTO(ctx->textos_globales.llamar));
     }
 }
 
-pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
+pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     // [yo, msj, ...#args]
-    size_t inic = PDCRT_CALC_INICIO();
-    size_t argp = inic + 2;
-    pdcrt_obj yo = ctx->pila[inic];
-    pdcrt_obj msj = ctx->pila[inic + 1];
-    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+    size_t argp = PDCRT_CALC_ARGS();
+    pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
+    pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
+    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
-    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): comoTexto no acepta argumentos");
         static_assert(sizeof(pdcrt_entero) <= 64, "pdcrt_entero no debe tener más de 64 bits");
         char texto[21]; // 64 bits => máx. 20 caracteres + '\0'
-        int len = snprintf(texto, sizeof(texto), "%" PDCRT_ENTERO_PRId, yo.ival);
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        int len = snprintf(texto, sizeof(texto), "%" PDCRT_ENTERO_PRId, oyo.ival);
         pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &k.marco, texto, len));
-        pdcrt_empujar(ctx, txt);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(txt));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.sumar)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_mas))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.sumar)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_mas))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): al sumar se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_entero(ctx, k.marco, yo.ival + otro.ival);
+            res = pdcrt_objeto_entero(oyo.ival + otro.ival);
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, ((pdcrt_float) yo.ival) + otro.fval);
+            res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) + otro.fval);
         else
             pdcrt_error(ctx, u8"Numero (entero): solo se pueden sumar dos números");
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.restar)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_menos))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.restar)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_menos))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): al restar se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_entero(ctx, k.marco, yo.ival - otro.ival);
+            res = pdcrt_objeto_entero(oyo.ival - otro.ival);
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, ((pdcrt_float) yo.ival) - otro.fval);
+            res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) - otro.fval);
         else
             pdcrt_error(ctx, u8"Numero (entero): solo se pueden restar dos números");
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.multiplicar)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_por))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.multiplicar)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_por))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): al multiplicar se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_entero(ctx, k.marco, yo.ival * otro.ival);
+            res = pdcrt_objeto_entero(oyo.ival * otro.ival);
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, ((pdcrt_float) yo.ival) * otro.fval);
+            res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) * otro.fval);
         else
             pdcrt_error(ctx, u8"Numero (entero): solo se pueden multiplicar dos números");
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.dividir)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_entre))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.dividir)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_entre))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): al dividir se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_float(ctx, k.marco, ((pdcrt_float) yo.ival) / ((pdcrt_float) otro.ival));
+        {
+            if(otro.ival == 0)
+                pdcrt_error(ctx, u8"división por 0");
+            res = pdcrt_objeto_entero(((pdcrt_float) oyo.ival) / ((pdcrt_float) otro.ival));
+        }
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, ((pdcrt_float) yo.ival) / otro.fval);
+        {
+            if(otro.fval == 0)
+                pdcrt_error(ctx, u8"división por 0.0");
+            res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) / otro.fval);
+        }
         else
+        {
             pdcrt_error(ctx, u8"Numero (entero): solo se pueden dividir dos números");
+        }
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.igual)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_igual))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.igual)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_igual))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): operador_= / igualA necesitan 1 argumento");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_obj arg = ctx->pila[argp];
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, yo.ival == arg.ival);
-        }
+            res = pdcrt_objeto_booleano(oyo.ival == arg.ival);
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, pdcrt_comparar_entero_y_float(yo.ival, arg.fval, PDCRT_IGUAL_A));
-        }
+            res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, PDCRT_IGUAL_A));
         else
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, false);
-        }
+            res = pdcrt_objeto_booleano(false);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.distinto)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_distinto))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.distinto)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_distinto))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (entero): operador_no= / distintoDe necesitan 1 argumento");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_obj arg = ctx->pila[argp];
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, yo.ival != arg.ival);
-        }
+            res = pdcrt_objeto_booleano(oyo.ival != arg.ival);
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, !pdcrt_comparar_entero_y_float(yo.ival, arg.fval, PDCRT_IGUAL_A));
-        }
+            res = pdcrt_objeto_booleano(!pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, PDCRT_IGUAL_A));
         else
-        {
-            pdcrt_empujar_booleano(ctx, k.marco, true);
-        }
+            res = pdcrt_objeto_booleano(true);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
 #define PDCRT_COMPARAR_ENTERO(m, opm, ms, opms, cmp, op)                \
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.m)    \
-            || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.opm)) \
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.m)    \
+            || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.opm)) \
     {                                                                   \
         if(args != 1)                                                   \
             pdcrt_error(ctx, "Numero (entero): "opms" / "ms" necesitan 1 argumento"); \
-        pdcrt_extender_pila(ctx, k.marco, 1);                           \
-        pdcrt_obj arg = ctx->pila[argp];                                \
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                        \
+        pdcrt_obj res = pdcrt_objeto_nulo();                            \
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                 \
-            pdcrt_empujar_booleano(ctx, k.marco, yo.ival op arg.ival);            \
+            res = pdcrt_objeto_booleano(oyo.ival op arg.ival);          \
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)             \
-            pdcrt_empujar_booleano(ctx, k.marco, pdcrt_comparar_entero_y_float(yo.ival, arg.fval, cmp)); \
+            res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, cmp)); \
         else                                                            \
             pdcrt_error(ctx, u8"Numero (entero): "opms" / "ms" solo pueden comparar dos números"); \
         PDCRT_SACAR_PRELUDIO();                                         \
-        return pdcrt_continuar(ctx, k);                                 \
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));       \
     }
     PDCRT_COMPARAR_ENTERO(menor_que, operador_menor_que, "menorQue", "operador_<", PDCRT_MENOR_QUE, <)
     PDCRT_COMPARAR_ENTERO(mayor_que, operador_mayor_que, "mayorQue", "operador_>", PDCRT_MAYOR_QUE, >)
     PDCRT_COMPARAR_ENTERO(menor_o_igual_a, operador_menor_o_igual_a, "menorOIgualA", "operador_=<", PDCRT_MENOR_O_IGUAL_A, <=)
     PDCRT_COMPARAR_ENTERO(mayor_o_igual_a, operador_mayor_o_igual_a, "mayorOIgualA", "operador_>=", PDCRT_MAYOR_O_IGUAL_A, >=)
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.negar))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.negar))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): negar no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, -yo.ival);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(-oyo.ival)));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.piso))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.piso))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): piso no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, yo.ival);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(oyo.ival)));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.techo))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.techo))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): techo no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, yo.ival);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(oyo.ival)));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.truncar))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.truncar))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): truncar no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, yo.ival);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(oyo.ival)));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.byte_como_texto))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.byte_como_texto))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): byteComoTexto no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        char c = yo.ival;
-        pdcrt_empujar_texto(ctx, &k.marco, &c, 1);
+        unsigned char c = (unsigned char) oyo.ival;
+        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &k.marco, (const char *) &c, 1));
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(txt));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.invertir))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.invertir))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (entero): invertir no acepta argumentos");
-        pdcrt_extender_pila(ctx, k.marco, 1);
-        pdcrt_empujar_entero(ctx, k.marco, ~yo.ival);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(~oyo.ival)));
     }
 #define PDCRT_OPERADOR_BIT(txt, nm, op)                                              \
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.txt))              \
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.txt))             \
     {                                                                                \
         if(args != 1)                                                                \
             pdcrt_error(ctx, "Numero (entero): "nm" acepta solo un argumento");      \
-        pdcrt_extender_pila(ctx, k.marco, 1);                                        \
-        pdcrt_obj arg = ctx->pila[argp];                                             \
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                                     \
+        pdcrt_obj res = pdcrt_objeto_nulo();                                         \
         if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                              \
-            pdcrt_empujar_entero(ctx, k.marco, yo.ival op arg.ival);                 \
+            res = pdcrt_objeto_entero(oyo.ival op arg.ival);                         \
         else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)                          \
-            pdcrt_empujar_entero(ctx, k.marco, yo.ival op (pdcrt_entero) arg.fval);  \
+            res = pdcrt_objeto_entero(oyo.ival op (pdcrt_entero) arg.fval);          \
         else                                                                         \
             pdcrt_error(ctx, "Argumento de tipo inesperado");                        \
         PDCRT_SACAR_PRELUDIO();                                                      \
-        return pdcrt_continuar(ctx, k);                                              \
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));                    \
     }
     PDCRT_OPERADOR_BIT(operador_bitand, "operador_<*>", &)
     PDCRT_OPERADOR_BIT(operador_bitor, "operador_<+>", |)
@@ -338,63 +325,61 @@ pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k)
     PDCRT_OPERADOR_BIT(operador_bitrshift, "operador_>>", >>)
 #undef PDCRT_OPERADOR_BIT
 
-    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_NUMERO);
+    return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_NUMERO, PDCRT_A_IMM);
 }
 
-pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k)
+pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     // [yo, msj, ...#args]
-    size_t inic = PDCRT_CALC_INICIO();
-    size_t argp = inic + 2;
-    pdcrt_obj yo = ctx->pila[inic];
-    pdcrt_obj msj = ctx->pila[inic + 1];
-    pdcrt_debe_tener_tipo(ctx, msj, PDCRT_TOBJ_TEXTO);
+    size_t argp = PDCRT_CALC_ARGS();
+    pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
+    pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
+    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
-    if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.como_texto))
+    if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
         if(args != 0)
             pdcrt_error(ctx, "Numero (float): comoTexto no acepta argumentos");
         char texto[30];
-        int len = snprintf(texto, sizeof(texto), "%g", (double) yo.fval);
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        int len = snprintf(texto, sizeof(texto), "%g", (double) oyo.fval);
         pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &k.marco, texto, len));
-        pdcrt_empujar(ctx, txt);
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(txt));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.sumar)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_mas))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.sumar)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_mas))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (float): al sumar se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_float(ctx, k.marco, yo.fval + ((pdcrt_float) otro.ival));
+            res = pdcrt_objeto_float(oyo.fval + ((pdcrt_float) otro.ival));
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, yo.fval + otro.fval);
+            res = pdcrt_objeto_float(oyo.fval + otro.fval);
         else
             pdcrt_error(ctx, u8"Numero (float): solo se pueden sumar dos números");
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
-    else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.restar)
-        || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_menos))
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.restar)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_menos))
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (float): al restar se debe especificar un argumento");
         pdcrt_obj otro = ctx->pila[argp];
         pdcrt_extender_pila(ctx, k.marco, 1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
+        pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
-            pdcrt_empujar_float(ctx, k.marco, yo.fval - ((pdcrt_float) otro.ival));
+            res = pdcrt_objeto_float(oyo.fval - ((pdcrt_float) otro.ival));
         else if(t_otro == PDCRT_TOBJ_FLOAT)
-            pdcrt_empujar_float(ctx, k.marco, yo.fval - otro.fval);
+            res = pdcrt_objeto_float(oyo.fval - otro.fval);
         else
             pdcrt_error(ctx, u8"Numero (float): solo se pueden restar dos números");
         PDCRT_SACAR_PRELUDIO();
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.multiplicar)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_por))

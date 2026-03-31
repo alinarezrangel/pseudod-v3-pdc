@@ -9,6 +9,9 @@
 #include "pdcrt_ops.h"
 
 
+extern pdcrt_obj pdcrt_obj_desde_xmm(__m128i r);
+extern __m128i pdcrt_xmm_desde_obj(pdcrt_obj o);
+
 int pdcrt_time(struct timespec *out)
 {
     struct timespec tmp;
@@ -100,8 +103,8 @@ void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
     }
 }
 
-extern _Noreturn pdcrt_k pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_k k);
-extern pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k);
+extern _Noreturn pdcrt_tk pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_tk k);
+extern pdcrt_tk pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k, __m128i res);
 
 
 extern bool pdcrt_es_menor_que(enum pdcrt_comparacion op);
@@ -652,7 +655,7 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->mensaje_de_error = NULL;
 
     ctx->hay_una_salida_del_trampolin = false;
-    ctx->continuacion_actual = (pdcrt_k) { .kf = NULL, .marco = NULL };
+    ctx->continuacion_actual = (pdcrt_tk) { .k = (pdcrt_k) { .kf = NULL, .marco = NULL }, .res = PDCRT_XMM_NULO() };
 
     ctx->hay_un_continuar = false;
 
@@ -804,13 +807,15 @@ bool pdcrt_stack_lleno(pdcrt_ctx *ctx)
     return diff > ctx->tam_stack;
 }
 
-static pdcrt_k pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m)
+static pdcrt_tk pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
     if(!ctx->hay_una_salida_del_trampolin)
     {
         // TODO: Documenta este mensaje de error.
         pdcrt_error(ctx, u8"Debe haber una salida del trampolín para terminar la ejecución");
     }
+    pdcrt_extender_pila(ctx, m, 1);
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(res));
     // Si el marco es reubicado, la nueva dirección quedará en `m`, que será
     // inaccesible después de que `longjmp` devuelva.
     //
@@ -822,6 +827,9 @@ static pdcrt_k pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool protegido)
 {
+    // TODO args > 0 en ejecutar_opt
+    assert(args == 0 && "TODO ejecutar_opt(args > 0)");
+
     pdcrt_ctx * volatile ctx = ctxp;
     pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, 0, (pdcrt_k){0});
     pdcrt_k k = {
@@ -882,13 +890,19 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     if(setjmp(ctx->continuar) == 0)
     {
         ctx->hay_un_continuar = true;
-        ctx->continuacion_actual = f(ctx, args, k);
+        ctx->continuacion_actual = f(ctx, 0, k,
+            PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(),
+            PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
     }
 
     // ReSharper disable once CppDFAEndlessLoop
     while(1)
     {
-        ctx->continuacion_actual = (*ctx->continuacion_actual.kf)(ctx, ctx->continuacion_actual.marco);
+        ctx->continuacion_actual = (*ctx->continuacion_actual.k.kf)(
+            ctx,
+            ctx->continuacion_actual.k.marco,
+            ctx->continuacion_actual.res
+        );
     }
 }
 
@@ -902,20 +916,19 @@ bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f)
     return pdcrt_ejecutar_opt(ctx, args, f, true);
 }
 
-static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
-static pdcrt_k pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k)
+static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
     return pdcrt_importar(ctx, m, "pdcrt_N95_runtime", 17, &pdcrt_preparar_registro_de_modulos_importar_k1);
 }
 
-static pdcrt_k pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
     PDCRT_K(pdcrt_preparar_registro_de_modulos_importar_k1);
-    ctx->espacio_de_nombres_runtime = pdcrt_convertir_a_espacio_de_nombres(ctx, m, pdcrt_sacar(ctx));
-    pdcrt_empujar_nulo(ctx, m);
-    return pdcrt_devolver(ctx, m, 1);
+    ctx->espacio_de_nombres_runtime = pdcrt_convertir_a_espacio_de_nombres(ctx, m, pdcrt_obj_desde_xmm(res));
+    return pdcrt_devolver1(ctx, m, PDCRT_XMM_NULO());
 }
 
 void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods)
@@ -926,16 +939,17 @@ void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods)
     (void) pdcrt_sacar(ctx);
 }
 
-static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m);
+static pdcrt_tk pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
-static pdcrt_k pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_k k)
+static pdcrt_tk pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
-    static const int proto[] = {0, 0};
-    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_cargar_dependencia_fijarEn_k1);
+    assert(args == 2 && "cargar_dependencia_fijarEn(reg, nm, mod)");
+    return pdcrt_llamar2(ctx, m, &pdcrt_cargar_dependencia_fijarEn_k1,
+        a1, PDCRT_XMM_TEXTO(ctx->textos_globales.fijarEn), a2, a3);
 }
 
-static pdcrt_k pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
+static pdcrt_tk pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
     PDCRT_K(pdcrt_cargar_dependencia_fijarEn_k1);
     // [nulo]

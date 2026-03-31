@@ -121,16 +121,37 @@ void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_params_data *restrict p);
 
 pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
-pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
-                             const char* msj, size_t tam_msj,
-                             const int* proto, size_t nproto,
-                             pdcrt_kf kf);
-pdcrt_k pdcrt_enviar_mensaje_obj(pdcrt_ctx *ctx, pdcrt_marco *m,
-                                 const int* proto, size_t nproto,
-                                 pdcrt_kf kf);
+
+size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, pdcrt_marco *m, const int* proto, size_t nproto);
+
+pdcrt_tk pdcrt_llamar0(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj);
+pdcrt_tk pdcrt_llamar1(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1);
+pdcrt_tk pdcrt_llamar2(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2);
+pdcrt_tk pdcrt_llamar3(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3);
+pdcrt_tk pdcrt_llamar4(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4);
+pdcrt_tk pdcrt_llamar5(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5);
+pdcrt_tk pdcrt_llamar6(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6);
+pdcrt_tk pdcrt_llamarn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       int nargs,
+                       __m128i obj, __m128i msj);
+
 void pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj v);
 void pdcrt_prnl(pdcrt_ctx *ctx, pdcrt_marco *m);
-pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
+pdcrt_tk pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
+pdcrt_tk pdcrt_devolver1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
 pdcrt_k pdcrt_importar(pdcrt_ctx *ctx,
                        pdcrt_marco *m,

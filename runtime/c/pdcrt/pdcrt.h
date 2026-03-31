@@ -20,6 +20,10 @@
 
 #include <stdalign.h>
 
+#include <xmmintrin.h>
+#include <smmintrin.h>
+#include <immintrin.h>
+
 int pdcrt_time(struct timespec *out);
 
 typedef struct pdcrt_timediff
@@ -46,13 +50,25 @@ typedef struct pdcrt_marco pdcrt_marco;
 struct pdcrt_k;
 typedef struct pdcrt_k pdcrt_k;
 
-typedef pdcrt_k (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k);
-typedef pdcrt_k (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *);
+struct pdcrt_tk;
+typedef struct pdcrt_tk pdcrt_tk;
+
+#define PDCRT_F_IMM __m128i yo, __m128i msj, __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6
+#define PDCRT_A_IMM yo, msj, a1, a2, a3, a4, a5, a6
+
+typedef pdcrt_tk (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k k, PDCRT_F_IMM);
+typedef pdcrt_tk (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *, __m128i res);
 
 struct pdcrt_k
 {
     pdcrt_kf kf;
     pdcrt_marco *marco;
+};
+
+struct pdcrt_tk
+{
+    pdcrt_k k;
+    __m128i res;
 };
 
 
@@ -168,6 +184,19 @@ typedef struct pdcrt_obj
         pdcrt_cabecera_gc *gc;
     };
 } pdcrt_obj;
+
+inline pdcrt_obj pdcrt_obj_desde_xmm(__m128i r)
+{
+    return (pdcrt_obj){ .recv = (void*) _mm_cvtsi128_si64(r), .pval = (void*) _mm_extract_epi64(r, 1) };
+}
+
+inline __m128i pdcrt_xmm_desde_obj(pdcrt_obj o)
+{
+    return _mm_set_epi64x((int64_t) (uint64_t) o.recv, (int64_t) (uint64_t) o.pval);
+}
+
+#define PDCRT_XMM_NULO() pdcrt_xmm_desde_obj(pdcrt_objeto_nulo())
+#define PDCRT_XMM_TEXTO(texto) pdcrt_xmm_desde_obj(pdcrt_objeto_texto(texto))
 
 struct pdcrt_arreglo
 {
@@ -389,6 +418,7 @@ typedef enum pdcrt_tipo
     X(fijar_clase_tipo_nulo, u8"fijarClaseTipoNulo")                    \
     X(fijar_clase_texto, u8"fijarClaseTexto")                           \
     X(obtener_clase_objeto, u8"obtenerClaseObjeto")                     \
+    X(obtener_metodo_de_instancia, u8"_obtenerMétodoDeInstancia")       \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
     X(finalizada, "finalizada")                                         \
@@ -412,7 +442,7 @@ struct pdcrt_ctx
     size_t cap_pila;
 
     pdcrt_gc gc;
-    pdcrt_k continuacion_actual;
+    pdcrt_tk continuacion_actual;
 
     unsigned int cnt;
 
@@ -589,7 +619,7 @@ PDCRT_INLINE bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
     if(pdcrt_stack_lleno(ctx))                          \
     {                                                   \
         pdcrt_recolectar_basura_por_pila(ctx, &m);      \
-        return pdcrt_trampolin(ctx, (pdcrt_k) { .kf = &func, .marco = m }); \
+        return pdcrt_trampolin(ctx, (pdcrt_tk) { .k = (pdcrt_k) { .kf = &func, .marco = m }, .res = res }); \
     }
 
 bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_comparacion op);
@@ -614,28 +644,29 @@ void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
                                  size_t espacio);
 
 bool pdcrt_stack_lleno(pdcrt_ctx *ctx);
-PDCRT_INLINE _Noreturn pdcrt_k pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_k k)
+PDCRT_INLINE _Noreturn pdcrt_tk pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_tk tk)
 {
     if(!ctx->hay_un_continuar)
         pdcrt_error(ctx, u8"No se inicializó el trampolín");
-    ctx->continuacion_actual = k;
+    ctx->continuacion_actual = tk;
     longjmp(ctx->continuar, 1);
 }
 
-PDCRT_INLINE pdcrt_k pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k)
+PDCRT_INLINE pdcrt_tk pdcrt_continuar(pdcrt_ctx *ctx, pdcrt_k k, __m128i res)
 {
 #ifdef PDCRT_DBG_NO_K
-    return k; // No usamos el trampolín dado que NO_K hace que la pila nunca esté muy llena
+    // No usamos el trampolín dado que NO_K hace que la pila nunca esté muy llena
+    return (pdcrt_tk) { .k = k, .res = res };
 #else
-    return k.kf(ctx, k.marco);
+    return k.kf(ctx, k.marco, res);
 #endif
 }
 
 bool pdcrt_es_primitivo(pdcrt_ctx *ctx, pdcrt_obj o);
 pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o);
 bool pdcrt_igualdad(pdcrt_ctx *ctx, pdcrt_obj a, pdcrt_obj b);
-pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_tk pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 
 void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
 void pdcrt_inspeccionar_texto(pdcrt_texto *txt);
@@ -647,27 +678,27 @@ void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, 
 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f);
 
-pdcrt_k pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_tk pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
 
 pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o);
 
-pdcrt_k pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k);
-pdcrt_k pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 
 #define pdcrt_objeto_entero(i) ((pdcrt_obj) { .recv = &pdcrt_recv_entero, .ival = (i) })
 #define pdcrt_objeto_float(f) ((pdcrt_obj) { .recv = &pdcrt_recv_float, .fval = (f) })

@@ -338,6 +338,7 @@ pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok)
     *ok = false;
     if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_ENTERO)
     {
+        // ReSharper disable once CppDFAUnreachableCode
         if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS)
         {
             *ok = true;
@@ -589,85 +590,229 @@ pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf)
     return (*kf)(ctx, m);
 }
 
-pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
-                             const char* msj, size_t tam_msj,
-                             const int* proto, size_t nproto,
-                             pdcrt_kf kf)
+
+size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, pdcrt_marco *m, const int* proto, size_t nproto)
 {
-    pdcrt_extender_pila(ctx, m, 1);
-    pdcrt_obj msj_o = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &m, msj, tam_msj));
-    for(size_t i = 0; i < nproto; i++)
+    // TODO implementar
+}
+
+pdcrt_tk pdcrt_llamar0(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                      __m128i obj, __m128i msj)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 0, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar1(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1)
+
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 1, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        a1, PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar2(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 2, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        a1, a2, PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar3(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 3, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        a1, a2, a3, PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar4(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 4, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        a1, a2, a3, a4, PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar5(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 5, (pdcrt_k) { .kf = kf, .marco = m },
+                        obj, msj,
+                        a1, a2, a3, a4, a5, PDCRT_XMM_NULO());
+}
+
+pdcrt_tk pdcrt_llamar6(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       __m128i obj, __m128i msj,
+                       __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6)
+{
+    pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+    return (*oobj.recv)(ctx, 6, (pdcrt_k) { .kf = kf, .marco = m }, obj, msj, a1, a2, a3, a4, a5, a6);
+}
+
+pdcrt_tk pdcrt_llamarn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                       int nargs,
+                       __m128i obj, __m128i msj)
+{
+    if(nargs == 0)
     {
-        pdcrt_fijar_pila(ctx, ctx->tam_pila - i, ctx->pila[(ctx->tam_pila - i) - 1]);
+        return pdcrt_llamar0(ctx, m, kf, obj, msj);
     }
-    pdcrt_fijar_pila(ctx, (ctx->tam_pila++) - nproto, msj_o);
-    return pdcrt_enviar_mensaje_obj(ctx, m, proto, nproto, kf);
+    else if(nargs == 1)
+    {
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar1(ctx, m, kf, obj, msj, a1);
+    }
+    else if(nargs == 2)
+    {
+        __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar2(ctx, m, kf, obj, msj, a1, a2);
+    }
+    else if(nargs == 3)
+    {
+        __m128i a3 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar3(ctx, m, kf, obj, msj, a1, a2, a3);
+    }
+    else if(nargs == 4)
+    {
+        __m128i a4 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a3 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar4(ctx, m, kf, obj, msj, a1, a2, a3, a4);
+    }
+    else if(nargs == 5)
+    {
+        __m128i a5 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a4 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a3 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar5(ctx, m, kf, obj, msj, a1, a2, a3, a4, a5);
+    }
+    else if(nargs == 6)
+    {
+        __m128i a6 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a5 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a4 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a3 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar6(ctx, m, kf, obj, msj, a1, a2, a3, a4, a5, a6);
+    }
+    else
+    {
+        __m128i a6 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 0]);
+        __m128i a5 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 1]);
+        __m128i a4 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 2]);
+        __m128i a3 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 3]);
+        __m128i a2 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 4]);
+        __m128i a1 = pdcrt_xmm_desde_obj(ctx->pila[(ctx->tam_pila - nargs) - 5]);
+        pdcrt_eliminar_elementos(ctx, -nargs, 6);
+        pdcrt_obj oobj = pdcrt_obj_desde_xmm(obj);
+        nargs -= 6;
+        return (*oobj.recv)(ctx, nargs, (pdcrt_k) { .kf = kf, .marco = m },
+                            obj, msj, a1, a2, a3, a4, a5, a6);
+    }
 }
 
 
-pdcrt_k pdcrt_enviar_mensaje_obj(pdcrt_ctx *ctx, pdcrt_marco *m,
-                                 const int* proto, size_t nproto,
-                                 pdcrt_kf kf)
-{
-    pdcrt_k k = {
-        .kf = kf,
-        .marco = m,
-    };
-
-    // Posición del inicio de los argumentos
-    size_t base = ctx->tam_pila - nproto;
-
-    size_t nargs_expandidos = 0, num_args = 0, variadic_args = 0;
-    for(size_t i = 0; i < nproto; i++)
-    {
-        if(proto && proto[i] == 1)
-        {
-            pdcrt_obj arg = ctx->pila[base + i];
-            pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_ARREGLO);
-            nargs_expandidos += arg.arreglo->longitud;
-            variadic_args += 1;
-        }
-        else
-        {
-            num_args += 1;
-        }
-    }
-
-    pdcrt_extender_pila(ctx, m, nargs_expandidos + variadic_args);
-
-    if(proto)
-    {
-        size_t cur = 0;
-        for(size_t i = 0; i < nproto; i++)
-        {
-            size_t argpos = base + cur;
-            pdcrt_obj arg = ctx->pila[argpos];
-            if(proto[i] == 1)
-            {
-                // Validado arriba:
-                // pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_ARREGLO);
-                size_t len = arg.arreglo->longitud;
-                size_t por_mover = nproto - (i + 1);
-                memmove(ctx->pila + argpos + len, ctx->pila + argpos + 1, por_mover * sizeof(pdcrt_obj));
-                num_args += len;
-                for(size_t j = 0; j < len; j++)
-                {
-                    pdcrt_fijar_pila(ctx, argpos + j, arg.arreglo->valores[j]);
-                }
-                cur += len;
-            }
-            else
-            {
-                cur += 1;
-            }
-        }
-    }
-
-    ctx->tam_pila -= variadic_args;
-    ctx->tam_pila += nargs_expandidos;
-    pdcrt_obj t = ctx->pila[(ctx->tam_pila - num_args) - 2];
-    return (*t.recv)(ctx, num_args, k);
-}
+// pdcrt_k pdcrt_enviar_mensaje(pdcrt_ctx *ctx, pdcrt_marco *m,
+//                              const char* msj, size_t tam_msj,
+//                              const int* proto, size_t nproto,
+//                              pdcrt_kf kf)
+// {
+//     pdcrt_extender_pila(ctx, m, 1);
+//     pdcrt_obj msj_o = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &m, msj, tam_msj));
+//     for(size_t i = 0; i < nproto; i++)
+//     {
+//         pdcrt_fijar_pila(ctx, ctx->tam_pila - i, ctx->pila[(ctx->tam_pila - i) - 1]);
+//     }
+//     pdcrt_fijar_pila(ctx, (ctx->tam_pila++) - nproto, msj_o);
+//     return pdcrt_enviar_mensaje_obj(ctx, m, proto, nproto, kf);
+// }
+//
+//
+// pdcrt_k pdcrt_enviar_mensaje_obj(pdcrt_ctx *ctx, pdcrt_marco *m,
+//                                  const int* proto, size_t nproto,
+//                                  pdcrt_kf kf)
+// {
+//     pdcrt_k k = {
+//         .kf = kf,
+//         .marco = m,
+//     };
+//
+//     // Posición del inicio de los argumentos
+//     size_t base = ctx->tam_pila - nproto;
+//
+//     size_t nargs_expandidos = 0, num_args = 0, variadic_args = 0;
+//     for(size_t i = 0; i < nproto; i++)
+//     {
+//         if(proto && proto[i] == 1)
+//         {
+//             pdcrt_obj arg = ctx->pila[base + i];
+//             pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_ARREGLO);
+//             nargs_expandidos += arg.arreglo->longitud;
+//             variadic_args += 1;
+//         }
+//         else
+//         {
+//             num_args += 1;
+//         }
+//     }
+//
+//     pdcrt_extender_pila(ctx, m, nargs_expandidos + variadic_args);
+//
+//     if(proto)
+//     {
+//         size_t cur = 0;
+//         for(size_t i = 0; i < nproto; i++)
+//         {
+//             size_t argpos = base + cur;
+//             pdcrt_obj arg = ctx->pila[argpos];
+//             if(proto[i] == 1)
+//             {
+//                 // Validado arriba:
+//                 // pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_ARREGLO);
+//                 size_t len = arg.arreglo->longitud;
+//                 size_t por_mover = nproto - (i + 1);
+//                 memmove(ctx->pila + argpos + len, ctx->pila + argpos + 1, por_mover * sizeof(pdcrt_obj));
+//                 num_args += len;
+//                 for(size_t j = 0; j < len; j++)
+//                 {
+//                     pdcrt_fijar_pila(ctx, argpos + j, arg.arreglo->valores[j]);
+//                 }
+//                 cur += len;
+//             }
+//             else
+//             {
+//                 cur += 1;
+//             }
+//         }
+//     }
+//
+//     ctx->tam_pila -= variadic_args;
+//     ctx->tam_pila += nargs_expandidos;
+//     pdcrt_obj t = ctx->pila[(ctx->tam_pila - num_args) - 2];
+//     return (*t.recv)(ctx, num_args, k);
+// }
 
 static void pdcrt_prn_helper(pdcrt_ctx *ctx, pdcrt_obj o)
 {
@@ -750,11 +895,16 @@ void pdcrt_prnl(pdcrt_ctx *ctx, pdcrt_marco *m)
     puts("");
 }
 
-pdcrt_k pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
+pdcrt_tk pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
+{
+    assert(rets == 1);
+    return pdcrt_continuar(ctx, m->k, pdcrt_xmm_desde_obj(pdcrt_sacar(ctx)));
+}
+
+pdcrt_tk pdcrt_devolver1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
     (void) ctx;
-    assert(rets == 1);
-    return pdcrt_continuar(ctx, m->k);
+    return pdcrt_continuar(ctx, m->k, res);
 }
 
 
@@ -779,8 +929,10 @@ pdcrt_k pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_
     // [valop, nom, reg]
     pdcrt_empujar_texto(ctx, &m, nombre, tam_nombre);
     // [valop, nom, reg, nom]
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, "contiene", 8, proto, 1, &pdcrt_importar_k1);
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar1(ctx, m, &pdcrt_importar_k1,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.contiene), a1);
 }
 
 static pdcrt_k pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -799,8 +951,10 @@ static pdcrt_k pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
         // [valop, nom, reg]
         pdcrt_duplicar(ctx, m, -2);
         // [valop, nom, reg, nom]
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_importar_k2);
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar1(ctx, m, &pdcrt_importar_k2,
+                             obj, PDCRT_XMM_TEXTO(ctx->textos_globales.en), a1);
     }
     else
     {
@@ -810,8 +964,10 @@ static pdcrt_k pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
         // [valop, nom, mods]
         pdcrt_duplicar(ctx, m, -2);
         // [valop, nom, mods, nom]
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_importar_k3);
+        __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+        return pdcrt_llamar1(ctx, m, &pdcrt_importar_k3,
+                             obj, PDCRT_XMM_TEXTO(ctx->textos_globales.en), a1);
     }
 }
 
@@ -837,7 +993,8 @@ static pdcrt_k pdcrt_importar_k3(pdcrt_ctx *ctx, pdcrt_marco *m)
 {
     PDCRT_K(pdcrt_importar_k3);
     // [valop, nom, mfunc]
-    return pdcrt_enviar_mensaje(ctx, m, "llamar", 6, NULL, 0, &pdcrt_importar_k4);
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar0(ctx, m, &pdcrt_importar_k4, obj, PDCRT_XMM_TEXTO(ctx->textos_globales.llamar));
 }
 
 static pdcrt_k pdcrt_importar_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -851,8 +1008,10 @@ static pdcrt_k pdcrt_importar_k4(pdcrt_ctx *ctx, pdcrt_marco *m)
     // [valop, nom, reg]
     pdcrt_insertar(ctx, -2);
     // [valop, reg, nom]
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_importar_k5);
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar1(ctx, m, &pdcrt_importar_k5,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.en), a1);
 }
 
 static pdcrt_k pdcrt_importar_k5(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -894,8 +1053,10 @@ pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx,
     // [mod, valop, mod]
     pdcrt_empujar_texto(ctx, &m, nombre, tam_nombre);
     // [mod, valop, mod, nom]
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_extraerv_k1);
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar1(ctx, m, &pdcrt_extraerv_k1,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.en), a1);
 }
 
 pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -904,8 +1065,10 @@ pdcrt_k pdcrt_extraerv_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
     // [mod, valop, arr]
     pdcrt_empujar_entero(ctx, m, 0);
     // [mod, valop, arr, 0]
-    static const int proto[] = {0};
-    return pdcrt_enviar_mensaje(ctx, m, "en", 2, proto, 1, &pdcrt_extraerv_k2);
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar1(ctx, m, &pdcrt_extraerv_k2,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.en), a1);
 }
 
 pdcrt_k pdcrt_extraerv_k2(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -966,8 +1129,11 @@ pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx,
     *pkf = kf;
     pdcrt_insertar(ctx, -4);
     // [mod, valop, mod, nom, arr]
-    static const int proto[] = {0, 0};
-    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_agregar_nombre_k1);
+    __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar2(ctx, m, &pdcrt_agregar_nombre_k1,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.fijarEn), a1, a2);
 }
 
 static pdcrt_k pdcrt_agregar_nombre_k1(pdcrt_ctx *ctx, pdcrt_marco *m)
@@ -1009,8 +1175,11 @@ pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx,
     // [reg, mod, nom]
     pdcrt_insertar(ctx, -2);
     // [reg, nom, mod]
-    static const int proto[] = {0, 0};
-    return pdcrt_enviar_mensaje(ctx, m, "fijarEn", 7, proto, 2, &pdcrt_exportar_k1);
+    __m128i a2 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i a1 = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    __m128i obj = pdcrt_xmm_desde_obj(pdcrt_sacar(ctx));
+    return pdcrt_llamar2(ctx, m, &pdcrt_exportar_k1,
+                         obj, PDCRT_XMM_TEXTO(ctx->textos_globales.fijarEn), a1, a2);
 }
 
 static pdcrt_k pdcrt_exportar_k1(pdcrt_ctx *ctx, pdcrt_marco *m)

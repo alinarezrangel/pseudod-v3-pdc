@@ -7,30 +7,27 @@
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
 
-pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k)
+pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     if(args != 2)
         pdcrt_error(ctx, u8"FunciónIgualdad: se esperaban 2 argumentos");
 
-    pdcrt_obj a = pdcrt_cima_en(ctx, 0);
-    pdcrt_obj b = pdcrt_cima_en(ctx, 1);
+    pdcrt_obj a = pdcrt_obj_desde_xmm(a1);
+    pdcrt_obj b = pdcrt_obj_desde_xmm(a2);
 
     if(pdcrt_es_primitivo(ctx, a) || pdcrt_es_primitivo(ctx, b))
     {
         bool ok = pdcrt_igualdad(ctx, a, b);
-        pdcrt_sacar(ctx);
-        pdcrt_sacar(ctx);
-        pdcrt_empujar_booleano(ctx, k.marco, ok);
         return pdcrt_continuar(ctx, k);
     }
     else
     {
-        static const int proto[] = {0};
-        return pdcrt_enviar_mensaje(ctx, k.marco, "igualA", 6, proto, 1, k.kf);
+        return pdcrt_llamar1(ctx, k.marco, k.kf,
+                             a1, PDCRT_XMM_TEXTO(ctx->textos_globales.igual), a2);
     }
 }
 
-pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k)
+pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     if(args != 1)
         pdcrt_error(ctx, u8"FunciónHash: se esperaba 1 argumento");
