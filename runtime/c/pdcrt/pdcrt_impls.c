@@ -368,8 +368,7 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     {
         if(args != 1)
             pdcrt_error(ctx, "Numero (float): al restar se debe especificar un argumento");
-        pdcrt_obj otro = ctx->pila[argp];
-        pdcrt_extender_pila(ctx, k.marco, 1);
+        pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
         pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
         if(t_otro == PDCRT_TOBJ_ENTERO)
@@ -381,6 +380,7 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
     }
+    // =========== Desde aquí todo esta sin cambiar: =============
     else if(pdcrt_comparar_textos(msj.texto, ctx->textos_globales.multiplicar)
         || pdcrt_comparar_textos(msj.texto, ctx->textos_globales.operador_por))
     {
