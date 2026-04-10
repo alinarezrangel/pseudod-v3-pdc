@@ -281,6 +281,8 @@ clase Arreglo hereda Objeto
     metodo estatico vacío
     metodo estatico vacio
     metodo estatico crearCon: ...valores
+
+    metodo igualA: otro
 finclase
 
 metodo estatico Arreglo#crear
@@ -299,7 +301,173 @@ metodo estatico Arreglo#crearCon: ...valores
     devolver valores
 finmetodo
 
+metodo Arreglo#igualA: otro
+    si son diferentes yo#longitud y otro#longitud
+        devolver FALSO
+    finsi
+
+    variable i
+    fijar i a 0
+    mientras i < yo#longitud
+        si no ((yo#en: i)#igualA: (otro#en: i))
+            devolver FALSO
+        finsi
+        fijar i a i + 1
+    finmientras
+    devolver VERDADERO
+finmetodo
+
+metodo Arreglo#distíntoDe: otro
+    si son diferentes yo#longitud y otro#longitud
+        devolver VERDADERO
+    finsi
+
+    variable i
+    fijar i a 0
+    mientras i < yo#longitud
+        si (yo#en: i)#distíntoDe: (otro#en: i)
+            devolver VERDADERO
+        finsi
+        fijar i a i + 1
+    finmientras
+    devolver FALSO
+finmetodo
+
+metodo Arreglo#comoTexto
+    variables res, i
+    fijar res a Arreglo#vacío
+    fijar i a 0
+
+    mientras i < yo#longitud
+        res#agregarAlFinal: (yo#en: i)#comoTexto
+        fijar i a i + 1
+    finmientras
+
+    devolver {(Arreglo ~t)}#formatear: (res#unir: {, })
+finmetodo
+
 __RT#fijarClaseArreglo: Arreglo
+
+clase Tabla hereda Objeto
+    metodo estatico vacía
+    metodo estatico desdePares: ...pares
+    metodo estatico desdeArreglo: pares
+
+    metodo intentaEn: llave, predeterminado
+    metodo transformarPar: llave, proc
+    metodo comoTexto
+    metodo comoArreglo
+    metodo paraCadaPar: proc
+    metodo paraCadaLlave: proc
+    metodo paraCadaValor: proc
+    metodo reducir: ini, proc
+    metodo transformar: proc
+    metodo mapear: proc
+finclase
+
+metodo estatico Tabla#vacía
+    devolver __RT#crearTabla: 16
+finmetodo
+
+metodo estatico Tabla#desdePares: ...pares
+    necesitas (pares#longitud - (2 * (pares#longitud / 2)#truncar)) = 0
+    variables tbl, i
+    fijar tbl a __RT#crearTabla: (pares#longitud / 2)
+    fijar i a 0
+    mientras i < pares#longitud
+        tbl#fijarEn: (pares#en: i), (pares#en: (i + 1))
+        fijar i a i + 2
+    finmientras
+    devolver tbl
+finmetodo
+
+metodo estatico Tabla#desdeArreglo: pares
+    variables tbl, i
+    fijar tbl a __RT#crearTabla: pares#longitud
+    fijar i a 0
+    mientras i < pares#longitud
+        variable par
+        fijar par a pares#en: i
+        necesitas par#longitud = 2
+        tbl#fijarEn: (par#en: 1), (par#en: 2)
+        fijar i a i + 1
+    finmientras
+    devolver tbl
+finmetodo
+
+metodo Tabla#intentaEn: llave, predeterminado
+    si yo#contiene: llave
+        devolver yo#en: llave
+    sino
+        devolver predeterminado
+    finsi
+finmetodo
+
+metodo Tabla#transformarPar: llave, proc
+    yo#fijarEn: llave, (%proc: (yo#en: llave))
+finmetodo
+
+metodo Tabla#comoTexto
+    variable partes
+    fijar partes a Arreglo#vacío
+    yo#paraCadaPar: procedimiento: llave, valor
+        partes#agregarAlFinal: ({~t => ~t}#formatear: llave, valor)
+    finprocedimiento
+    devolver {(Tabla ~t)}#formatear: (partes#unir: {, })
+finmetodo
+
+metodo Tabla#comoArreglo
+    variable partes
+    fijar partes a Arreglo#vacío
+    yo#paraCadaPar: procedimiento: llave, valor
+        partes#agregarAlFinal: (__CrearArreglo: llave, valor)
+    finprocedimiento
+    devolver partes
+finmetodo
+
+metodo Tabla#paraCadaLlave: proc
+    yo#paraCadaPar: procedimiento: llave, _valor
+        %proc: llave
+    finprocedimiento
+finmetodo
+
+metodo Tabla#paraCadaValor: proc
+    yo#paraCadaPar: procedimiento: _llave, valor
+        %proc: valor
+    finprocedimiento
+finmetodo
+
+metodo Tabla#reducir: ini, proc
+    variable estado
+    fijar estado a ini
+    yo#paraCadaPar: procedimiento: llave, valor
+        fijar estado a %proc: estado, llave, valor
+    finprocedimiento
+    devolver estado
+finmetodo
+
+metodo Tabla#transformar: proc
+    variable tbl
+    fijar tbl a yo#mapear: proc
+    yo#vaciar
+    tbl#paraCadaPar: procedimiento: llave, valor
+        yo#fijarEn: llave, valor
+    finprocedimiento
+finmetodo
+
+metodo Tabla#mapear: proc
+    variable tbl
+    fijar tbl a Tabla#vacía
+    yo#paraCadaPar: procedimiento: llave, valor
+        variable par
+        fijar par a %proc: llave, valor
+        necesitas par#longitud = 2
+        tbl#fijarEn: (par#en: 0), (par#en: 1)
+    finprocedimiento
+    devolver tbl
+finmetodo
+
+__RT#fijarClaseTabla: Tabla
 
 clase EspacioDeNombres hereda Objeto
     metodo estatico crear
@@ -393,6 +561,86 @@ finmetodo
 
 metodo estatico Texto#crear
     devolver {}
+finmetodo
+
+variables ESC_LF, ESC_CRLF
+fijar ESC_LF a {~|%}#concatenar: 10#byteComoTexto
+fijar ESC_CRLF a ({~|%}#concatenar: 13#byteComoTexto)#concatenar: 10#byteComoTexto
+
+metodo Texto#formatear: ...valores
+    variables partes, i, i', esc, arg
+    fijar partes a Arreglo#vacío
+    fijar i a 0
+    fijar arg a 0
+
+    procedimiento Argumento
+        si arg >= valores#longitud
+            __FallarConMensaje: ((({No hay suficientes argumentos para [}#concatenar: yo)#concatenar: {]#formatear: solo hay })#concatenar: valores#longitud#comoTexto)
+        finsi
+        variable c
+        fijar c a valores#en: arg
+        fijar arg a arg + 1
+        devolver c
+    finprocedimiento
+
+    mientras VERDADERO
+        fijar i' a yo#buscar: i, {~}
+        si son identicos i' y NULO
+            partes#agregarAlFinal: (yo#parteDelTexto: i, yo#longitud)
+            devolver partes#unir: {}
+        sino
+            partes#agregarAlFinal: (yo#parteDelTexto: i, i')
+        finsi
+
+        variable ok
+        fijar ok a NULO
+
+        fijar esc a yo#subTexto: i', 2
+        si esc = {~t}
+            partes#agregarAlFinal: Argumento#comoTexto
+            fijar ok a esc
+        finsi
+        si esc = {~T}
+            partes#agregarAlFinal: Argumento
+            fijar ok a esc
+        finsi
+        si esc = {~~}
+            partes#agregarAlFinal: {~}
+            fijar ok a esc
+        finsi
+        si esc = {~%}
+            partes#agregarAlFinal: 10#byteComoTexto
+            fijar ok a esc
+        finsi
+        si esc = {~e}
+            partes#agregarAlFinal: «}»
+            fijar ok a esc
+        finsi
+        si esc = {~E}
+            partes#agregarAlFinal: {»}
+            fijar ok a esc
+        finsi
+        si esc = {~q}
+            partes#agregarAlFinal: {"}
+            fijar ok a esc
+        finsi
+
+        fijar esc a yo#subTexto: i', ESC_LF#longitud
+        si esc = ESC_LF
+            fijar ok a esc
+        finsi
+
+        fijar esc a yo#subTexto: i', ESC_CRLF#longitud
+        si esc = ESC_CRLF
+            fijar ok a esc
+        finsi
+
+        si son identicos ok y NULO
+            __FallarConMensaje: (({Secuencia de escape inválida en [}#concatenar: yo)#concatenar: {]})
+        finsi
+
+        fijar i a i' + ok#longitud
+    finmientras
 finmetodo
 
 __RT#fijarClaseTexto: Texto

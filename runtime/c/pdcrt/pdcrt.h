@@ -55,6 +55,7 @@ typedef struct pdcrt_tk pdcrt_tk;
 
 #define PDCRT_F_IMM __m128i yo, __m128i msj, __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6
 #define PDCRT_A_IMM yo, msj, a1, a2, a3, a4, a5, a6
+#define PDCRT_AA_IMM a1, a2, a3, a4, a5, a6
 
 typedef pdcrt_tk (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k k, PDCRT_F_IMM);
 typedef pdcrt_tk (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *, __m128i res);
@@ -417,12 +418,16 @@ typedef enum pdcrt_tipo
     X(fijar_clase_procedimiento, u8"fijarClaseProcedimiento")           \
     X(fijar_clase_tipo_nulo, u8"fijarClaseTipoNulo")                    \
     X(fijar_clase_texto, u8"fijarClaseTexto")                           \
+    X(fijar_clase_tabla, u8"fijarClaseTabla")                           \
     X(obtener_clase_objeto, u8"obtenerClaseObjeto")                     \
     X(obtener_metodo_de_instancia, u8"_obtenerMétodoDeInstancia")       \
     X(crearCorrutina, "crearCorrutina")                                 \
     X(avanzar, "avanzar")                                               \
     X(finalizada, "finalizada")                                         \
-    X(recolectar_basura, "recolectarBasura")
+    X(recolectar_basura, "recolectarBasura")                            \
+    X(vaciar, "vaciar")                                                 \
+    X(texto_vacio, "")                                                  \
+    X(nulo_como_texto, "NULO")
 
 typedef struct pdcrt_textos
 {
@@ -467,6 +472,7 @@ struct pdcrt_ctx
     pdcrt_obj clase_procedimiento;
     pdcrt_obj clase_tipo_nulo;
     pdcrt_obj clase_texto;
+    pdcrt_obj clase_tabla;
 
     uintptr_t inicio_del_stack;
     size_t tam_stack;
@@ -500,6 +506,7 @@ void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
 size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl);
 void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear);
 void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, size_t nueva_cap);
+void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, bool rehashear);
 bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor);
 void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear);
 
@@ -628,7 +635,7 @@ bool pdcrt_comparar_floats(pdcrt_float a, pdcrt_float b, enum pdcrt_comparacion 
 bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
 
 #define pdcrt_crear_texto_desde_cstr(ctx, m, cstr) \
-    pdcrt_crear_texto(ctx, m, cstr, sizeof(cstr) - 1)
+    pdcrt_crear_texto(ctx, m, cstr, strlen(cstr))
 
 _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj);
 _Noreturn void pdcrt_enomem(pdcrt_ctx *ctx);

@@ -479,6 +479,7 @@ static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_procedimiento, params);
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_texto, params);
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_tipo_nulo, params);
+    pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_tabla, params);
 
     if(ctx->continuacion_actual.marco)
     {

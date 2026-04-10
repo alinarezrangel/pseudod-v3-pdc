@@ -342,3 +342,22 @@ void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcr
         pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
     }
 }
+
+void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, bool rehashear)
+{
+    for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
+    {
+        tbl->buckets[i].activo = false;
+    }
+    for(size_t i = 0; i < tbl->num_colisiones; i++)
+    {
+        tbl->colisiones[i].activo = false;
+    }
+    tbl->num_colisiones = 0;
+    tbl->buckets_ocupados = 0;
+
+    if(rehashear)
+    {
+        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+    }
+}

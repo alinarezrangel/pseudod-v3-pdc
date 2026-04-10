@@ -643,6 +643,7 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     ctx->clase_procedimiento = pdcrt_objeto_nulo();
     ctx->clase_tipo_nulo = pdcrt_objeto_nulo();
     ctx->clase_texto = pdcrt_objeto_nulo();
+    ctx->clase_tabla = pdcrt_objeto_nulo();
 
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;

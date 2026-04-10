@@ -64,3 +64,30 @@ instrucción es una tupla cuyo primer elemento es el opcode y los demás son los
 argumentos.
 
 [^1]: Del inglés *reify*.
+
+## El runtime ##
+
+La segunda mitad del proyecto es el runtime en C (o *pdcrt*) que provee las
+funciones, tipos de datos y macros necesarias para ejecutar los programas
+emitidos por el compilador.
+
+El código del runtime se encuentra en el directorio [`runtime/c/pdcrt`](../runtime/c/pdcrt).
+El runtime contiene una parte que está escrita en PseudoD y es cargada al inicio de cada
+programa. Esta es [`runtime/c/runtime.pd`](../runtime/c/runtime.pd).
+
+El runtime está conceptualmente inspirado por el runtime de
+[CHICKEN Scheme](https://call-cc.org/). Específicamente en el uso de un
+recolector de basura del tipo *Cheney on the MTA* (véase
+[CHICKEN internals: the garbage collector](https://www.more-magic.net/posts/internals-gc.html),
+[A guide to the CHICKEN compilation process](https://wiki.call-cc.org/chicken-compilation-process)
+y por supuesto también
+[CONS should not CONS its arguments, part II: Cheney on the M.T.A.](https://dl.acm.org/doi/10.1145/214448.214454)
+por el mismísimo Henry G. Baker). Algunas diferencias notables con
+CHICKEN Scheme es que este usa *pointer tagging* para representar los
+valores de Scheme[^2] mientras que PseudoD utiliza *punteros gordos*
+(de forma similar a la implementación ENative del lenguaje E, véase
+[Fat Pointers](http://erights.org/enative/fatpointers.html)). Cada
+puntero gordo ocupa 128-bits y es almacenado en 2 variables de 64-bits
+(véase la estructura `pdcrt_obj`) o un registro SIMD (`__m128i`).
+
+[^2]: [CHICKEN internals: data representation](https://www.more-magic.net/posts/internals-data-representation.html)

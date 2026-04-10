@@ -13,35 +13,12 @@ void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem);
 
 typedef ssize_t pdcrt_stp;
 
-void pdcrt_empujar_entero(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_entero i);
-void pdcrt_empujar_booleano(pdcrt_ctx *ctx, pdcrt_marco *m, bool v);
-void pdcrt_empujar_float(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_float f);
-void pdcrt_empujar_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco **m);
-void pdcrt_empujar_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len);
-void pdcrt_empujar_texto_cstr(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str);
-void pdcrt_empujar_nulo(pdcrt_ctx *ctx, pdcrt_marco *m);
-void pdcrt_empujar_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad);
-void pdcrt_empujar_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco **m);
-void pdcrt_empujar_tabla_vacia(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad);
-pdcrt_obj pdcrt_obtener_objeto_runtime(pdcrt_ctx *ctx, pdcrt_marco *m);
-void* pdcrt_empujar_valop(pdcrt_ctx *ctx, pdcrt_marco **m, size_t num_bytes);
-void pdcrt_empujar_voidptr(pdcrt_ctx *ctx, pdcrt_marco *m, void* ptr);
-void pdcrt_empujar_corrutina(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_stp f);
-void pdcrt_empujar_instancia(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_stp metodos, pdcrt_stp metodo_no_encontrado, size_t num_atrs);
-
 pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt_marco **m);
 pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len);
 
-pdcrt_entero pdcrt_obtener_entero(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-pdcrt_float pdcrt_obtener_float(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-bool pdcrt_obtener_booleano(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-size_t pdcrt_obtener_tam_texto(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-bool pdcrt_obtener_texto(pdcrt_ctx *ctx, pdcrt_stp i, char *buffer, size_t tam_buffer);
-void* pdcrt_obtener_valop(pdcrt_ctx *ctx, pdcrt_stp i, bool *ok);
-
-void pdcrt_envolver_en_caja(pdcrt_ctx *ctx, pdcrt_marco **m);
-
-void pdcrt_negar(pdcrt_ctx *ctx);
+pdcrt_entero pdcrt_obtener_entero_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
+pdcrt_float pdcrt_obtener_float_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
+size_t pdcrt_obtener_tam_texto_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
 
 void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
@@ -82,12 +59,6 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
 
 pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco *m);
 
-void pdcrt_arreglo_en(pdcrt_ctx *ctx, pdcrt_stp arr, pdcrt_entero i);
-void pdcrt_arreglo_empujar_al_final(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp arr);
-
-void pdcrt_caja_fijar(pdcrt_ctx *ctx, pdcrt_stp caja);
-void pdcrt_caja_obtener(pdcrt_ctx *ctx, pdcrt_stp caja);
-
 #define pdcrt_fijar_caja(ctx, o, v)                     \
     do                                                  \
     {                                                   \
@@ -120,8 +91,6 @@ void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_marco *m,
                   pdcrt_params_data *restrict p);
 
-pdcrt_k pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf);
-
 size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, pdcrt_marco *m, const int* proto, size_t nproto);
 
 pdcrt_tk pdcrt_llamar0(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
@@ -147,36 +116,38 @@ pdcrt_tk pdcrt_llamar6(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
 pdcrt_tk pdcrt_llamarn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
                        int nargs,
                        __m128i obj, __m128i msj);
+pdcrt_tk pdcrt_llamarnr(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
+                        int nargs,
+                        __m128i obj, __m128i msj,
+                        __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6);
 
-void pdcrt_prn(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj v);
-void pdcrt_prnl(pdcrt_ctx *ctx, pdcrt_marco *m);
 pdcrt_tk pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
 pdcrt_tk pdcrt_devolver1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
-pdcrt_k pdcrt_importar(pdcrt_ctx *ctx,
-                       pdcrt_marco *m,
-                       const char *nombre,
-                       size_t tam_nombre,
-                       pdcrt_kf kf);
-pdcrt_k pdcrt_extraerv(pdcrt_ctx *ctx,
-                       pdcrt_marco *m,
-                       pdcrt_obj mod,
-                       const char *nombre,
-                       size_t tam_nombre,
-                       pdcrt_kf kf);
-pdcrt_k pdcrt_agregar_nombre(pdcrt_ctx *ctx,
-                             pdcrt_marco *m,
-                             pdcrt_obj mod,
-                             pdcrt_obj valor,
-                             const char *nombre,
-                             size_t tam_nombre,
-                             bool autoejec,
-                             pdcrt_kf kf);
-pdcrt_k pdcrt_exportar(pdcrt_ctx *ctx,
-                       pdcrt_marco *m,
-                       pdcrt_obj mod,
-                       const char *modulo,
-                       size_t tam_modulo);
+pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx,
+                        pdcrt_marco *m,
+                        const char *nombre,
+                        size_t tam_nombre,
+                        pdcrt_kf kf);
+pdcrt_tk pdcrt_extraerv(pdcrt_ctx *ctx,
+                        pdcrt_marco *m,
+                        pdcrt_obj mod,
+                        const char *nombre,
+                        size_t tam_nombre,
+                        pdcrt_kf kf);
+pdcrt_tk pdcrt_agregar_nombre(pdcrt_ctx *ctx,
+                              pdcrt_marco *m,
+                              pdcrt_obj mod,
+                              pdcrt_obj valor,
+                              const char *nombre,
+                              size_t tam_nombre,
+                              bool autoejec,
+                              pdcrt_kf kf);
+pdcrt_tk pdcrt_exportar(pdcrt_ctx *ctx,
+                        pdcrt_marco *m,
+                        pdcrt_obj mod,
+                        const char *modulo,
+                        size_t tam_modulo);
 
 pdcrt_obj pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m);
 
@@ -184,7 +155,11 @@ typedef struct pdcrt_captura
 {
     size_t registro;
 } pdcrt_captura;
-void pdcrt_empujar_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t num_caps);
+
+pdcrt_obj pdcrt_crear_closure_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t num_caps);
+pdcrt_obj pdcrt_crear_closure_obj_1(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f,
+                                    __m128i c1);
+
 pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
                            pdcrt_marco **m,
                            pdcrt_f f,
@@ -207,8 +182,8 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, s
 pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco **m);
 pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad);
 pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_marco **m, size_t num_bytes);
-pdcrt_corrutina* pdcrt_crear_corrutina(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_stp f_idx);
-pdcrt_instancia* pdcrt_crear_instancia(pdcrt_ctx *ctx, pdcrt_marco **m,
-                                       pdcrt_stp metodos, pdcrt_stp metodo_no_encontrado, size_t num_atrs);
+pdcrt_corrutina* pdcrt_crear_corrutina_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_obj f);
+pdcrt_instancia* pdcrt_crear_instancia_obj(pdcrt_ctx *ctx, pdcrt_marco **m,
+                                           pdcrt_obj metodos, pdcrt_obj metodo_no_encontrado, size_t num_atrs);
 
 #endif //PDCRT_OPS_H
