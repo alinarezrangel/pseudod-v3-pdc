@@ -76,7 +76,7 @@ extern bool pdcrt_gc_recoleccion_debe_mover_pila(pdcrt_recoleccion r);
 extern bool pdcrt_gc_recoleccion_es_mayor(pdcrt_recoleccion r);
 extern bool pdcrt_gc_recoleccion_es_menor(pdcrt_recoleccion r);
 
-void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_recoleccion params)
+void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_recoleccion params)
 {
     if(ctx->recolector_de_basura_activo)
     {
@@ -133,7 +133,7 @@ void pdcrt_inicializar_obj(pdcrt_ctx *ctx,
     pdcrt_gc_agregar_a_grupo(&ctx->gc.blanco_joven, h);
 }
 
-void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_tipo_obj_gc tipo, size_t sz)
+void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz)
 {
     pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, sz);
     pdcrt_intenta_invocar_al_recolector(ctx, m, params);
@@ -186,8 +186,6 @@ static pdcrt_cabecera_gc *pdcrt_gc_reubicar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h
     pdcrt_objeto_generico_gc *nuevo = pdcrt_alojar_obj(ctx, NULL, h->tipo, h->num_bytes);
     if(gc_activo)
         pdcrt_activar_recolector_de_basura(ctx);
-    if(!nuevo)
-        pdcrt_enomem(ctx);
     nuevo->gc.tipo = h->tipo;
     nuevo->gc.num_bytes = h->num_bytes;
 
@@ -456,13 +454,28 @@ static void pdcrt_gc_marcar_raiz_obj(pdcrt_ctx *ctx, pdcrt_obj *obj, pdcrt_recol
     pdcrt_gc_marcar_obj(ctx, obj, params);
 }
 
-static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_recoleccion params)
+static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_recoleccion params)
 {
     for(size_t i = 0; i < ctx->tam_pila; i++)
         pdcrt_gc_marcar_raiz_obj(ctx, &ctx->pila[i], params);
 
-    if(m && *m)
-        pdcrt_gc_marcar_raiz(ctx, PDCRT_CABECERA_GC_PTR(m), params);
+    // TODO: Encojer la pila si tiene mucha capacidad sin usar
+
+    while(m)
+    {
+        for(size_t i = 0; i < m->num_raices; i++)
+        {
+            pdcrt_obj *o = &m->raices_locales[i];
+            if(!o->recv && !o->gc)
+                continue;
+
+            if(o->recv)
+                pdcrt_gc_marcar_raiz_obj(ctx, &m->raices_locales[i], params);
+            else
+                pdcrt_gc_marcar_raiz(ctx, &o->gc, params);
+        }
+        m = m->superior;
+    }
 
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->funcion_igualdad, params);
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->funcion_hash, params);
@@ -481,9 +494,9 @@ static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_tipo_nulo, params);
     pdcrt_gc_marcar_raiz_obj(ctx, &ctx->clase_tabla, params);
 
-    if(ctx->continuacion_actual.marco)
+    if(ctx->continuacion_actual.k.marco)
     {
-        pdcrt_gc_marcar_raiz(ctx, PDCRT_CABECERA_GC_PTR(&ctx->continuacion_actual.marco), params);
+        pdcrt_gc_marcar_raiz(ctx, PDCRT_CABECERA_GC_PTR(&ctx->continuacion_actual.k.marco), params);
     }
 
 #define PDCRT_X(nombre, _texto)                                         \
@@ -608,7 +621,7 @@ static void pdcrt_gc_mover_negros_a_blancos(pdcrt_ctx *ctx, pdcrt_recoleccion pa
 }
 
 void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
-                                    pdcrt_marco **m,
+                                    pdcrt_gc_raices *m,
                                     pdcrt_recoleccion params)
 {
     struct timespec inicio, marcar, recolectar, total;
@@ -683,7 +696,7 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
     }
 }
 
-void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_marco **m)
+void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_gc_raices *m)
 {
     pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_pila(ctx);
     pdcrt_recolectar_basura_simple(ctx, m, params);

@@ -7,7 +7,7 @@
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
 
-pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
+pdcrt_tk pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     if(args != 2)
         pdcrt_error(ctx, u8"FunciónIgualdad: se esperaban 2 argumentos");
@@ -18,7 +18,7 @@ pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     if(pdcrt_es_primitivo(ctx, a) || pdcrt_es_primitivo(ctx, b))
     {
         bool ok = pdcrt_igualdad(ctx, a, b);
-        return pdcrt_continuar(ctx, k);
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(ok)));
     }
     else
     {
@@ -27,14 +27,12 @@ pdcrt_k pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     }
 }
 
-pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
+pdcrt_tk pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     if(args != 1)
         pdcrt_error(ctx, u8"FunciónHash: se esperaba 1 argumento");
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, args, k);
-    pdcrt_fijar_local(ctx, m, 0, pdcrt_sacar(ctx));
-    pdcrt_empujar_entero(ctx, m, pdcrt_hash(ctx, pdcrt_obtener_local(ctx, m, 0)));
-    return pdcrt_devolver(ctx, m, 1);
+    pdcrt_entero hash = pdcrt_hash(ctx, pdcrt_obj_desde_xmm(a1));
+    return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(hash)));
 }
 
 
@@ -44,7 +42,7 @@ pdcrt_k pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 
 _Static_assert(PDCRT_TABLA_TAM_MINIMO > 1, "PDCRT_TABLA_TAM_MINIMO debe ser mayor a 1");
 _Static_assert(PDCRT_TABLA_OCUPACION_MAXIMA >= 1, "PDCRT_TABLA_OCUPACION_MAXIMA debe ser mayor a 100%");
-_Static_assert(PDCRT_TABLA_OCUPACION_MINIMA > 1, "PDCRT_TABLA_OCUPACION_MINIMA debe ser menor a 1");
+_Static_assert(PDCRT_TABLA_OCUPACION_MINIMA > 1, "PDCRT_TABLA_OCUPACION_MINIMA debe ser mayor a 1");
 
 #define PDCRT_TABLA_NUM_MAX_BUCKETS (1LLU << ((sizeof(size_t) * 8LLU) - 1))
 
@@ -97,10 +95,8 @@ size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl)
     return total;
 }
 
-void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, size_t nueva_cap)
+void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
 {
-    (void) m;
-
     if(nueva_cap <= tbl->buckets_ocupados)
         // No redimensiones, resultaría en peor rendimiento
         return;
@@ -128,7 +124,7 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, siz
     {
         pdcrt_bucket *b = &viejos_buckets[i];
         if(b->activo)
-            pdcrt_tabla_fijar(ctx, m, tbl, b->llave, b->valor, false);
+            pdcrt_tabla_fijar(ctx, tbl, b->llave, b->valor, false);
     }
 
     pdcrt_desalojar_ctx(ctx, viejos_buckets, hasheables_viejos * sizeof(pdcrt_bucket));
@@ -139,7 +135,7 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, siz
     {
         pdcrt_bucket b = tbl->colisiones[i];
         if(b.activo)
-            pdcrt_tabla_fijar(ctx, m, tbl, b.llave, b.valor, false);
+            pdcrt_tabla_fijar(ctx, tbl, b.llave, b.valor, false);
     }
 
     assert(tbl->num_colisiones <= (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap);
@@ -159,10 +155,8 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, siz
     assert(tbl->buckets_ocupados == buckets_ocupados);
 }
 
-void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear)
+void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear)
 {
-    (void) m;
-
     if(!pdcrt_es_primitivo(ctx, llave))
         pdcrt_error(ctx, u8"Se trató de agregar un valor no primitivo a una tabla primitiva");
 
@@ -240,18 +234,16 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_o
 
     if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
     {
-        pdcrt_tabla_rehashear(ctx, m, tbl, tbl->buckets_ocupados);
+        pdcrt_tabla_rehashear(ctx, tbl, tbl->buckets_ocupados);
     }
     else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
     {
-        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
     }
 }
 
-bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor)
+bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor)
 {
-    (void) m;
-
     if(!pdcrt_es_primitivo(ctx, llave))
         return false;
 
@@ -279,10 +271,8 @@ bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj 
     }
 }
 
-void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear)
+void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear)
 {
-    (void) m;
-
     if(!pdcrt_es_primitivo(ctx, llave))
         return;
 
@@ -335,15 +325,15 @@ void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcr
 
     if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
     {
-        pdcrt_tabla_rehashear(ctx, m, tbl, tbl->buckets_ocupados);
+        pdcrt_tabla_rehashear(ctx, tbl, tbl->buckets_ocupados);
     }
     else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
     {
-        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
     }
 }
 
-void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, bool rehashear)
+void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, bool rehashear)
 {
     for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
     {
@@ -358,6 +348,6 @@ void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, bool r
 
     if(rehashear)
     {
-        pdcrt_tabla_rehashear(ctx, m, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
+        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
     }
 }

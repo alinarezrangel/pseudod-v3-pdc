@@ -9,12 +9,11 @@
 #include "pdcrt.h"
 
 
-void pdcrt_extender_pila(pdcrt_ctx *ctx, pdcrt_marco *m, size_t num_elem);
+void pdcrt_extender_pila(pdcrt_ctx *ctx, size_t num_elem);
 
 typedef ssize_t pdcrt_stp;
 
-pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt_marco **m);
-pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len);
+pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *str, size_t len);
 
 pdcrt_entero pdcrt_obtener_entero_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
 pdcrt_float pdcrt_obtener_float_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
@@ -23,10 +22,12 @@ size_t pdcrt_obtener_tam_texto_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok);
 void pdcrt_eliminar_elemento(pdcrt_ctx *ctx, pdcrt_stp pos);
 void pdcrt_eliminar_elementos(pdcrt_ctx *ctx, pdcrt_stp inic, size_t cnt);
 
-void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp i);
+void pdcrt_duplicar(pdcrt_ctx *ctx, pdcrt_stp i);
 void pdcrt_extraer(pdcrt_ctx *ctx, pdcrt_stp i);
 void pdcrt_insertar(pdcrt_ctx *ctx, pdcrt_stp pos);
-void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_stp pos, size_t num_els);
+
+// TODO: ¿Especializar? mover_a_cima(1), mover_a_cima(2), etc
+void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_stp pos, size_t num_els);
 
 void pdcrt_empujar_interceptar(pdcrt_ctx *ctx, pdcrt_obj o);
 void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
@@ -57,7 +58,7 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
     }                                                                   \
     while(0)
 
-pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_marco *m);
+pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_gc_raices *m);
 
 #define pdcrt_fijar_caja(ctx, o, v)                     \
     do                                                  \
@@ -91,7 +92,7 @@ void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_marco *m,
                   pdcrt_params_data *restrict p);
 
-size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, pdcrt_marco *m, const int* proto, size_t nproto);
+size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto);
 
 pdcrt_tk pdcrt_llamar0(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
                        __m128i obj, __m128i msj);
@@ -149,41 +150,44 @@ pdcrt_tk pdcrt_exportar(pdcrt_ctx *ctx,
                         const char *modulo,
                         size_t tam_modulo);
 
-pdcrt_obj pdcrt_obtener_clase_objeto(pdcrt_ctx *ctx, pdcrt_marco *m);
-
 typedef struct pdcrt_captura
 {
     size_t registro;
 } pdcrt_captura;
 
-pdcrt_obj pdcrt_crear_closure_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t num_caps);
-pdcrt_obj pdcrt_crear_closure_obj_1(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f,
-                                    __m128i c1);
+pdcrt_obj pdcrt_crear_closure_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f, size_t num_caps);
+pdcrt_obj pdcrt_crear_closure_obj_0(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f);
+pdcrt_obj pdcrt_crear_closure_obj_1(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f, __m128i c1);
 
 pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
-                           pdcrt_marco **m,
+                           pdcrt_marco *m,
+                           pdcrt_gc_raices *rc,
                            pdcrt_f f,
                            const pdcrt_captura *caps,
                            size_t ncaps);
 
-void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj v);
+void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_obj v);
 
 
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, size_t capturas, int args, pdcrt_k k);
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k);
 void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
                              pdcrt_marco *m,
                              size_t sz,
                              size_t registros,
-                             size_t capturas,
                              int args,
                              pdcrt_k k);
-pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad);
-pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_f f, size_t capturas);
-pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_marco **m);
-pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_marco **m, size_t capacidad);
-pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_marco **m, size_t num_bytes);
-pdcrt_corrutina* pdcrt_crear_corrutina_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_obj f);
-pdcrt_instancia* pdcrt_crear_instancia_obj(pdcrt_ctx *ctx, pdcrt_marco **m,
+pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t capacidad);
+pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f, size_t capturas);
+pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_gc_raices *m);
+pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t capacidad);
+pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t num_bytes);
+pdcrt_corrutina* pdcrt_crear_corrutina_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_obj f);
+pdcrt_instancia* pdcrt_crear_instancia_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m,
                                            pdcrt_obj metodos, pdcrt_obj metodo_no_encontrado, size_t num_atrs);
+
+PDCRT_INLINE pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt_gc_raices *m)
+{
+    return pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, m, 32));
+}
 
 #endif //PDCRT_OPS_H

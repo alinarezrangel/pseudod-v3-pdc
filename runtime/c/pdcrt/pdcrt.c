@@ -188,7 +188,7 @@ bool pdcrt_igualdad(pdcrt_ctx *ctx, pdcrt_obj a, pdcrt_obj b)
 
 
 
-static pdcrt_texto* pdcrt_crear_nuevo_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len)
+static pdcrt_texto* pdcrt_crear_nuevo_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *str, size_t len)
 {
     pdcrt_texto *txt = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_TEXTO, sizeof(pdcrt_texto) + len + 1);
     if(!txt)
@@ -210,7 +210,7 @@ static int pdcrt_comparar_str(const char *s1, size_t l1, const char *s2, size_t 
         return memcmp(s1, s2, l1);
 }
 
-pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_marco **m, const char *str, size_t len)
+pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *str, size_t len)
 {
     // Al alojar un texto nuevo (en caso de que no exista) se podría invocar al
     // recolector de basura. En ese caso, la lista de textos sobre la que
@@ -660,22 +660,20 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 
     ctx->hay_un_continuar = false;
 
-    pdcrt_marco *m = NULL;
-
 #define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = NULL;
     PDCRT_TABLA_TEXTOS(PDCRT_X);
 #undef PDCRT_X
-#define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = pdcrt_crear_texto_desde_cstr(ctx, &m, texto);
+#define PDCRT_X(nombre, texto) ctx->textos_globales.nombre = pdcrt_crear_texto_desde_cstr(ctx, NULL, texto);
     PDCRT_TABLA_TEXTOS(PDCRT_X);
 #undef PDCRT_X
 
     ctx->funcion_igualdad = pdcrt_objeto_closure(
-            pdcrt_crear_closure(ctx, &m, &pdcrt_funcion_igualdad, 0));
+            pdcrt_crear_closure(ctx, NULL, &pdcrt_funcion_igualdad, 0));
     ctx->funcion_hash = pdcrt_objeto_closure(
-            pdcrt_crear_closure(ctx, &m, &pdcrt_funcion_hash, 0));
+            pdcrt_crear_closure(ctx, NULL, &pdcrt_funcion_hash, 0));
 
-    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, 0));
-    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, 0));
+    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, 0));
+    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, 0));
 
     ctx->capacidades.time = !!pdcrt_time(NULL);
 
@@ -692,22 +690,23 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 
 void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
 {
-    pdcrt_marco *m = NULL;
-    pdcrt_extender_pila(ctx, NULL, 1);
+    pdcrt_extender_pila(ctx, 1);
     if(argc > 0)
     {
-        pdcrt_obj nm = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &m, argv[0], strlen(argv[0])));
+        pdcrt_obj nm = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, NULL, argv[0], strlen(argv[0])));
         ctx->nombre_del_programa = nm;
     }
-    pdcrt_empujar_arreglo_vacio(ctx, &m, argc - 1);
-    pdcrt_obj arr = pdcrt_cima(ctx);
+    pdcrt_arreglo *arr = pdcrt_crear_arreglo_vacio(ctx, NULL, argc - 1);
+    PDCRT_DEFINE_RAICES(1);
     for(int i = 1; i < argc; i++)
     {
-        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &m, argv[i], strlen(argv[i])));
-        pdcrt_barrera_de_escritura(ctx, arr, txt);
-        arr.arreglo->valores[arr.arreglo->longitud++] = txt;
+        PDCRT_GUARDAR_RAIZ_CABECERA(0, arr);
+        pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), argv[i], strlen(argv[i])));
+        PDCRT_CARGAR_RAIZ_CABECERA(0, arr);
+        pdcrt_barrera_de_escritura(ctx, pdcrt_objeto_arreglo(arr), txt);
+        arr->valores[arr->longitud++] = txt;
     }
-    ctx->argv = arr;
+    ctx->argv = pdcrt_objeto_arreglo(arr);
     (void) pdcrt_sacar(ctx);
 }
 
@@ -720,9 +719,8 @@ pdcrt_obj pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m, p
 
 static void pdcrt_preparar_registros(pdcrt_ctx *ctx, size_t num_mods)
 {
-    pdcrt_marco *m = NULL;
-    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, num_mods));
-    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, &m, num_mods));
+    ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, num_mods));
+    ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, num_mods));
 }
 
 static void pdcrt_liberar_grupo(pdcrt_ctx *ctx, pdcrt_gc_grupo *grupo)
@@ -810,19 +808,22 @@ bool pdcrt_stack_lleno(pdcrt_ctx *ctx)
 
 static pdcrt_tk pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
 {
+    (void) m;
+
     if(!ctx->hay_una_salida_del_trampolin)
     {
         // TODO: Documenta este mensaje de error.
         pdcrt_error(ctx, u8"Debe haber una salida del trampolín para terminar la ejecución");
     }
-    pdcrt_extender_pila(ctx, m, 1);
+    PDCRT_DEFINE_RAICES(1);
+    pdcrt_extender_pila(ctx, 1);
     pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(res));
     // Si el marco es reubicado, la nueva dirección quedará en `m`, que será
     // inaccesible después de que `longjmp` devuelva.
     //
     // Esto normalmente sería problematico, pero aquí no importa ya que nada
     // usará el marco después de esta llamada.
-    pdcrt_recolectar_basura_por_pila(ctx, &m);
+    pdcrt_recolectar_basura_por_pila(ctx, PDCRT_GC());
     longjmp(ctx->salir_del_trampolin, 1);
 }
 
@@ -832,7 +833,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     assert(args == 0 && "TODO ejecutar_opt(args > 0)");
 
     pdcrt_ctx * volatile ctx = ctxp;
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, 0, (pdcrt_k){0});
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, (pdcrt_k){0});
     pdcrt_k k = {
         .kf = &pdcrt_continuacion_de_ejecutar,
         .marco = m,
@@ -921,7 +922,7 @@ static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, p
 
 static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, args, k);
     return pdcrt_importar(ctx, m, "pdcrt_N95_runtime", 17, &pdcrt_preparar_registro_de_modulos_importar_k1);
 }
 
@@ -940,32 +941,17 @@ void pdcrt_preparar_registro_de_modulos(pdcrt_ctx *ctx, size_t num_mods)
     (void) pdcrt_sacar(ctx);
 }
 
-static pdcrt_tk pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
-
-static pdcrt_tk pdcrt_cargar_dependencia_fijarEn(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
-{
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, args, k);
-    assert(args == 2 && "cargar_dependencia_fijarEn(reg, nm, mod)");
-    return pdcrt_llamar2(ctx, m, &pdcrt_cargar_dependencia_fijarEn_k1,
-        a1, PDCRT_XMM_TEXTO(ctx->textos_globales.fijarEn), a2, a3);
-}
-
-static pdcrt_tk pdcrt_cargar_dependencia_fijarEn_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
-{
-    PDCRT_K(pdcrt_cargar_dependencia_fijarEn_k1);
-    // [nulo]
-    return pdcrt_devolver(ctx, m, 1);
-}
-
 void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, size_t tam_nombre)
 {
-    pdcrt_marco *m = NULL;
-    pdcrt_extender_pila(ctx, NULL, 3);
-    pdcrt_empujar(ctx, ctx->registro_de_modulos);
-    pdcrt_empujar_texto(ctx, &m, nombre, tam_nombre);
-    pdcrt_empujar_closure(ctx, &m, fmod, 0);
-    pdcrt_ejecutar(ctx, 0, pdcrt_cargar_dependencia_fijarEn);
-    (void) pdcrt_sacar(ctx);
+    PDCRT_DEFINE_RAICES(1);
+
+    pdcrt_obj onombre = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), nombre, tam_nombre));
+
+    PDCRT_GUARDAR_RAIZ(0, onombre);
+    pdcrt_obj ocls = pdcrt_crear_closure_obj_0(ctx, PDCRT_GC(), fmod);
+    PDCRT_CARGAR_RAIZ(0, onombre);
+
+    pdcrt_tabla_fijar(ctx, ctx->registro_de_modulos.tabla, onombre, ocls, true);
 }
 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f)

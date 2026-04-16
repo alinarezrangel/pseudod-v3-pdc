@@ -56,6 +56,8 @@ typedef struct pdcrt_tk pdcrt_tk;
 #define PDCRT_F_IMM __m128i yo, __m128i msj, __m128i a1, __m128i a2, __m128i a3, __m128i a4, __m128i a5, __m128i a6
 #define PDCRT_A_IMM yo, msj, a1, a2, a3, a4, a5, a6
 #define PDCRT_AA_IMM a1, a2, a3, a4, a5, a6
+#define PDCRT_N_IMM 8
+#define PDCRT_NN_IMM 6
 
 typedef pdcrt_tk (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k k, PDCRT_F_IMM);
 typedef pdcrt_tk (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *, __m128i res);
@@ -500,23 +502,41 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj);
 void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 
-size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara);
-void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len);
-void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
-size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl);
-void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear);
-void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, size_t nueva_cap);
-void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, bool rehashear);
-bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor);
-void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear);
-
 void pdcrt_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_f f);
 bool pdcrt_ejecutar_protegido(pdcrt_ctx *ctx, int args, pdcrt_f f);
 
 
 pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o);
 
-void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_marco **m);
+typedef struct pdcrt_gc_raices
+{
+    struct pdcrt_gc_raices *superior;
+    size_t num_raices;
+    pdcrt_obj raices_locales[];
+} pdcrt_gc_raices;
+
+#define PDCRT_DEFINE_RAICES(n) \
+    _Alignas(pdcrt_gc_raices) char raices_locales_buffer[sizeof(pdcrt_gc_raices) + sizeof(pdcrt_obj) * (n)] = {0}; \
+    pdcrt_gc_raices *raices_locales = (pdcrt_gc_raices *) raices_locales_buffer; \
+    raices_locales->superior = NULL; \
+    raices_locales->num_raices = (n);
+#define PDCRT_RAICES_SUPERIORES(sup) raices_locales->superior = (sup)
+#define PDCRT_REINICIAR_RAICES() memset(raices_locales->raices_locales, 0, sizeof(pdcrt_obj) * raices_locales->num_raices)
+
+#define PDCRT_GUARDAR_RAIZ(n, o) raices_locales->raices_locales[n] = (o)
+#define PDCRT_CARGAR_RAIZ(n, o) (o) = raices_locales->raices_locales[n]
+#define PDCRT_GUARDAR_RAIZ_CABECERA(n, c) raices_locales->raices_locales[n] = (pdcrt_obj) { .recv = NULL, .gc = PDCRT_CABECERA_GC(c) };
+#define PDCRT_CARGAR_RAIZ_CABECERA(n, c) (c) = (void *) raices_locales->raices_locales[n].gc
+#define PDCRT_GUARDAR_RAIZ_XMM(n, xmm) raices_locales->raices_locales[n] = pdcrt_obj_desde_xmm(xmm)
+#define PDCRT_CARGAR_RAIZ_XMM(n, xmm) (xmm) = pdcrt_xmm_desde_obj(raices_locales->raices_locales[n])
+#define PDCRT_GUARDAR_RAIZ_K(n, k) PDCRT_GUARDAR_RAIZ_CABECERA(n, (k).marco)
+#define PDCRT_CARGAR_RAIZ_K(n, k) PDCRT_CARGAR_RAIZ_CABECERA(n, (k).marco)
+
+// Marcador de pdcrt_gc_raices. Debe usarse en todos los puntos en los
+// que se realize una posible recolección de basura.
+#define PDCRT_GC() raices_locales
+
+void pdcrt_recolectar_basura_por_pila(pdcrt_ctx *ctx, pdcrt_gc_raices *m);
 
 void pdcrt_gc_mover_a_grupo(pdcrt_gc_grupo *desde, pdcrt_gc_grupo *hacia, pdcrt_cabecera_gc *h);
 
@@ -559,15 +579,15 @@ PDCRT_INLINE bool pdcrt_gc_recoleccion_es_menor(pdcrt_recoleccion r)
     return r.tipo == PDCRT_RECOLECCION_SIN_PILA;
 }
 
-void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_recoleccion params);
-void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_recoleccion params);
+void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_recoleccion params);
+void pdcrt_intenta_invocar_al_recolector(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_recoleccion params);
 void pdcrt_activar_recolector_de_basura(pdcrt_ctx *ctx);
 void pdcrt_desactivar_recolector_de_basura(pdcrt_ctx *ctx);
 void pdcrt_inicializar_obj(pdcrt_ctx *ctx,
                            pdcrt_cabecera_gc *h,
                            pdcrt_tipo_obj_gc tipo,
                            size_t sz);
-void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_marco **m, pdcrt_tipo_obj_gc tipo, size_t sz);
+void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz);
 
 typedef struct pdcrt_objeto_generico_gc
 {
@@ -594,6 +614,16 @@ inline void pdcrt_barrera_de_escritura(pdcrt_ctx *ctx, pdcrt_obj contenedor, pdc
         return;
     pdcrt_barrera_de_escritura_cabecera(ctx, ch, vh);
 }
+
+size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara);
+void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len);
+void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
+size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl);
+void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear);
+void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap);
+void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, bool rehashear);
+bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor);
+void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear);
 
 enum pdcrt_comparacion
 {
@@ -625,7 +655,10 @@ PDCRT_INLINE bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
 #define PDCRT_K(func)                                   \
     if(pdcrt_stack_lleno(ctx))                          \
     {                                                   \
-        pdcrt_recolectar_basura_por_pila(ctx, &m);      \
+        PDCRT_DEFINE_RAICES(1);                         \
+        PDCRT_GUARDAR_RAIZ_CABECERA(0, m);              \
+        pdcrt_recolectar_basura_por_pila(ctx, PDCRT_GC()); \
+        PDCRT_CARGAR_RAIZ_CABECERA(0, m);               \
         return pdcrt_trampolin(ctx, (pdcrt_tk) { .k = (pdcrt_k) { .kf = &func, .marco = m }, .res = res }); \
     }
 
@@ -685,7 +718,7 @@ void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, 
 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f);
 
-pdcrt_tk pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k);
+pdcrt_tk pdc_instalar_pdcrt_N95_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 
 pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o);
 
@@ -726,6 +759,7 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 #define pdcrt_objeto_reubicado(reub) ((pdcrt_obj) { .recv = &pdcrt_recv_reubicado, .reubicado = (reub) })
 
 #ifdef PDCRT_DBG_NO_K
+// TODO fix:
 #define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
     pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, num_capturas, args, k);
 #else
