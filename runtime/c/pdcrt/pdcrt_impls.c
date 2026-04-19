@@ -1302,7 +1302,7 @@ pdcrt_tk pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     {
         if(args != 1)
             pdcrt_error(ctx, "Tabla: paraCadaPar necesita 1 argumento");
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, k);
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, k, NULL);
         pdcrt_fijar_local(ctx, m, 0, oyo);
         pdcrt_fijar_local(ctx, m, 1, pdcrt_obj_desde_xmm(a1));
         pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(0));
@@ -1813,7 +1813,7 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             PDCRT_DEFINE_RAICES(3);
             oyo.coro->estado = PDCRT_CORO_EJECUTANDOSE;
             oyo.coro->punto_de_continuacion = k;
-            pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, k);
+            pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, k, NULL);
             pdcrt_fijar_local(ctx, m, 0, oyo);
             PDCRT_GUARDAR_RAIZ_K(0, k);
             PDCRT_GUARDAR_RAIZ(1, oyo);

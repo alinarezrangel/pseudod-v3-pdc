@@ -833,7 +833,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     assert(args == 0 && "TODO ejecutar_opt(args > 0)");
 
     pdcrt_ctx * volatile ctx = ctxp;
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, (pdcrt_k){0});
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, (pdcrt_k){0}, NULL);
     pdcrt_k k = {
         .kf = &pdcrt_continuacion_de_ejecutar,
         .marco = m,
@@ -922,7 +922,7 @@ static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, p
 
 static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, args, k);
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, args, k, NULL);
     return pdcrt_importar(ctx, m, "pdcrt_N95_runtime", 17, &pdcrt_preparar_registro_de_modulos_importar_k1);
 }
 

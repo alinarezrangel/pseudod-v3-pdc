@@ -107,11 +107,11 @@ funcion EscaparTexto: txt
 finfuncion
 
 procedimiento DeclararFunción: puerto, identificadorDelMódulo, func
-    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k);}
+    EmitirLínea: puerto, {static pdcrt_tk }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k, PDCRT_F_IMM);}
 finprocedimiento
 
 procedimiento DeclararContinuación: puerto, identificadorDelMódulo, k
-    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m);}
+    EmitirLínea: puerto, {static pdcrt_tk }, (NombreDeLaContinuación: identificadorDelMódulo, k#id), {(pdcrt_ctx* ctx, pdcrt_marco* m, __m128i res);}
 finprocedimiento
 
 funcion NombreDeLaEstructuraConParámetros: identificadorDelMódulo, id
@@ -119,10 +119,10 @@ funcion NombreDeLaEstructuraConParámetros: identificadorDelMódulo, id
 finfuncion
 
 procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
-    EmitirLínea: puerto, {static pdcrt_k }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k)}
+    EmitirLínea: puerto, {static pdcrt_tk }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k, PDCRT_F_IMM)}
     EmitirLínea: puerto, «{»
     [ FIXME: Como no hay un `VERIFICA_PILA` aquí, podríamos causar un stack-overflow ]
-    EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, }, func#númCapturas, {, args, k);}
+    EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, args, k);}
     variables fid, idcVariadic
     fijar fid a NombreDeLaEstructuraConParámetros: identificadorDelMódulo, func#id
     EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
@@ -130,11 +130,11 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
     EmitirLínea: puerto,
                  «static const struct », fid,
                  « pdc_params = { .base = { .num_params = », func#parámetros#longitud,
-                 «, .tiene_variadic = », ((no EsNulo: idcVariadic)#escojer: {true}, {false}),
+                 «, .tiene_variadic = », ((no EsNulo: idcVariadic)#escoger: {true}, {false}),
                  «, .idc_variadic = », ((EsNulo: idcVariadic)#escoger: 0, idcVariadic),
                  «, }, .params = {», (Unir: (Mapear: func#parámetros, funcion: p devolver «{~t}»#formatear: p#registro finfuncion), {, }),
                  «} };»
-    EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params);}
+    EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -144,9 +144,9 @@ finprocedimiento
 procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
     variable nombre
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
-    EmitirLínea: puerto, {static pdcrt_k }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m)}
+    EmitirLínea: puerto, {static pdcrt_tk }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m, __m128i res)}
     EmitirLínea: puerto, «{»
-    EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, }, nombre, {);}
+    EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, res, }, nombre, {);}
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla
     finprocedimiento
@@ -161,44 +161,106 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         EmitirLínea: puerto, {pdcrt_obj csaltar_obj = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
         EmitirLínea: puerto, {if(pdcrt_tipo_de_obj(csaltar_obj) != PDCRT_TOBJ_BOOLEANO) pdcrt_error(ctx, "Se esperaba un objeto de tipo Boole");}
         EmitirLínea: puerto, {if(csaltar_obj.bval)}
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {, PDCRT_XMM_NULO());}
         EmitirLínea: puerto, {else}
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {, PDCRT_XMM_NULO());}
     finsi
 
     si opcode = Opcode#saltar
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {);}
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {, PDCRT_XMM_NULO());}
+    finsi
+
+    si opcode = Opcode#continuar
+        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {, PDCRT_XMM_NULO());}
     finsi
 
     si opcode = Opcode#enviarMensaje_s1
-        variables rets, args, msj, objReg
+        variables rets, args, msj, objReg, tieneArgsVariadic
         fijar rets a tupla#en: 1
         fijar objReg a tupla#en: 2
         fijar msj a tupla#en: 3
         fijar args a tupla#en: 4
         necesitas rets#longitud = 1
         necesitas no (rets#en: 0)#esVariadic
-        EmitirLínea: puerto, {static const int proto[] =}
-        Emitir: puerto, «{ »
-        ParaCadaElemento: args, procedimiento: arg
-            Emitir: puerto, (arg#esVariadic#escoger: {1}, {0}), {, }
-        finprocedimiento
-        EmitirLínea: puerto, «};»
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, }, (args#longitud + 1), {);}
-        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, objReg, {));}
-        ParaCadaElemento: args, procedimiento: arg
-            EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, arg#registro, {));}
-        finprocedimiento
-        EmitirLínea: puerto,
-            {return pdcrt_enviar_mensaje(ctx, m, },
-            (EscaparTexto: msj),
-            {, },
-            msj#longitud,
-            {, proto, },
-            args#longitud,
-            {, },
-            (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
-            {);}
+
+        fijar tieneArgsVariadic a Algún: (Mapear: args, (MétodoComoFunción: {esVariadic}))
+        si tieneArgsVariadic
+            EmitirLínea: puerto, {static const int proto[] =}
+            Emitir: puerto, «{ »
+            ParaCadaElemento: args, procedimiento: arg
+                Emitir: puerto, (arg#esVariadic#escoger: {1}, {0}), {, }
+            finprocedimiento
+            EmitirLínea: puerto, «};»
+            EmitirLínea: puerto, {pdcrt_extender_pila(ctx, }, args#longitud, {);}
+            ParaCadaElemento: args, procedimiento: arg
+                EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, arg#registro, {));}
+            finprocedimiento
+
+            EmitirLínea: puerto, {size_t llamar_nargs = pdcrt_expandir_varargs(ctx, proto, }, args#longitud, {);}
+
+            EmitirLínea: puerto, «{»
+            EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto,
+                         {pdcrt_obj llamar_msj = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), },
+                         (EscaparTexto: msj),
+                         {, },
+                         msj#longitud,
+                         {));}
+            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto,
+                         {return pdcrt_llamarn(ctx, m, },
+                         (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
+                         {, llamar_nargs, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                         objReg,
+                         {)), pdcrt_xmm_desde_obj(llamar_msj));}
+            EmitirLínea: puerto, «}»
+        sino
+            variables extraArgs, sufijoLlamar, argsEnLaPila, llamarNargs
+            si args#longitud =< 6
+                fijar sufijoLlamar a args#longitud#comoTexto
+                fijar llamarNargs a {}
+            sino
+                fijar sufijoLlamar a {nr}
+                fijar llamarNargs a {, }#concatenar: args#longitud#comoTexto
+            finsi
+
+            fijar extraArgs a {}
+            ParaCadaNúmero: 0, (Min: 6, args#longitud), procedimiento: i
+                variable arg
+                fijar arg a args#en: i
+                fijar extraArgs a extraArgs#concatenar: ({, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, ~t))}#formatear: arg#registro)
+            finprocedimiento
+
+            fijar argsEnLaPila a Min: 0, (args#longitud - 6)
+            si argsEnLaPila > 0
+                EmitirLínea: puerto, {pdcrt_extender_pila(ctx, }, argsEnLaPila, {);}
+                ParaCadaNúmero: 6, args#longitud, procedimiento: i
+                    variable arg
+                    fijar arg a args#en: i
+                    EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, arg#registro, {));}
+                finprocedimiento
+            finsi
+
+            EmitirLínea: puerto, «{»
+            EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto,
+                         {pdcrt_obj llamar_msj = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), },
+                         (EscaparTexto: msj),
+                         {, },
+                         msj#longitud,
+                         {));}
+            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto,
+                         {return pdcrt_llamar}, sufijoLlamar, {(ctx, m, },
+                         (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
+                         llamarNargs,
+                         {, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                         objReg,
+                         {)), pdcrt_xmm_desde_obj(llamar_msj)}, extraArgs, {);}
+            EmitirLínea: puerto, «}»
+        finsi
     finsi
 
     si opcode = Opcode#enviarMensaje_s2
@@ -209,7 +271,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         fijar args a tupla#en: 4
         necesitas rets#longitud = 1
         necesitas no (rets#en: 0)#esVariadic
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (rets#en: 0)#registro, {, pdcrt_sacar(ctx));}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (rets#en: 0)#registro, {, pdcrt_obj_desde_xmm(res));}
     finsi
 
     si opcode = Opcode#fijarRegistro
@@ -218,7 +280,10 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
 
     si opcode = Opcode#caja
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {pdcrt_obj caja = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, &m));}
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
+        EmitirLínea: puerto, {pdcrt_obj caja = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, PDCRT_GC()));}
+        EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_fijar_caja(ctx, caja, pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {));}
         EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, caja);}
         EmitirLínea: puerto, «} while(0);»
@@ -251,9 +316,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
         fijar rets a tupla#en: 1
         necesitas rets#longitud = 1
         necesitas no (rets#en: 0)#esVariadic
-        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, m, 1);}
-        EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, (rets#en: 0)#registro, {));}
-        EmitirLínea: puerto, {return pdcrt_devolver(ctx, m, 1);}
+        EmitirLínea: puerto, {return pdcrt_devolver1(ctx, m, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, }, (rets#en: 0)#registro, {)));}
     finsi
 
     si opcode = Opcode#número
@@ -268,9 +331,12 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
 
     si opcode = Opcode#texto
         EmitirLínea: puerto, «do {»
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto,
-                     {pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, &m, }, (EscaparTexto: (tupla#en: 2)),
+                     {pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), }, (EscaparTexto: (tupla#en: 2)),
                      {, }, (tupla#en: 2)#longitud, {));}
+        EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, txt);}
         EmitirLínea: puerto, «} while(0);»
     finsi
@@ -307,19 +373,18 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
                      (Unir: (Mapear: caps, funcion: reg devolver «{~t}»#formatear: reg finfuncion), {, }),
                      «};»
         EmitirLínea: puerto,
-                     {pdcrt_obj cl = pdcrt_mk_closure(ctx, &m, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 2)),
+                     {pdcrt_obj cl = pdcrt_mk_closure(ctx, &m, NULL, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 2)),
                      {, caps, }, caps#longitud, {);}
         EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, cl);}
         EmitirLínea: puerto, «} while(0);»
     finsi
 
-    si opcode = Opcode#continuar
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {);}
-    finsi
-
     si opcode = Opcode#espacioDeNombres
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {pdcrt_obj cons = pdcrt_crear_espacio_de_nombres_cons(ctx, &m);}
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
+        EmitirLínea: puerto, {pdcrt_obj cons = pdcrt_crear_espacio_de_nombres_cons(ctx, PDCRT_GC());}
+        EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, cons);}
         EmitirLínea: puerto, «} while(0);»
     finsi
@@ -353,7 +418,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#importar_s2
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_sacar(ctx));}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_obj_desde_xmm(res));}
     finsi
 
     si opcode = Opcode#extraer_s1
@@ -365,7 +430,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#extraer_s2
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_sacar(ctx));}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_obj_desde_xmm(res));}
     finsi
 
     si opcode = Opcode#comoEspacioDeNombres

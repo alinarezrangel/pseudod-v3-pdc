@@ -17,7 +17,8 @@ static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
                                          pdcrt_marco *m,
                                          size_t registros,
                                          int args,
-                                         pdcrt_k k)
+                                         pdcrt_k k,
+                                         pdcrt_closure *capturas)
 {
     m->args = args;
     m->k = k;
@@ -26,9 +27,21 @@ static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
     {
         m->registros[i] = pdcrt_objeto_nulo();
     }
+
+    if(capturas)
+    {
+        for(size_t i = 0; i < capturas->num_capturas; i++)
+        {
+            pdcrt_obj val = capturas->capturas[i];
+            pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(val);
+            if(vh)
+                pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(m), vh);
+            m->registros[i] = val;
+        }
+    }
 }
 
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k)
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k, pdcrt_closure *capturas)
 {
     PDCRT_DEFINE_RAICES(1);
     PDCRT_GUARDAR_RAIZ_CABECERA(0, k.marco);
@@ -36,7 +49,7 @@ pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt
     PDCRT_CARGAR_RAIZ_CABECERA(0, k.marco);
     if(!m)
         pdcrt_enomem(ctx);
-    pdcrt_inicializar_marco_impl(ctx, m, registros, args, k);
+    pdcrt_inicializar_marco_impl(ctx, m, registros, args, k, capturas);
     return m;
 }
 
@@ -45,10 +58,11 @@ void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
                              size_t sz,
                              size_t registros,
                              int args,
-                             pdcrt_k k)
+                             pdcrt_k k,
+                             pdcrt_closure *capturas)
 {
     pdcrt_inicializar_obj(ctx, PDCRT_CABECERA_GC(m), PDCRT_TGC_MARCO, sz);
-    pdcrt_inicializar_marco_impl(ctx, m, registros, args, k);
+    pdcrt_inicializar_marco_impl(ctx, m, registros, args, k, capturas);
     m->gc.en_la_pila = true;
     pdcrt_gc_mover_a_grupo(&ctx->gc.blanco_joven, &ctx->gc.blanco_en_la_pila, PDCRT_CABECERA_GC(m));
 }
@@ -310,35 +324,80 @@ void pdcrt_mover_a_cima(pdcrt_ctx *ctx, pdcrt_stp pos, size_t num_els)
 
 void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_marco *m,
-                  pdcrt_params_data *restrict p)
+                  pdcrt_params_data *restrict p,
+                  PDCRT_F_IMM)
 {
-    if(m->args < p->base.num_params - (p->base.tiene_variadic ? 1 : 0))
-        pdcrt_error(ctx, u8"función llamada de forma inválida");
-
-    // Núm. parámetros antes del variadic
-    size_t prefijo = p->base.tiene_variadic ? p->base.idc_variadic : p->base.num_params;
-    // Núm. parámetros después del variadic
-    size_t sufijo = p->base.tiene_variadic ? p->base.num_params - p->base.idc_variadic - 1 : 0;
-    // Núm. argumentos variadic
-    size_t num_args_variadic = p->base.tiene_variadic ? m->args - prefijo - sufijo : 0;
-    // Núm. parámetros variadic
-    size_t num_param_variadic = p->base.tiene_variadic ? 1 : 0;
-
-    assert(m->args == (prefijo + num_args_variadic + sufijo));
-    assert(p->base.num_params == (prefijo + sufijo + num_param_variadic));
-
-    for(size_t i = 0; i < prefijo; i++)
+    if(!p->base.tiene_variadic)
     {
-        m->registros[p->params[i].reg] = ctx->pila[ctx->tam_pila - m->args + i];
+        if(m->args != p->base.num_params)
+            pdcrt_error(ctx, u8"función llamada de forma inválida");
+
+        if(p->base.num_params >= 1)
+            m->registros[p->params[0].reg] = pdcrt_obj_desde_xmm(a1);
+        if(p->base.num_params >= 2)
+            m->registros[p->params[1].reg] = pdcrt_obj_desde_xmm(a2);
+        if(p->base.num_params >= 3)
+            m->registros[p->params[2].reg] = pdcrt_obj_desde_xmm(a3);
+        if(p->base.num_params >= 4)
+            m->registros[p->params[3].reg] = pdcrt_obj_desde_xmm(a4);
+        if(p->base.num_params >= 5)
+            m->registros[p->params[4].reg] = pdcrt_obj_desde_xmm(a5);
+        if(p->base.num_params >= 6)
+            m->registros[p->params[5].reg] = pdcrt_obj_desde_xmm(a6);
+        if(p->base.num_params >= 7)
+        {
+            for(size_t i = 6; i < p->base.num_params; i++)
+            {
+                m->registros[p->params[i].reg] = ctx->pila[ctx->tam_pila - (m->args - 6) + (i - 6)];
+            }
+        }
     }
-    for(size_t i = 0; i < sufijo; i++)
+    else
     {
-        m->registros[p->params[prefijo + num_param_variadic + i].reg] =
-            ctx->pila[ctx->tam_pila - m->args + prefijo + num_args_variadic + i];
-    }
+        size_t nargss = m->args < 6 ? 0 : m->args - 6;
+        size_t argp = ctx->tam_pila - nargss;
+        size_t nargsp = m->args < 6 ? m->args : 6;
+        pdcrt_extender_pila(ctx, nargsp);
+        memmove(ctx->pila + argp + nargsp,
+                ctx->pila + argp,
+                nargss * sizeof(pdcrt_obj));
+        ctx->tam_pila += nargsp;
+        if(nargsp >= 1)
+            pdcrt_fijar_pila(ctx, argp + 0, pdcrt_obj_desde_xmm(a1));
+        if(nargsp >= 2)
+            pdcrt_fijar_pila(ctx, argp + 1, pdcrt_obj_desde_xmm(a2));
+        if(nargsp >= 3)
+            pdcrt_fijar_pila(ctx, argp + 2, pdcrt_obj_desde_xmm(a3));
+        if(nargsp >= 4)
+            pdcrt_fijar_pila(ctx, argp + 3, pdcrt_obj_desde_xmm(a4));
+        if(nargsp >= 5)
+            pdcrt_fijar_pila(ctx, argp + 4, pdcrt_obj_desde_xmm(a5));
+        if(nargsp >= 6)
+            pdcrt_fijar_pila(ctx, argp + 5, pdcrt_obj_desde_xmm(a6));
 
-    if(p->base.tiene_variadic)
-    {
+        // Núm. parámetros antes del variadic
+        size_t prefijo = p->base.idc_variadic;
+        // Núm. parámetros después del variadic
+        size_t sufijo = p->base.num_params - p->base.idc_variadic - 1;
+        // Núm. argumentos variadic
+        size_t num_args_variadic = m->args - prefijo - sufijo;
+        // Núm. parámetros variadic
+        size_t num_param_variadic = 1;
+
+        if(m->args != (prefijo + num_args_variadic + sufijo))
+            pdcrt_error(ctx, u8"función llamada de forma inválida");
+        assert(p->base.num_params == (prefijo + sufijo + num_param_variadic));
+
+        for(size_t i = 0; i < prefijo; i++)
+        {
+            m->registros[p->params[i].reg] = ctx->pila[ctx->tam_pila - m->args + i];
+        }
+        for(size_t i = 0; i < sufijo; i++)
+        {
+            m->registros[p->params[prefijo + num_param_variadic + i].reg] =
+                ctx->pila[ctx->tam_pila - m->args + prefijo + num_args_variadic + i];
+        }
+
         PDCRT_DEFINE_RAICES(1);
         PDCRT_GUARDAR_RAIZ_CABECERA(0, m);
         pdcrt_obj arr = pdcrt_objeto_arreglo(pdcrt_crear_arreglo_vacio(ctx, PDCRT_GC(), num_args_variadic));
@@ -351,9 +410,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
             arr.arreglo->valores[arr.arreglo->longitud++] = val;
         }
         m->registros[p->params[p->base.idc_variadic].reg] = arr;
-    }
 
-    ctx->tam_pila -= m->args; // saca todos los argumentos
+        ctx->tam_pila -= m->args; // saca todos los argumentos
+    }
 }
 
 
@@ -382,7 +441,7 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
             pdcrt_obj val = ctx->pila[ctx->tam_pila - nproto + total];
             memmove(ctx->pila - nproto + total + val.arreglo->longitud,
                     ctx->pila - nproto + total,
-                    val.arreglo->longitud);
+                    val.arreglo->longitud * sizeof(pdcrt_obj));
             ctx->tam_pila += val.arreglo->longitud;
             total += val.arreglo->longitud;
         }
@@ -714,6 +773,8 @@ pdcrt_tk pdcrt_devolver1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
     return pdcrt_continuar(ctx, m->k, res);
 }
 
+extern pdcrt_tk pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf, __m128i res);
+
 static pdcrt_tk pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
 
 pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size_t tam_nombre, pdcrt_kf kf)
@@ -739,7 +800,7 @@ pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size
             pdcrt_error(ctx, u8"Módulo no exíste");
         }
 
-        pdcrt_marco *m2 = pdcrt_crear_marco(ctx, 1, 0, (pdcrt_k) { .kf = kf, .marco = m });
+        pdcrt_marco *m2 = pdcrt_crear_marco(ctx, 1, 0, (pdcrt_k) { .kf = kf, .marco = m }, NULL);
         pdcrt_fijar_local(ctx, m2, 0, onombre);
         return pdcrt_llamar0(ctx, m2, &pdcrt_importar_k1,
             pdcrt_xmm_desde_obj(ovalor), pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)));

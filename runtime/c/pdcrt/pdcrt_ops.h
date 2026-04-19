@@ -90,7 +90,8 @@ typedef struct pdcrt_params_data
 
 void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_marco *m,
-                  pdcrt_params_data *restrict p);
+                  pdcrt_params_data *restrict p,
+                  PDCRT_F_IMM);
 
 size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto);
 
@@ -124,6 +125,11 @@ pdcrt_tk pdcrt_llamarnr(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf,
 
 pdcrt_tk pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets);
 pdcrt_tk pdcrt_devolver1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res);
+
+PDCRT_INLINE pdcrt_tk pdcrt_saltar(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_kf kf, __m128i res)
+{
+    return (*kf)(ctx, m, res);
+}
 
 pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx,
                         pdcrt_marco *m,
@@ -169,13 +175,14 @@ pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
 void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_obj v);
 
 
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k);
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k, pdcrt_closure *capturas);
 void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
                              pdcrt_marco *m,
                              size_t sz,
                              size_t registros,
                              int args,
-                             pdcrt_k k);
+                             pdcrt_k k,
+                             pdcrt_closure *capturas);
 pdcrt_arreglo* pdcrt_crear_arreglo_vacio(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t capacidad);
 pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f, size_t capturas);
 pdcrt_caja* pdcrt_crear_caja(pdcrt_ctx *ctx, pdcrt_gc_raices *m);

@@ -760,26 +760,28 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 
 #ifdef PDCRT_DBG_NO_K
 // TODO fix:
-#define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, num_capturas, args, k);
+#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k)     \
+    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(oyo), PDCRT_TOBJ_CLOSURE); \
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, args, k, pdcrt_obj_desde_xmm(oyo).closure);
 #else
-#define PDCRT_ALOJAR_MARCO(ctx, num_regs, num_capturas, args, k)     \
+#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k)     \
+    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(oyo), PDCRT_TOBJ_CLOSURE); \
     alignas(alignof(pdcrt_cabecera_gc))                                 \
         char marco_en_pila[                                             \
             sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
     pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
-    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, num_capturas, args, k)
+    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, args, k, pdcrt_obj_desde_xmm(oyo).closure)
 #endif
 
 // Esta macro debería aceptar cuanta pila necesitamos, en bytes. En su forma actual, aún podríamos causar
 // stack-overflows.
-#define PDCRT_VERIFICA_PILA(ctx, m, nombre)                \
+#define PDCRT_VERIFICA_PILA(ctx, m, resv, nombre)          \
     do                                                     \
     {                                                      \
         if(pdcrt_stack_lleno(ctx))                         \
         {                                                  \
             pdcrt_recolectar_basura_por_pila(ctx, &m);     \
-            return pdcrt_trampolin(ctx, (pdcrt_k) { .kf = nombre, .marco = m }); \
+            return pdcrt_trampolin(ctx, (pdcrt_tk) { .k = { .kf = nombre, .marco = m }, .res = resv }); \
         }                                                  \
     }                                                      \
     while(0)
