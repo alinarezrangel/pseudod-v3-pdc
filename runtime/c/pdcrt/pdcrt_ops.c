@@ -355,6 +355,8 @@ void pdcrt_params(pdcrt_ctx *ctx,
                 m->registros[p->params[i].reg] = ctx->pila[ctx->tam_pila - (m->args - 6) + (i - 6)];
             }
         }
+
+        ctx->tam_pila -= (m->args <= 6 ? 0 : m->args - 6);
     }
     else
     {
@@ -418,9 +420,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
             arr.arreglo->valores[arr.arreglo->longitud++] = val;
         }
         m->registros[p->params[p->base.idc_variadic].reg] = arr;
-    }
 
-    ctx->tam_pila -= (m->args <= 6 ? 0 : m->args - 6); // saca todos los argumentos
+        ctx->tam_pila -= m->args;
+    }
 }
 
 
@@ -447,10 +449,11 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
         if(p == 1)
         {
             size_t ps = ctx->tam_pila - (nproto - i);
+            size_t rem = nproto - i;
             pdcrt_obj val = ctx->pila[ps];
             memmove(ctx->pila + ps + val.arreglo->longitud,
                     ctx->pila + ps,
-                    val.arreglo->longitud * sizeof(pdcrt_obj));
+                    rem * sizeof(pdcrt_obj));
             ctx->tam_pila += val.arreglo->longitud;
             ctx->tam_pila -= 1;
             total += val.arreglo->longitud;

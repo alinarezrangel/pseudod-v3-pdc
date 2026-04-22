@@ -70,9 +70,12 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
     bool contiene = pdcrt_tabla_en(ctx, metodos_inst.tabla, omsj, &metodo);
     if(contiene)
     {
-        pdcrt_extender_pila(ctx, 1);
-        pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
-        pdcrt_insertar(ctx, argp);
+        if(args >= 6)
+        {
+            pdcrt_extender_pila(ctx, 1);
+            pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
+            pdcrt_insertar(ctx, argp);
+        }
         return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 1,
             pdcrt_xmm_desde_obj(metodo),
             pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
@@ -1335,10 +1338,6 @@ static pdcrt_tk pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m
 
         if(yo.tabla->buckets[i].activo)
         {
-            pdcrt_extender_pila(ctx, 3);
-            pdcrt_empujar(ctx, iterador);
-            pdcrt_empujar(ctx, yo.tabla->buckets[i].llave);
-            pdcrt_empujar(ctx, yo.tabla->buckets[i].valor);
             return pdcrt_llamar2(ctx, m, &pdcrt_tabla_para_cada_par_k1,
                 pdcrt_xmm_desde_obj(iterador), pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
                 pdcrt_xmm_desde_obj(yo.tabla->buckets[i].llave), pdcrt_xmm_desde_obj(yo.tabla->buckets[i].valor));
@@ -1868,7 +1867,7 @@ static pdcrt_tk pdcrt_recv_corrutina_avanzar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, 
     if(yo.coro->estado != PDCRT_CORO_EJECUTANDOSE)
         pdcrt_error(ctx, "No se puede devolver de una corrutina que no se esta ejecutando");
     yo.coro->estado = PDCRT_CORO_FINALIZADA;
-    return pdcrt_devolver(ctx, m, 1);
+    return pdcrt_devolver1(ctx, m, res);
 }
 
 static pdcrt_tk pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
@@ -1903,9 +1902,12 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     bool contiene = pdcrt_tabla_en(ctx, oyo.inst->metodos.tabla, omsj, &metodo_de_instancia);
     if(contiene)
     {
-        pdcrt_extender_pila(ctx, 1);
-        pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
-        pdcrt_insertar(ctx, argp);
+        if(args >= 6)
+        {
+            pdcrt_extender_pila(ctx, 1);
+            pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
+            pdcrt_insertar(ctx, argp);
+        }
         return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 1,
             pdcrt_xmm_desde_obj(metodo_de_instancia),
             pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
@@ -1942,10 +1944,16 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         {
         LLAMAR:
             pdcrt_extender_pila(ctx, 2);
-            pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
-            pdcrt_insertar(ctx, argp);
-            pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a5));
-            pdcrt_insertar(ctx, argp);
+            if(args >= 7)
+            {
+                pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
+                pdcrt_insertar(ctx, argp);
+            }
+            if(args >= 6)
+            {
+                pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a5));
+                pdcrt_insertar(ctx, argp);
+            }
             return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 2,
                 pdcrt_xmm_desde_obj(no_enc),
                 pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
