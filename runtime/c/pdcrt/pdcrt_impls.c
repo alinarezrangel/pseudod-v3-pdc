@@ -73,7 +73,7 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
         pdcrt_extender_pila(ctx, 1);
         pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
         pdcrt_insertar(ctx, argp);
-        return pdcrt_llamarnr(ctx, k.marco, k.kf, args,
+        return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 1,
             pdcrt_xmm_desde_obj(metodo),
             pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
             yo, a1, a2, a3, a4, a5);
@@ -1302,7 +1302,11 @@ pdcrt_tk pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     {
         if(args != 1)
             pdcrt_error(ctx, "Tabla: paraCadaPar necesita 1 argumento");
-        pdcrt_marco *m = pdcrt_crear_marco(ctx, 3, 0, k, NULL);
+        PDCRT_DEFINE_RAICES(1);
+        PDCRT_GUARDAR_RAIZ_XMM(0, a1);
+        pdcrt_marco *m = pdcrt_crear_marco(ctx, PDCRT_GC(), 3, 0, k, NULL);
+        PDCRT_CARGAR_RAIZ_XMM(0, a1);
+
         pdcrt_fijar_local(ctx, m, 0, oyo);
         pdcrt_fijar_local(ctx, m, 1, pdcrt_obj_desde_xmm(a1));
         pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(0));
@@ -1331,6 +1335,7 @@ static pdcrt_tk pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m
 
         if(yo.tabla->buckets[i].activo)
         {
+            pdcrt_extender_pila(ctx, 3);
             pdcrt_empujar(ctx, iterador);
             pdcrt_empujar(ctx, yo.tabla->buckets[i].llave);
             pdcrt_empujar(ctx, yo.tabla->buckets[i].valor);
@@ -1506,17 +1511,15 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     {
         if(args < 2)
             pdcrt_error(ctx, "Runtime: enviarMensaje necesita al menos 2 argumentos");
-        pdcrt_extender_pila(ctx, 4);
-        memmove(ctx->pila + argp + 4,
-                ctx->pila + argp,
-                args);
-        ctx->tam_pila += 4;
-        pdcrt_fijar_pila(ctx, argp + 0, pdcrt_obj_desde_xmm(a3));
-        pdcrt_fijar_pila(ctx, argp + 1, pdcrt_obj_desde_xmm(a4));
-        pdcrt_fijar_pila(ctx, argp + 2, pdcrt_obj_desde_xmm(a5));
-        pdcrt_fijar_pila(ctx, argp + 3, pdcrt_obj_desde_xmm(a6));
-        return pdcrt_llamarn(ctx, k.marco, k.kf, args - 2,
-            a1, a2);
+        pdcrt_mover_a_cima(ctx, -(pdcrt_stp) (args <= 6 ? 0 : args - 6), 2);
+        pdcrt_obj na6 = pdcrt_objeto_nulo(), na5 = pdcrt_objeto_nulo();
+        if(args >= 6)
+            na6 = pdcrt_sacar(ctx);
+        if(args >= 5)
+            na5 = pdcrt_sacar(ctx);
+        return pdcrt_llamarnr(ctx, k.marco, k.kf, args - 2,
+            a1, a2,
+            a3, a4, a5, a6, pdcrt_xmm_desde_obj(na5), pdcrt_xmm_desde_obj(na6));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.fallar_con_mensaje))
     {
@@ -1811,20 +1814,33 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(oyo.coro->estado == PDCRT_CORO_INICIAL)
         {
             PDCRT_DEFINE_RAICES(3);
+
+            __m128i punto = pdcrt_xmm_desde_obj(oyo.coro->punto_de_inicio);
             oyo.coro->estado = PDCRT_CORO_EJECUTANDOSE;
             oyo.coro->punto_de_continuacion = k;
-            pdcrt_marco *m = pdcrt_crear_marco(ctx, 1, 0, k, NULL);
+
+            PDCRT_GUARDAR_RAIZ(0, oyo);
+            PDCRT_GUARDAR_RAIZ(1, kval);
+            PDCRT_GUARDAR_RAIZ_XMM(2, punto);
+            pdcrt_marco *m = pdcrt_crear_marco(ctx, PDCRT_GC(), 1, 0, k, NULL);
+            PDCRT_CARGAR_RAIZ(0, oyo);
+            PDCRT_CARGAR_RAIZ(1, kval);
+            PDCRT_CARGAR_RAIZ_XMM(2, punto);
+
             pdcrt_fijar_local(ctx, m, 0, oyo);
-            PDCRT_GUARDAR_RAIZ_K(0, k);
-            PDCRT_GUARDAR_RAIZ(1, oyo);
-            PDCRT_GUARDAR_RAIZ(2, kval);
+
+            PDCRT_REINICIAR_RAICES();
+            PDCRT_GUARDAR_RAIZ(0, kval);
+            PDCRT_GUARDAR_RAIZ_CABECERA(1, m);
+            PDCRT_GUARDAR_RAIZ_XMM(2, punto);
             pdcrt_obj cls = pdcrt_crear_closure_obj_1(ctx, PDCRT_GC(), &pdcrt_corrutina_generar,
                 pdcrt_xmm_desde_obj(oyo));
-            PDCRT_CARGAR_RAIZ_K(0, k);
-            PDCRT_CARGAR_RAIZ(1, oyo);
-            PDCRT_CARGAR_RAIZ(2, kval);
+            PDCRT_CARGAR_RAIZ(0, kval);
+            PDCRT_CARGAR_RAIZ_CABECERA(1, m);
+            PDCRT_CARGAR_RAIZ_XMM(2, punto);
+
             return pdcrt_llamar2(ctx, m, &pdcrt_recv_corrutina_avanzar_k1,
-                pdcrt_xmm_desde_obj(oyo.coro->punto_de_inicio),
+                punto,
                 pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
                 pdcrt_xmm_desde_obj(cls), pdcrt_xmm_desde_obj(kval));
         }
@@ -1890,7 +1906,7 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_extender_pila(ctx, 1);
         pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6));
         pdcrt_insertar(ctx, argp);
-        return pdcrt_llamarnr(ctx, k.marco, k.kf, args,
+        return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 1,
             pdcrt_xmm_desde_obj(metodo_de_instancia),
             pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
             yo, a1, a2, a3, a4, a5);
@@ -1930,7 +1946,7 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_insertar(ctx, argp);
             pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a5));
             pdcrt_insertar(ctx, argp);
-            return pdcrt_llamarnr(ctx, k.marco, k.kf, args,
+            return pdcrt_llamarnr(ctx, k.marco, k.kf, args + 2,
                 pdcrt_xmm_desde_obj(no_enc),
                 pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
                 yo, msj, a1, a2, a3, a4);

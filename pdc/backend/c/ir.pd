@@ -2,6 +2,8 @@ utilizar bepd/builtins
 utilizar bepd/x/enum (EnumConValores)
 utilizar bepd/x/datos (TipoDeDatos)
 
+utilizar pdc/tokens (ÁreaTextual)
+
 [DOCUMENTA
 @title{La representación intermediaria del backend de C}
 
@@ -39,8 +41,8 @@ la implementación. Las continuaciones @bold{no son de primera clase} lo que
 significa que no hay un "tipo de continuación".
 
 Una instrucción es un arreglo cuyo primer elemento es un @pd{Opcode}. Los demás
-elementos son los "argumentos" de la instrucción. Estos arreglos son llamados
-"tuplas".
+elementos son los "argumentos" de la instrucción. El último elemento es un índice
+al arreglo de metadatos. Estos arreglos son llamados "tuplas".
 
 @subtitle{Estructura del código}
 
@@ -77,6 +79,15 @@ extraer 0, 10, {ejemplo1} ; fija el registro #0 al nombre {ejemplo1}
 extraer 1, 10, {ejemplo2}
 comoEspacioDeNombres 2, 10 ; registro #2 = espacio de nombres de #10
 }|
+
+@subtitle{Metadatos}
+
+La instrucción @code|{importar_s1 10, {foo}}| es representada como
+@pd|{Arreglo#crearCon: Opcode#importar_s1, 10, {foo}, K, M}| donde @code{M} es
+un entero a la tabla de metadatos del programa (@code{K} es la
+continuación implícita) o @pd{NULO} si la instrucción no tiene
+metadatos. Esta tabla contiene el lugar del programa de donde
+viene la instrucción. Véase @pd{ProgramaIR#metadatos}.
 
 @toplevel()
 DOCUMENTA]
@@ -323,7 +334,7 @@ finmetodo
 
 Las funciones tienen un número de parámetros y un número de capturas. Las
 capturas son valores guardados al momento de crear el closure y son accesibles
-en cada ejecución de la función. Además, las funciones estan identificadas por
+en cada ejecución de la función. Además, las funciones están identificadas por
 un ID, un número entero que es su nombre.
 DOCUMENTA]
 clase FunciónIR
@@ -355,16 +366,22 @@ clase FunciónIR
     atributo parámetros
 
     [DOCUMENTA
+    @brief{Índice de los metadatos de esta función.}
+    DOCUMENTA]
+    atributo idcMetadata
+
+    [DOCUMENTA
     @brief{Crea y devuelve una nueva función.}
     DOCUMENTA]
-    metodo estatico crear: parámetros, númLocales, númCapturas, instrucciones
+    metodo estatico crear: parámetros, númLocales, númCapturas, instrucciones, idcMetadata
 finclase
 
-metodo FunciónIR#inicializar: parámetros, númLocales, númCapturas, instrucciones
+metodo FunciónIR#inicializar: parámetros, númLocales, númCapturas, instrucciones, idcMetadata
     fijar yo#instrucciones a instrucciones
     fijar yo#númLocales a númLocales
     fijar yo#númCapturas a númCapturas
     fijar yo#parámetros a parámetros
+    fijar yo#idcMetadata a idcMetadata
 finmetodo
 
 metodo FunciónIR#númRegistros
@@ -417,17 +434,23 @@ clase ProgramaIR
     atributo continuaciones
 
     [DOCUMENTA
+    @brief{Arreglo de @pd{ÁreaTextual}es con los lugares de cada instrucción.}
+    DOCUMENTA]
+    atributo metadata
+
+    [DOCUMENTA
     @brief{Crea y devuelve un nuevo programa.}
 
     Véase los atributos de los mismos nombres de los argumentos.
     DOCUMENTA]
-    metodo estatico crear: idDeLaFunciónPrincipal, funciones, continuaciones
+    metodo estatico crear: idDeLaFunciónPrincipal, funciones, continuaciones, metadata
 finclase
 
-metodo ProgramaIR#inicializar: idDeLaFunciónPrincipal, funciones, continuaciones
+metodo ProgramaIR#inicializar: idDeLaFunciónPrincipal, funciones, continuaciones, metadata
     fijar yo#idDeLaFunciónPrincipal a idDeLaFunciónPrincipal
     fijar yo#funciones a funciones
     fijar yo#continuaciones a continuaciones
+    fijar yo#metadata a metadata
 finmetodo
 
 [DOCUMENTA

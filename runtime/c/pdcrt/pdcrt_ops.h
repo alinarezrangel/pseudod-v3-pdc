@@ -175,7 +175,7 @@ pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
 void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_obj v);
 
 
-pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, size_t registros, int args, pdcrt_k k, pdcrt_closure *capturas);
+pdcrt_marco* pdcrt_crear_marco(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t registros, int args, pdcrt_k k, pdcrt_closure *capturas);
 void pdcrt_inicializar_marco(pdcrt_ctx *ctx,
                              pdcrt_marco *m,
                              size_t sz,

@@ -165,15 +165,22 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar tablasRnAst#tablaInformaciónDeMódulo a Tabla#vacíaConEsquema: InformaciónDeMódulo
     fijar tablasRnAst#tablaCondicionalEstático a Tabla#vacíaConEsquema: CondicionalEstático
 
+    Escribir: {-- Inicio}
+    Escribir: {-- Parsear}
+
     fijar cst a CrearCST: código, archivo
     fijar tablaCst a EntablarÁrbol: cst
     fijar parchesNombres a Arreglo#vacio
     fijar ámbito a Ámbito#inicial: tablaNombres
 
+    Escribir: {-- Dependencias}
+
     fijar dependencias a DependenciasDelNodo: cst, tablasRnCst#tablaInformaciónDeMódulo, paquete, nombreDelMódulo
     ParaCadaElemento: dependencias, procedimiento: dep
         %necesitaDependencia: dep#paquete, dep#módulo
     finprocedimiento
+
+    Escribir: {-- Builtins}
 
     ParaCadaElemento: builtins, procedimiento: builtin
         variables binding
@@ -181,16 +188,24 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
         tablasRnCst#tablaBuiltins#agregar: (Builtin#crear: binding, builtin#builtin)
     finprocedimiento
 
+    Escribir: {-- Nombres}
+
     ResolverNombres: cst, tablasRnCst, bdMod, ámbito, parchesNombres
     ParaCadaElemento: parchesNombres, (MétodoComoFunción: {llamar})
+
+    Escribir: {-- Valida llamadas}
     ValidaLlamadasAutoejecutables: cst, tablasRnCst, tablaCst
 
+    Escribir: {-- Abstracción}
     fijar parchesAbstraer a Arreglo#vacio
     fijar ast a Abstraer: cst, tablaCst, tablasRnCst, tablasRnAst, parchesAbstraer, NULO
     fijar tablaAst a EntablarÁrbol: ast
     ParaCadaElemento: parchesAbstraer, (MétodoComoFunción: {llamar})
+
+    Escribir: {-- Valida «devolver»}
     ValidaDevolverFueraDeFunción: ast
 
+    Escribir: {-- Marcar capturas}
     variables posiblesCapturas, definitivamenteNoCapturas, tablasMcAst
     fijar posiblesCapturas a Diccionario#vacío
     fijar definitivamenteNoCapturas a Arreglo#vacio
@@ -203,12 +218,14 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar tablasMcAst#tablaEsCapturada a tablaEsCap
     MarcarCapturas: ast, tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
 
+    Escribir: {-- Emitir}
     variables emisor, estado, programa
     fijar emisor a Emisor#crear
     fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     estado#emitir: ast
     fijar programa a estado#emisor#programa
 
+    Escribir: {-- Buscar dependencias}
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
     fijar prefijosTransitivos' a Diccionario#vacío
     ParaCadaElemento: dependencias, funcion: dep
@@ -225,6 +242,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
         prefijosTransitivos#agregarAlFinal: prefijo
     finprocedimiento
 
+    Escribir: {-- Compilar}
     CompilarPrograma: salidaCompilado, prefijoDelMódulo, prefijosTransitivos, programa
 
     fijar exportaciones a Arreglo#vacio
@@ -243,6 +261,8 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     fijar bdComp#tablasRnCst a tablasRnCst
     fijar bdComp#tablasRnAst a tablasRnAst
     fijar bdComp#tablasMcAst a tablasMcAst
+
+    Escribir: {-- OK}
 
     devolver ObjetoAdHoc:
         {compilado}, (Compilado#crear: bdComp,

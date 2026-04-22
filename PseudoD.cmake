@@ -141,6 +141,7 @@ function(add_pseudod_executable pdtarget)
                     DEPENDS "${sfile}" ${interface_deps}
                     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
                     COMMENT "Compiling PseudoD module ${package}/${module}"
+                    # JOB_POOL console
                     VERBATIM
                     COMMAND_EXPAND_LISTS
             )

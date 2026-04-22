@@ -190,7 +190,7 @@ typedef struct pdcrt_obj
 
 inline pdcrt_obj pdcrt_obj_desde_xmm(__m128i r)
 {
-    return (pdcrt_obj){ .recv = (void*) _mm_cvtsi128_si64(r), .pval = (void*) _mm_extract_epi64(r, 1) };
+    return (pdcrt_obj){ .recv = (void*) _mm_extract_epi64(r, 1), .pval = (void*) _mm_cvtsi128_si64(r) };
 }
 
 inline __m128i pdcrt_xmm_desde_obj(pdcrt_obj o)
@@ -289,6 +289,7 @@ struct pdcrt_marco
     int args;
     pdcrt_k k;
     size_t num_registros;
+    const char *debug_srcloc;
     pdcrt_obj registros[];
 };
 
@@ -760,17 +761,19 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 
 #ifdef PDCRT_DBG_NO_K
 // TODO fix:
-#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k)     \
-    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(oyo), PDCRT_TOBJ_CLOSURE); \
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, args, k, pdcrt_obj_desde_xmm(oyo).closure);
+#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k, srcloc)     \
+    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(yo), PDCRT_TOBJ_CLOSURE); \
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, args, k, pdcrt_obj_desde_xmm(yo).closure); \
+    m->debug_srcloc = srcloc;
 #else
-#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k)     \
-    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(oyo), PDCRT_TOBJ_CLOSURE); \
+#define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k, srcloc)     \
+    pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(yo), PDCRT_TOBJ_CLOSURE); \
     alignas(alignof(pdcrt_cabecera_gc))                                 \
         char marco_en_pila[                                             \
             sizeof(pdcrt_marco) + sizeof(pdcrt_obj) * (num_regs)]; \
     pdcrt_marco *m = (pdcrt_marco *) marco_en_pila;                     \
-    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, args, k, pdcrt_obj_desde_xmm(oyo).closure)
+    pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, args, k, pdcrt_obj_desde_xmm(yo).closure); \
+    m->debug_srcloc = srcloc;
 #endif
 
 // Esta macro debería aceptar cuanta pila necesitamos, en bytes. En su forma actual, aún podríamos causar
@@ -780,21 +783,26 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
     {                                                      \
         if(pdcrt_stack_lleno(ctx))                         \
         {                                                  \
-            pdcrt_recolectar_basura_por_pila(ctx, &m);     \
+            PDCRT_DEFINE_RAICES(2);                        \
+            PDCRT_GUARDAR_RAIZ_CABECERA(0, m);             \
+            PDCRT_GUARDAR_RAIZ_XMM(1, resv);               \
+            pdcrt_recolectar_basura_por_pila(ctx, PDCRT_GC()); \
+            PDCRT_CARGAR_RAIZ_CABECERA(0, m);              \
+            PDCRT_CARGAR_RAIZ_XMM(1, resv);              \
             return pdcrt_trampolin(ctx, (pdcrt_tk) { .k = { .kf = nombre, .marco = m }, .res = resv }); \
         }                                                  \
     }                                                      \
     while(0)
 
 #define PDCRT_DECLARAR_ENTRYPOINT(mod, fmain)                       \
-    pdcrt_k pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k) \
+    pdcrt_tk pdc_instalar_##mod(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM) \
     {                                                               \
-        return fmain(ctx, args, k);                                 \
+        return fmain(ctx, args, k, PDCRT_A_IMM);                    \
     }
 
 #define PDCRT_PRECARGAR(f, n, l) num_mods += 1;
 #define PDCRT_CARGAR(f, n, l) pdcrt_cargar_dependencia(ctx, &pdc_instalar_##f, n, l);
-#define PDCRT_PREDECLARAR(f, n, l) pdcrt_k pdc_instalar_##f(pdcrt_ctx *ctx, int args, pdcrt_k k);
+#define PDCRT_PREDECLARAR(f, n, l) pdcrt_tk pdc_instalar_##f(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 #define PDCRT_DECLARAR_DEPS(X)                             \
     X(PDCRT_PREDECLARAR)                                   \
     void pdcrt_cargar_dependencias(pdcrt_ctx *ctx)         \

@@ -28,6 +28,7 @@ DOCUMENTA]
 procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, identificadoresDeDependencias, programa
     EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
     EmitirLínea: puertoDeEscritura, {#include "pdcrt/pdcrt.h"}
+    EmitirLínea: puertoDeEscritura, {#include "pdcrt/pdcrt_ops.h"}
 
     ParaCadaElemento: programa#funciones, procedimiento: func
         DeclararFunción: puertoDeEscritura, identificadorDelMódulo, func
@@ -37,10 +38,10 @@ procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, iden
     finprocedimiento
 
     ParaCadaElemento: programa#funciones, procedimiento: func
-        CompilarFunción: puertoDeEscritura, identificadorDelMódulo, func
+        CompilarFunción: puertoDeEscritura, identificadorDelMódulo, func, programa#metadata
     finprocedimiento
     ParaCadaElemento: programa#continuaciones, procedimiento: k
-        CompilarContinuación: puertoDeEscritura, identificadorDelMódulo, k
+        CompilarContinuación: puertoDeEscritura, identificadorDelMódulo, k, programa#metadata
     finprocedimiento
 
     EmitirLínea: puertoDeEscritura, {PDCRT_DECLARAR_ENTRYPOINT(}, identificadorDelMódulo, {, }, (NombreDeLaFunción: identificadorDelMódulo, programa#idDeLaFunciónPrincipal), {)}
@@ -118,11 +119,30 @@ funcion NombreDeLaEstructuraConParámetros: identificadorDelMódulo, id
     devolver {pdc_params_data_m~t_p~t}#formatear: identificadorDelMódulo, id
 finfuncion
 
-procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
+procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataGlobal
+    variable áreaTextual
+    fijar áreaTextual a metadataGlobal#en: func#idcMetadata
+
     EmitirLínea: puerto, {static pdcrt_tk }, (NombreDeLaFunción: identificadorDelMódulo, func#id), {(pdcrt_ctx* ctx, int args, pdcrt_k k, PDCRT_F_IMM)}
     EmitirLínea: puerto, «{»
+    EmitirLínea: puerto, ({/* ##SRCLOC## ~t => ~t:~t >> ~t:~t */}#formatear:
+            (EscaparTexto: áreaTextual#posiciónInicial#nombreDelArchivo),
+            áreaTextual#posiciónInicial#línea,
+            áreaTextual#posiciónInicial#columna,
+            áreaTextual#posiciónFinal#línea,
+            áreaTextual#posiciónFinal#columna)
+    EmitirLínea: puerto,
+                 {static const char *const func_srcloc = },
+                 (EscaparTexto:
+                         ({~t|~t:~t|~t:~t}#formatear: áreaTextual#posiciónInicial#nombreDelArchivo,
+                                                      áreaTextual#posiciónInicial#línea,
+                                                      áreaTextual#posiciónInicial#columna,
+                                                      áreaTextual#posiciónFinal#línea,
+                                                      áreaTextual#posiciónFinal#columna)),
+                 {;}
+
     [ FIXME: Como no hay un `VERIFICA_PILA` aquí, podríamos causar un stack-overflow ]
-    EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, args, k);}
+    EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, args, k, func_srcloc);}
     variables fid, idcVariadic
     fijar fid a NombreDeLaEstructuraConParámetros: identificadorDelMódulo, func#id
     EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
@@ -136,24 +156,33 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func
                  «} };»
     EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
-        CompilarTupla: puerto, identificadorDelMódulo, tupla
+        CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
     EmitirLínea: puerto, «}»
 finprocedimiento
 
-procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k
+procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k, metadataGlobal
     variable nombre
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
     EmitirLínea: puerto, {static pdcrt_tk }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m, __m128i res)}
     EmitirLínea: puerto, «{»
     EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, res, }, nombre, {);}
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
-        CompilarTupla: puerto, identificadorDelMódulo, tupla
+        CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
     EmitirLínea: puerto, «}»
 finprocedimiento
 
-procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
+procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
+    variable áreaTextual
+    fijar áreaTextual a metadataGlobal#en: (ÚltimoElemento: tupla)
+    EmitirLínea: puerto, ({/* ##SRCLOC## ~t => ~t:~t >> ~t:~t */}#formatear:
+            (EscaparTexto: áreaTextual#posiciónInicial#nombreDelArchivo),
+            áreaTextual#posiciónInicial#línea,
+            áreaTextual#posiciónInicial#columna,
+            áreaTextual#posiciónFinal#línea,
+            áreaTextual#posiciónFinal#columna)
+
     variable opcode
     fijar opcode a tupla#en: 0
 
@@ -232,7 +261,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
                 fijar extraArgs a extraArgs#concatenar: ({, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, ~t))}#formatear: arg#registro)
             finprocedimiento
 
-            fijar argsEnLaPila a Min: 0, (args#longitud - 6)
+            fijar argsEnLaPila a Max: 0, (args#longitud - 6)
             si argsEnLaPila > 0
                 EmitirLínea: puerto, {pdcrt_extender_pila(ctx, }, argsEnLaPila, {);}
                 ParaCadaNúmero: 6, args#longitud, procedimiento: i
@@ -300,15 +329,19 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#prn
-        EmitirLínea: puerto, {pdcrt_prn(ctx, m, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {));}
+        EmitirLínea: puerto, «do {»
+        EmitirLínea: puerto, {pdcrt_obj v = pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {);}
+        EmitirLínea: puerto, {pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_TEXTO);}
+        EmitirLínea: puerto, {printf("%.*s", (int) v.texto->longitud, v.texto->contenido);}
+        EmitirLínea: puerto, «} while(0);»
     finsi
 
     si opcode = Opcode#prnl
-        EmitirLínea: puerto, {pdcrt_prnl(ctx, m);}
+        EmitirLínea: puerto, {putchar('\n');}
     finsi
 
     si opcode = Opcode#assert
-        EmitirLínea: puerto, {pdcrt_assert(ctx, m, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {));}
+        EmitirLínea: puerto, {pdcrt_assert(ctx, pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {));}
     finsi
 
     si opcode = Opcode#devolverN
@@ -361,7 +394,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerObjeto
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_obtener_clase_objeto(ctx, m));}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, ctx->clase_objeto);}
     finsi
 
     si opcode = Opcode#mkclz
@@ -372,9 +405,12 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
                      «static const pdcrt_captura caps[] = {»,
                      (Unir: (Mapear: caps, funcion: reg devolver «{~t}»#formatear: reg finfuncion), {, }),
                      «};»
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto,
-                     {pdcrt_obj cl = pdcrt_mk_closure(ctx, &m, NULL, }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 2)),
+                     {pdcrt_obj cl = pdcrt_mk_closure(ctx, m, PDCRT_GC(), }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 2)),
                      {, caps, }, caps#longitud, {);}
+        EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, cl);}
         EmitirLínea: puerto, «} while(0);»
     finsi
@@ -407,7 +443,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     finsi
 
     si opcode = Opcode#obtenerRuntime
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_obtener_objeto_runtime(ctx, m));}
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_runtime());}
     finsi
 
     si opcode = Opcode#importar_s1
@@ -443,6 +479,6 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla
     si opcode = Opcode#obtenerEspacioDeNombresDelRuntime
         EmitirLínea: puerto,
                      {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1),
-                     {, pdcrt_obtener_espacio_de_nombres_del_runtime(ctx, m));}
+                     {, ctx->espacio_de_nombres_runtime);}
     finsi
 finprocedimiento

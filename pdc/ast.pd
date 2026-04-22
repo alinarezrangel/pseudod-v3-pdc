@@ -201,6 +201,10 @@ DOCUMENTA]
 clase NodoNl hereda Nodo
 finclase
 
+metodo NodoNl#inicializar: área
+    fijar yo#áreaTextual a área
+finmetodo
+
 metodo NodoNl#recursivo: f
 finmetodo
 

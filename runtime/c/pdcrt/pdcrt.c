@@ -707,7 +707,6 @@ void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
         arr->valores[arr->longitud++] = txt;
     }
     ctx->argv = pdcrt_objeto_arreglo(arr);
-    (void) pdcrt_sacar(ctx);
 }
 
 pdcrt_obj pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj mod)
@@ -827,13 +826,19 @@ static pdcrt_tk pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m, _
     longjmp(ctx->salir_del_trampolin, 1);
 }
 
+static pdcrt_tk pdcrt_inicio_de_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
+{
+    return pdcrt_llamar0(ctx, NULL, &pdcrt_continuacion_de_ejecutar,
+        a1, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)));
+}
+
 static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool protegido)
 {
     // TODO args > 0 en ejecutar_opt
     assert(args == 0 && "TODO ejecutar_opt(args > 0)");
 
     pdcrt_ctx * volatile ctx = ctxp;
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, 0, (pdcrt_k){0}, NULL);
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, NULL, 0, 0, (pdcrt_k){0}, NULL);
     pdcrt_k k = {
         .kf = &pdcrt_continuacion_de_ejecutar,
         .marco = m,
@@ -892,8 +897,9 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     if(setjmp(ctx->continuar) == 0)
     {
         ctx->hay_un_continuar = true;
-        ctx->continuacion_actual = f(ctx, 0, k,
-            PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(),
+        pdcrt_obj cls = pdcrt_crear_closure_obj_0(ctx, NULL, f);
+        ctx->continuacion_actual = pdcrt_inicio_de_ejecutar(ctx, 0, k,
+            PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), pdcrt_xmm_desde_obj(cls), PDCRT_XMM_NULO(),
             PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
     }
 
@@ -922,7 +928,7 @@ static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar_k1(pdcrt_ctx *ctx, p
 
 static pdcrt_tk pdcrt_preparar_registro_de_modulos_importar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, 0, args, k, NULL);
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, NULL, 0, args, k, NULL);
     return pdcrt_importar(ctx, m, "pdcrt_N95_runtime", 17, &pdcrt_preparar_registro_de_modulos_importar_k1);
 }
 
