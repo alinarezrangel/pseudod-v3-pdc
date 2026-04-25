@@ -837,6 +837,8 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     // TODO args > 0 en ejecutar_opt
     assert(args == 0 && "TODO ejecutar_opt(args > 0)");
 
+    PDCRT_PROBE0(ejecutar_entry);
+
     pdcrt_ctx * volatile ctx = ctxp;
     pdcrt_marco *m = pdcrt_crear_marco(ctx, NULL, 0, 0, (pdcrt_k){0}, NULL);
     pdcrt_k k = {
@@ -878,6 +880,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     if(setjmp(ctx->salir_del_trampolin) > 0)
     {
         CLEANUP();
+        PDCRT_PROBE0(ejecutar_exit);
         return true;
     }
     if(protegido)
@@ -886,6 +889,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
         {
             CLEANUP();
             ctx->tam_pila = tam_pila; // Saca los valores intermediarios
+            PDCRT_PROBE0(ejecutar_exit);
             return false;
         }
 
@@ -911,6 +915,7 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
             ctx->continuacion_actual.k.marco,
             ctx->continuacion_actual.res
         );
+        PDCRT_PROBE0(trampolin_lento);
     }
 }
 

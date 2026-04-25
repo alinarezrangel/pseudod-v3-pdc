@@ -931,7 +931,7 @@ funcion EsNulo: val
     si __Impl = {Lua Bootstrap}
         devolver __Lua: {function(val) return rawequal(val, nil) end}, val
     sino
-        devolver ((TipoDe: val) = TipoNulo) && (val = NULO)
+        devolver son identicos val y NULO
     finsi
 finfuncion
 

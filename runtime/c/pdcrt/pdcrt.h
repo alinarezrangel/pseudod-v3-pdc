@@ -15,6 +15,7 @@
 #include "pdcrt-plataforma.h"
 
 #include "pdcrt_base.h"
+#include "pdcrt_dtrace.h"
 
 #ifdef PDCRT_INTERNO
 
@@ -188,12 +189,12 @@ typedef struct pdcrt_obj
     };
 } pdcrt_obj;
 
-inline pdcrt_obj pdcrt_obj_desde_xmm(__m128i r)
+PDCRT_INLINE pdcrt_obj pdcrt_obj_desde_xmm(__m128i r)
 {
     return (pdcrt_obj){ .recv = (void*) _mm_extract_epi64(r, 1), .pval = (void*) _mm_cvtsi128_si64(r) };
 }
 
-inline __m128i pdcrt_xmm_desde_obj(pdcrt_obj o)
+PDCRT_INLINE __m128i pdcrt_xmm_desde_obj(pdcrt_obj o)
 {
     return _mm_set_epi64x((int64_t) (uint64_t) o.recv, (int64_t) (uint64_t) o.pval);
 }
@@ -689,6 +690,7 @@ PDCRT_INLINE _Noreturn pdcrt_tk pdcrt_trampolin(pdcrt_ctx *ctx, pdcrt_tk tk)
 {
     if(!ctx->hay_un_continuar)
         pdcrt_error(ctx, u8"No se inicializó el trampolín");
+    PDCRT_PROBE0(trampolin_rapido);
     ctx->continuacion_actual = tk;
     longjmp(ctx->continuar, 1);
 }

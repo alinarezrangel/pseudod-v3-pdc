@@ -141,6 +141,7 @@ void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tip
     if(!h)
         pdcrt_error(ctx, u8"No se pudo alojar más memoria");
     pdcrt_inicializar_obj(ctx, h, tipo, sz);
+    PDCRT_PROBE0(gc_nuevo_objeto_heap);
     return h;
 }
 
@@ -196,6 +197,7 @@ static pdcrt_cabecera_gc *pdcrt_gc_reubicar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h
     h->tipo = PDCRT_TGC_REUBICADO;
     pdcrt_reubicado *reub = (pdcrt_reubicado *) h;
     reub->nueva_direccion = PDCRT_CABECERA_GC(nuevo);
+    PDCRT_PROBE0(gc_reubicar);
     return reub->nueva_direccion;
 }
 
@@ -626,8 +628,15 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
 {
     struct timespec inicio, marcar, recolectar, total;
     pdcrt_timediff dif_marcar, dif_recolectar, dif_total;
-    size_t mem_usada_al_inicio = 0;
+    size_t mem_usada_al_inicio = 0, mem_usada_al_final = 0;
     char buffer[PDCRT_FORMATEAR_BYTES_TAM_BUFFER];
+
+    if(PDCRT_DTRACE_COMPILADO)
+    {
+        mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        int tipo_recoleccion = params.tipo == PDCRT_RECOLECCION_SIN_MEMORIA ? 0 : 1;
+        PDCRT_PROBE2(gc_entry, mem_usada_al_inicio, tipo_recoleccion);
+    }
 
     if(ctx->log.gc && PDCRT_LOG_COMPILADO)
     {
@@ -642,11 +651,15 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
             pdcrt_time(&inicio);
     }
 
+    PDCRT_PROBE0(gc_marcar_entry);
+
     pdcrt_gc_marcar_y_mover_todo(ctx, m, params);
     while(ctx->gc.gris.primero)
     {
         pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
     }
+
+    PDCRT_PROBE0(gc_marcar_exit);
 
     if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
     {
@@ -655,7 +668,11 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
         pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "marcar: %ld.%03ld (%03ld %03ld)\n", dif_marcar.dif_s, dif_marcar.dif_ms, dif_marcar.dif_us, dif_marcar.dif_ns);
     }
 
+    PDCRT_PROBE0(gc_recolectar_entry);
+
     pdcrt_gc_recolectar(ctx, params);
+
+    PDCRT_PROBE0(gc_recolectar_exit);
 
     if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
     {
@@ -664,11 +681,14 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
         pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "recolectar: %ld.%03ld (%03ld %03ld)\n", dif_recolectar.dif_s, dif_recolectar.dif_ms, dif_recolectar.dif_us, dif_recolectar.dif_ns);
     }
 
+    PDCRT_PROBE0(gc_reset_entry);
+
     pdcrt_gc_mover_negros_a_blancos(ctx, params);
+
+    PDCRT_PROBE0(gc_reset_exit);
 
     if(ctx->log.gc && PDCRT_LOG_COMPILADO)
     {
-        size_t mem_usada_al_final = 0;
         mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
         pdcrt_formatear_bytes(buffer, mem_usada_al_final);
         if(ctx->capacidades.time)
@@ -693,6 +713,12 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
             pdcrt_formatear_bytes(buffer, mem_usada_al_inicio - mem_usada_al_final);
             pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       delta: -%s\n", buffer);
         }
+    }
+
+    if(PDCRT_DTRACE_COMPILADO)
+    {
+        mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        PDCRT_PROBE1(gc_exit, mem_usada_al_final);
     }
 }
 

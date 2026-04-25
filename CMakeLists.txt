@@ -38,7 +38,11 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_tabla.c
         runtime/c/pdcrt/pdcrt_impls.c
         runtime/c/pdcrt/pdcrt_ops.c
-        runtime/c/pdcrt/pdcrt_ops.h)
+        runtime/c/pdcrt/pdcrt_ops.h
+        runtime/c/pdcrt/pdcrt_dtrace.c
+        runtime/c/pdcrt/pdcrt_dtrace.h)
+
+# target_include_directories(pdcrt PRIVATE libs/systemtap)
 
 target_link_libraries(pdcrt INTERFACE m)
 
@@ -80,6 +84,8 @@ option(PDCRT_DBG "Activa la depuración del runtime" OFF)
 cmake_dependent_option(PDCRT_DBG_GC "Activa la depuración del recolector de basura" ON PDCRT_DBG OFF)
 cmake_dependent_option(PDCRT_DBG_NO_K "Desactiva el uso de continuaciones" ON PDCRT_DBG OFF)
 cmake_dependent_option(PDCRT_EMP_INTR "Activa la intercepción de las operaciones de la pila" OFF PDCRT_DBG OFF)
+
+option(PDCRT_DTRACE "Activa la integración con DTrace / SystemTap" OFF)
 
 option(PDCRT_LOG "Activa el sistema de logging del runtime" OFF)
 cmake_dependent_option(PDCRT_LOG_GC "Activa el sistema de logging del recolector de basura" ON PDCRT_LOG OFF)

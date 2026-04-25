@@ -101,6 +101,8 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
         // No redimensiones, resultaría en peor rendimiento
         return;
 
+    PDCRT_PROBE1(tabla_rehashear_entry, nueva_cap);
+
     if(nueva_cap > PDCRT_TABLA_NUM_MAX_BUCKETS)
         nueva_cap = PDCRT_TABLA_NUM_MAX_BUCKETS;
     nueva_cap = pdcrt_redondear_a_p2(nueva_cap);
@@ -152,6 +154,8 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
         tbl->cap_colisiones = (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1;
     }
 
+    PDCRT_PROBE0(tabla_rehashear_exit);
+
     assert(tbl->buckets_ocupados == buckets_ocupados);
 }
 
@@ -165,6 +169,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
     pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
     if(b->activo)
     {
+        PDCRT_PROBE0(tabla_fijar_colision);
         while(true)
         {
             assert(b->activo);
@@ -192,6 +197,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
                     if(!tbl->colisiones)
                         pdcrt_enomem(ctx);
                     tbl->cap_colisiones = nueva_cap;
+                    PDCRT_PROBE1(tabla_mas_colisiones, nueva_cap);
                     assert(tbl->num_colisiones < tbl->cap_colisiones);
                 }
 

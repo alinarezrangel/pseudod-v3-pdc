@@ -80,7 +80,7 @@ void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
 #  error builtins needed
 #endif
 
-inline uintptr_t pdcrt_obtener_stack_pointer(void)
+PDCRT_INLINE uintptr_t pdcrt_obtener_stack_pointer(void)
 {
     // TODO: Portar a distíntas arquitecturas
     uintptr_t sp;

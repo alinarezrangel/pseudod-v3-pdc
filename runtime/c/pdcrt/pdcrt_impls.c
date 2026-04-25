@@ -27,6 +27,8 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
+    PDCRT_PROBE1(fallback_a_clase, clase);
+
     pdcrt_obj oclase;
     switch(clase)
     {
@@ -95,6 +97,8 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_entero);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
@@ -322,6 +326,8 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
+    PDCRT_PROBE0(recv_float);
+
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
         if(args != 0)
@@ -538,6 +544,8 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
+    PDCRT_PROBE0(recv_booleano);
+
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
         if(args != 0)
@@ -647,6 +655,8 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_texto);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.concatenar))
     {
@@ -970,6 +980,7 @@ pdcrt_tk pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
     (void) yo;
+    PDCRT_PROBE0(recv_nulo);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.igual)
        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_igual))
@@ -1009,6 +1020,8 @@ pdcrt_tk pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_arreglo);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.igual)
        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_igual))
@@ -1137,6 +1150,8 @@ pdcrt_tk pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
 
+    PDCRT_PROBE0(recv_closure);
+
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.igual)
        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_igual))
     {
@@ -1220,6 +1235,8 @@ pdcrt_tk pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_tabla);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.fijarEn))
     {
@@ -1377,6 +1394,8 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_runtime);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
@@ -1636,6 +1655,8 @@ pdcrt_tk pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
     (void) argp;
 
+    PDCRT_PROBE0(recv_voidptr);
+
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
         if(args != 0)
@@ -1665,6 +1686,8 @@ pdcrt_tk pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
     (void) argp;
+
+    PDCRT_PROBE0(recv_valop);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
@@ -1696,6 +1719,8 @@ pdcrt_tk pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCR
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
     (void) argp;
+
+    PDCRT_PROBE0(recv_espacio_de_nombres);
 
     pdcrt_obj valor = pdcrt_objeto_nulo();
     if(!pdcrt_tabla_en(ctx, oyo.tabla, omsj, &valor))
@@ -1737,6 +1762,8 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_corrutina);
 
     if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
@@ -1896,6 +1923,8 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+
+    PDCRT_PROBE0(recv_instancia);
 
     pdcrt_debe_tener_tipo(ctx, oyo.inst->metodos, PDCRT_TOBJ_TABLA);
     pdcrt_obj metodo_de_instancia = pdcrt_objeto_nulo();

@@ -18,6 +18,8 @@
 #cmakedefine PDCRT_LOG
 #cmakedefine PDCRT_LOG_GC
 
+#cmakedefine PDCRT_DTRACE
+
 #define PDCRT_PTR_BITS @PDCRT_PTR_BITS@
 
 #define PDCRT_VERSION "@PROJECT_VERSION@"
