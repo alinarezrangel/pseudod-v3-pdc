@@ -277,3 +277,8 @@ biblioteca para `base` y `extra`. Genera una biblioteca de enlace estático:
     
     pdc -b ./programa3.pd -k mi-programa:./mi-programa.bpd -o programa3.opd
     pdc ./programa3.opd -L. -lmi-programa -o programa3
+
+## BUGS ##
+
+Las opciones `-Y`, `-fwhole-program`, `-fsanitize`, `-fno-main`, `-fno-pic`, `-fpie`, `-k` y `-K` no están
+implementadas.
