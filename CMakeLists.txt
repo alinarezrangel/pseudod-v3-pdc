@@ -15,6 +15,7 @@ include(CMakeDependentOption)
 include(CPack)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(ExternalProject)
 
 add_subdirectory(build-stage0)
 
@@ -160,74 +161,28 @@ target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
 
 include("./PseudoD.cmake")
 
-add_pseudod_collection(src_bepd
-        PACKAGE bepd
-        SOURCES
-        bepd/algoritmos.pd
-        bepd/builtins.pd
-        bepd/builtinsImpl.pd
-        bepd/datos/caja.pd
-        bepd/datos/conjunto.pd
-        bepd/datos/diccionario.pd
-        bepd/datos/diccionario/alist.pd
-        bepd/datos/diccionario/hashmap.pd
-        bepd/datos/diccionario/interfaz.pd
-        bepd/datos/pila.pd
-        bepd/datos/resultado.pd
-        bepd/intrinsics.pd
-        bepd/utilidades/arreglo.pd
-        bepd/utilidades/iteración.pd
-        bepd/utilidades/texto.pd
-        bepd/utilidades/texto/ascii.pd
-        bepd/x/adhoc.pd
-        bepd/x/algebraico.pd
-        bepd/x/cli.pd
-        bepd/x/control.pd
-        bepd/x/datos.pd
-        bepd/x/datos2.pd
-        bepd/x/entorno.pd
-        bepd/x/enum.pd
-        bepd/x/json.pd
-        bepd/x/lazy.pd
-        bepd/x/logs.pd
-        bepd/x/puerto.pd
-        bepd/x/puerto/conPosición.pd
-        bepd/x/puerto/deArchivo.pd
-        bepd/x/sexpr.pd
-        bepd/x/sistemaDeArchivos/archivo.pd
-        bepd/x/sistemaDeArchivos/rutas.pd
-        bepd/x/utf8.pd
+set(INNER_PDC_CGEN_BUILD_DIR "${CMAKE_SOURCE_DIR}/outputs/inner_pdc_cgen"
+    CACHE PATH "Directorio de build compartido para la generación de C de inner_pdc")
+set(INNER_PDC_CGEN_OUTPUT_DIR "${INNER_PDC_CGEN_BUILD_DIR}/cgen")
+
+ExternalProject_Add(inner_pdc_cgen
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/cmake/inner_pdc"
+        BINARY_DIR "${INNER_PDC_CGEN_BUILD_DIR}"
+        CMAKE_ARGS
+        "-DPDC=${PDC}"
+        "-DPSEUDOD_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        "-DPSEUDOD_CGEN_OUTPUT_DIR=${INNER_PDC_CGEN_OUTPUT_DIR}"
+        "-DPSEUDOD_COMPILE_OPTIONS=${PSEUDOD_COMPILE_OPTIONS}"
+        INSTALL_COMMAND ""
+        USES_TERMINAL_BUILD ON
+        BUILD_ALWAYS ON
 )
 
-add_pseudod_collection(src_pdc
-        PACKAGE pdc
-        SOURCES
-        pdc/abstraer.pd
-        pdc/ast.pd
-        pdc/backend/c.pd
-        pdc/backend/c/ir.pd
-        pdc/backend/c/lowerer.pd
-        pdc/capturas.pd
-        pdc/catamorfismos.pd
-        pdc/combinadores.pd
-        pdc/compilador.pd
-        pdc/cst.pd
-        pdc/dependencias.pd
-        pdc/info.pd
-        pdc/inicio.pd
-        pdc/módulos.pd
-        pdc/nombres.pd
-        pdc/parser.pd
-        pdc/tabla.pd
-        pdc/tokenizador.pd
-        pdc/tokens.pd
-        pdc/validación.pd
-        pdc/subproceso.pd
-)
-
-add_pseudod_executable(inner_pdc
-        COLLECTIONS src_bepd src_pdc
+add_pseudod_executable_from_cfiles(inner_pdc
+        CGEN_OUTPUT_DIR "${INNER_PDC_CGEN_OUTPUT_DIR}"
+        PACKAGES bepd pdc
         ENTRY pdc/inicio
+        DEPENDS inner_pdc_cgen
 )
 pseudod_target_cc_compile_options(inner_pdc PUBLIC -ggdb -O0)
 

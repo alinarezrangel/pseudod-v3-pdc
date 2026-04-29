@@ -22,6 +22,8 @@ set(PSEUDOD_CC_COMPILE_OPTIONS "$ENV{PDC_CFLAGS}" CACHE STRING
         "Extra options to use when compiling PseudoD-generated C code")
 set(PSEUDOD_LINK_LIBRARIES "$ENV{PDC_LIBS}" CACHE STRING
         "Extra libraries to link with when linking PseudoD code")
+set(PSEUDOD_CGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/cgen" CACHE PATH
+        "Directory where generated C files will be placed")
 
 define_property(TARGET PROPERTY PSEUDOD_COMPILE_OPTIONS)
 define_property(TARGET PROPERTY PSEUDOD_PUBLIC_CC_COMPILE_OPTIONS)
@@ -33,49 +35,10 @@ define_property(TARGET PROPERTY PSEUDOD_INTERFACE_LINK_LIBRARIES)
 
 define_property(TARGET PROPERTY PSEUDOD_COLLECTION_SOURCES)
 
-function(add_pseudod_collection pdcoll)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "" "BASE;PACKAGE" "SOURCES")
-
-    if(arg_BASE)
-        if(arg_BASE MATCHES "^(.+)/+$")
-            set(base "${CMAKE_MATCH_1}")
-        else()
-            set(base "${arg_BASE}")
-        endif()
-    endif()
-
-    add_custom_target("${pdcoll}")
-
-    set(sources "")
-    foreach(source IN LISTS arg_SOURCES)
-        if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
-            message(FATAL_ERROR "Sources used in PseudoD collections should be files: ${source}")
-        endif()
-
-        if(base)
-            if(source MATCHES "^${base}/+([^.]+)(\..*)$")
-                list(APPEND sources "${arg_PACKAGE}/${CMAKE_MATCH_1}:${CMAKE_CURRENT_SOURCE_DIR}/${source}")
-            else()
-                message(FATAL_ERROR "PseudoD source file for collection ${pdcoll} needs to have the form '${base}/<mod>.<ext>': ${source}")
-            endif()
-        else()
-            if(source MATCHES "^${arg_PACKAGE}/([^.]+)(\..*)$")
-                list(APPEND sources "${arg_PACKAGE}/${CMAKE_MATCH_1}:${CMAKE_CURRENT_SOURCE_DIR}/${source}")
-            else()
-                message(FATAL_ERROR "Could not infer package and module name for PseudoD source file in collection ${pdcoll}: '${source}'")
-            endif()
-        endif()
-    endforeach()
-
-    set_target_properties("${pdcoll}"
-            PROPERTIES PSEUDOD_COLLECTION_SOURCES "${sources}"
-    )
-endfunction()
-
-function(_pseudod_get_direct_dependencies source_file outvar)
+function(_pseudod_cgen_get_direct_dependencies source_file outvar)
     execute_process(
             COMMAND ${LUA_EXECUTABLE} "${PDC_DEPS_SCRIPT}" direct "${source_file}"
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            WORKING_DIRECTORY "${PSEUDOD_SOURCE_DIR}"
             OUTPUT_VARIABLE output
             RESULT_VARIABLE result
             OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -88,14 +51,51 @@ function(_pseudod_get_direct_dependencies source_file outvar)
     set("${outvar}" "${output}" PARENT_SCOPE)
 endfunction()
 
-function(add_pseudod_executable pdtarget)
+# Recopila los archivos fuente de una colección.
+# Uso: pseudod_cgen_collection(<name> PACKAGE <pkg> SOURCES <files...> [BASE <base>])
+function(pseudod_cgen_collection pdcoll)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "" "BASE;PACKAGE" "SOURCES")
+
+    if(arg_BASE)
+        if(arg_BASE MATCHES "^(.+)/+$")
+            set(base "${CMAKE_MATCH_1}")
+        else()
+            set(base "${arg_BASE}")
+        endif()
+    endif()
+
+    set(sources "")
+    foreach(source IN LISTS arg_SOURCES)
+        if(base)
+            if(source MATCHES "^${base}/+([^.]+)(\\..*)\$")
+                list(APPEND sources "${arg_PACKAGE}/${CMAKE_MATCH_1}:${PSEUDOD_SOURCE_DIR}/${source}")
+            else()
+                message(FATAL_ERROR "PseudoD source file for collection ${pdcoll} needs to have the form '${base}/<mod>.<ext>': ${source}")
+            endif()
+        else()
+            if(source MATCHES "^${arg_PACKAGE}/([^.]+)(\\..*)\$")
+                list(APPEND sources "${arg_PACKAGE}/${CMAKE_MATCH_1}:${PSEUDOD_SOURCE_DIR}/${source}")
+            else()
+                message(FATAL_ERROR "Could not infer package and module name for PseudoD source file in collection ${pdcoll}: '${source}'")
+            endif()
+        endif()
+    endforeach()
+
+    set("${pdcoll}_SOURCES" "${sources}" PARENT_SCOPE)
+
+    string(REPLACE ";" "\n" manifest "${sources}")
+    file(WRITE "${PSEUDOD_CGEN_OUTPUT_DIR}/${arg_PACKAGE}/manifest.txt" "${manifest}")
+endfunction()
+
+# Genera los archivos .c a partir de los .pd.
+# Uso: pseudod_cgen_generate(COLLECTIONS <col1> <col2> ... ENTRY <entry>)
+function(pseudod_cgen_generate)
     cmake_parse_arguments(PARSE_ARGV 0 arg "" "ENTRY" "COLLECTIONS")
 
-    set(other_cfiles "")
-    set(entry_cfile "")
-    set(found_entry OFF)
+    set(all_cfiles "")
+
     foreach(pdcoll IN LISTS arg_COLLECTIONS)
-        get_target_property(sources_data "${pdcoll}" PSEUDOD_COLLECTION_SOURCES)
+        set(sources_data "${${pdcoll}_SOURCES}")
 
         foreach(source_data IN LISTS sources_data)
             if(source_data MATCHES "^([^/]+)/([^:]+):(.*)$")
@@ -106,18 +106,18 @@ function(add_pseudod_executable pdtarget)
                 message(FATAL_ERROR "Invalid collection entry: ${pdcoll} -> '${source_data}'")
             endif()
 
-            file(MAKE_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}/${package}")
-            set(ifile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.ipd")
-            set(cfile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.c")
-            set(tcfile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.c.bkp")
+            file(MAKE_DIRECTORY "${PSEUDOD_CGEN_OUTPUT_DIR}/${package}")
+            set(ifile "${PSEUDOD_CGEN_OUTPUT_DIR}/${package}/${module}.ipd")
+            set(cfile "${PSEUDOD_CGEN_OUTPUT_DIR}/${package}/${module}.c")
+            set(tcfile "${PSEUDOD_CGEN_OUTPUT_DIR}/${package}/${module}.c.bkp")
 
-            _pseudod_get_direct_dependencies("${sfile}" direct_deps)
+            _pseudod_cgen_get_direct_dependencies("${sfile}" direct_deps)
 
             set(interface_deps "")
             set(deps_args "")
             foreach(direct_dep IN LISTS direct_deps)
                 string(REGEX REPLACE "\\.(pd|psd|pseudo|pseudod)$" "" path_no_ext "${direct_dep}")
-                set(iface_dep "${PSEUDOD_CURRENT_BINARY_DIR}/${path_no_ext}.ipd")
+                set(iface_dep "${PSEUDOD_CGEN_OUTPUT_DIR}/${path_no_ext}.ipd")
                 list(APPEND interface_deps "${iface_dep}")
                 list(APPEND deps_args "${path_no_ext}:${iface_dep}")
             endforeach()
@@ -128,53 +128,48 @@ function(add_pseudod_executable pdtarget)
                     OUTPUT "${ifile}" "${cfile}"
                     BYPRODUCTS "${tcfile}"
                     COMMAND ${PDC_EXECUTABLE}
-                        -Sc
-                        -Zid "pdh${module_id}"
-                        "${package}/${module}:${sfile}"
-                        -o "${tcfile}"
-                        -q "${package}/${module}:${ifile}"
-                        ${deps_args}
-                        ${PSEUDOD_COMPILE_OPTIONS}
-                        "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_COMPILE_OPTIONS>"
+                    -Sc
+                    -Zid "pdh${module_id}"
+                    "${package}/${module}:${sfile}"
+                    -o "${tcfile}"
+                    -q "${package}/${module}:${ifile}"
+                    ${deps_args}
+                    ${PSEUDOD_COMPILE_OPTIONS}
                     COMMAND ${CMAKE_COMMAND} -E rename "${tcfile}" "${cfile}"
                     COMMAND ${CMAKE_COMMAND} -E touch "${tcfile}"
                     DEPENDS "${sfile}" ${interface_deps}
                     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-                    COMMENT "Compiling PseudoD module ${package}/${module}"
-                    # JOB_POOL console
+                    COMMENT "Compiling PseudoD module ${package}/${module} to C"
                     VERBATIM
                     COMMAND_EXPAND_LISTS
             )
 
-            if("${package}/${module}" STREQUAL arg_ENTRY)
-                set(found_entry ON)
-                set(entry_cfile "${cfile}")
-            else()
-                list(APPEND other_cfiles "${cfile}")
+            list(APPEND all_cfiles "${cfile}")
+        endforeach()
+    endforeach()
+
+    add_custom_target(pseudod_cgen ALL DEPENDS ${all_cfiles})
+
+    # Escribir un archivo de manifiesto con la lista de archivos .c generados
+    # y cuál es el entry point
+    set(manifest_content "")
+    foreach(pdcoll IN LISTS arg_COLLECTIONS)
+        set(sources_data "${${pdcoll}_SOURCES}")
+        foreach(source_data IN LISTS sources_data)
+            if(source_data MATCHES "^([^/]+)/([^:]+):(.*)$")
+                set(package "${CMAKE_MATCH_1}")
+                set(module "${CMAKE_MATCH_2}")
+                set(cfile "${PSEUDOD_CGEN_OUTPUT_DIR}/${package}/${module}.c")
+                if("${package}/${module}" STREQUAL "${arg_ENTRY}")
+                    string(APPEND manifest_content "entry:${cfile}\n")
+                else()
+                    string(APPEND manifest_content "source:${cfile}\n")
+                endif()
             endif()
         endforeach()
-    endforeach ()
+    endforeach()
 
-    if(NOT found_entry)
-        message(FATAL_ERROR "PseudoD executable entry ${arg_ENTRY} not found in collections for ${pdtarget}")
-    endif()
-
-    add_library("${pdtarget}_obj" OBJECT ${other_cfiles})
-    target_link_libraries("${pdtarget}_obj" PUBLIC pdcrt)
-    target_compile_options("${pdtarget}_obj" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_CC_COMPILE_OPTIONS>")
-    target_compile_options("${pdtarget}_obj" PRIVATE ${PSEUDOD_CC_COMPILE_OPTIONS} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_CC_COMPILE_OPTIONS>")
-    target_compile_options("${pdtarget}_obj" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_CC_COMPILE_OPTIONS>")
-
-    add_executable("${pdtarget}" ${entry_cfile} "$<TARGET_OBJECTS:${pdtarget}_obj>")
-    target_compile_definitions("${pdtarget}" PRIVATE PDCRT_MAIN)
-    target_compile_options("${pdtarget}" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_CC_COMPILE_OPTIONS>")
-    target_compile_options("${pdtarget}" PRIVATE ${PSEUDOD_CC_COMPILE_OPTIONS} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_CC_COMPILE_OPTIONS>")
-    target_compile_options("${pdtarget}" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_CC_COMPILE_OPTIONS>")
-
-    target_link_libraries("${pdtarget}" PUBLIC pdcrt)
-    target_link_libraries("${pdtarget}" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_LINK_LIBRARIES>")
-    target_link_libraries("${pdtarget}" PRIVATE ${PSEUDOD_LINK_LIBRARIES} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_LINK_LIBRARIES>")
-    target_link_libraries("${pdtarget}" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_LINK_LIBRARIES>")
+    file(WRITE "${PSEUDOD_CGEN_OUTPUT_DIR}/manifest.txt" "${manifest_content}")
 endfunction()
 
 function(add_pseudod_library pdtarget)
@@ -215,4 +210,89 @@ function(pseudod_target_cc_compile_options pdtarget vis)
     endif()
     list(APPEND opts ${ARGN})
     set_target_properties("${pdtarget}" PROPERTIES PSEUDOD_${vis}_CC_COMPILE_OPTIONS "${opts}")
+endfunction()
+
+# Crea un ejecutable de PseudoD a partir de archivos .c ya generados por un
+# subproyecto externo (como inner_pdc_cgen). Recibe las colecciones y el
+# entry point, y calcula las rutas de los .c a partir de CGEN_OUTPUT_DIR.
+#
+# Uso:
+#   add_pseudod_executable_from_cfiles(<target>
+#       CGEN_OUTPUT_DIR <dir>
+#       PACKAGES <pkg1> <pkg2> ...
+#       ENTRY <package/module>
+#       [DEPENDS <external-project-target>]
+#   )
+function(add_pseudod_executable_from_cfiles pdtarget)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "" "CGEN_OUTPUT_DIR;ENTRY;DEPENDS" "PACKAGES")
+
+    if(NOT arg_CGEN_OUTPUT_DIR)
+        message(FATAL_ERROR "add_pseudod_executable_from_cfiles: CGEN_OUTPUT_DIR is required")
+    endif()
+    if(NOT arg_ENTRY)
+        message(FATAL_ERROR "add_pseudod_executable_from_cfiles: ENTRY is required")
+    endif()
+
+
+    set(entry_cfile "")
+    set(other_cfiles "")
+    set(found_entry OFF)
+
+    foreach(package IN LISTS arg_PACKAGES)
+        set(manifest_path "${arg_CGEN_OUTPUT_DIR}/${package}/manifest.txt")
+        if(NOT EXISTS "${manifest_path}")
+            set(manifest "")
+        else()
+            file(READ "${manifest_path}" manifest_in)
+            string(REPLACE "\n" ";" manifest "${manifest_in}")
+        endif()
+
+        foreach(source_data IN LISTS manifest)
+            if(source_data MATCHES "^([^/]+)/([^:]+):(.*)$")
+                set(package "${CMAKE_MATCH_1}")
+                set(module "${CMAKE_MATCH_2}")
+            else()
+                message(FATAL_ERROR "Invalid collection entry: ${package} -> '${source_data}'")
+            endif()
+
+            set(cfile "${arg_CGEN_OUTPUT_DIR}/${package}/${module}.c")
+
+            if("${package}/${module}" STREQUAL "${arg_ENTRY}")
+                set(found_entry ON)
+                set(entry_cfile "${cfile}")
+            else()
+                list(APPEND other_cfiles "${cfile}")
+            endif()
+        endforeach()
+    endforeach()
+
+    if(NOT found_entry)
+        message(FATAL_ERROR "add_pseudod_executable_from_cfiles: entry ${arg_ENTRY} not found in collections")
+    endif()
+
+    # Marca los archivos como GENERATED para que CMake no exija que existan
+    # en tiempo de configuración (serán generados por el subproyecto externo)
+    set_source_files_properties(${other_cfiles} ${entry_cfile} PROPERTIES GENERATED TRUE)
+
+    add_library("${pdtarget}_obj" OBJECT ${other_cfiles})
+    target_link_libraries("${pdtarget}_obj" PUBLIC pdcrt)
+    target_compile_options("${pdtarget}_obj" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_CC_COMPILE_OPTIONS>")
+    target_compile_options("${pdtarget}_obj" PRIVATE ${PSEUDOD_CC_COMPILE_OPTIONS} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_CC_COMPILE_OPTIONS>")
+    target_compile_options("${pdtarget}_obj" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_CC_COMPILE_OPTIONS>")
+
+    add_executable("${pdtarget}" ${entry_cfile} "$<TARGET_OBJECTS:${pdtarget}_obj>")
+    target_compile_definitions("${pdtarget}" PRIVATE PDCRT_MAIN)
+    target_compile_options("${pdtarget}" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_CC_COMPILE_OPTIONS>")
+    target_compile_options("${pdtarget}" PRIVATE ${PSEUDOD_CC_COMPILE_OPTIONS} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_CC_COMPILE_OPTIONS>")
+    target_compile_options("${pdtarget}" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_CC_COMPILE_OPTIONS>")
+
+    target_link_libraries("${pdtarget}" PUBLIC pdcrt)
+    target_link_libraries("${pdtarget}" PUBLIC "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PUBLIC_LINK_LIBRARIES>")
+    target_link_libraries("${pdtarget}" PRIVATE ${PSEUDOD_LINK_LIBRARIES} "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_PRIVATE_LINK_LIBRARIES>")
+    target_link_libraries("${pdtarget}" INTERFACE "$<TARGET_PROPERTY:${pdtarget},PSEUDOD_INTERFACE_LINK_LIBRARIES>")
+
+    if(arg_DEPENDS)
+        add_dependencies("${pdtarget}_obj" "${arg_DEPENDS}")
+        add_dependencies("${pdtarget}" "${arg_DEPENDS}")
+    endif()
 endfunction()
