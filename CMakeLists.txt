@@ -8,7 +8,7 @@ project(pdcrt
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -march=native -Werror=vla")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Werror=vla")
 
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
@@ -184,7 +184,7 @@ add_pseudod_executable_from_cfiles(inner_pdc
         ENTRY pdc/inicio
         DEPENDS inner_pdc_cgen
 )
-pseudod_target_cc_compile_options(inner_pdc PUBLIC -ggdb -O0)
+pseudod_target_cc_compile_options(inner_pdc PUBLIC -ggdb -O1)
 
 if(PDCRT_ASAN)
   pseudod_target_cc_compile_options(inner_pdc PUBLIC -fsanitize=address)
