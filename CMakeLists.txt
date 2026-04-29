@@ -43,7 +43,7 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_dtrace.c
         runtime/c/pdcrt/pdcrt_dtrace.h)
 
-# target_include_directories(pdcrt PRIVATE libs/systemtap)
+target_include_directories(pdcrt PRIVATE libs/systemtap)
 
 target_link_libraries(pdcrt INTERFACE m)
 

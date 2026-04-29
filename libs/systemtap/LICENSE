@@ -1,5 +1,5 @@
-The `sys/sdt.h` header file is from the SystemTap project, release 5.4 and
-is under the following license:
+The `sys/sdt.h` and `sys/sdt-config.h` header files are from the SystemTap project,
+release 5.4 and is under the following license:
 
 > This file is dedicated to the public domain, pursuant to CC0
 > (https://creativecommons.org/publicdomain/zero/1.0/)
