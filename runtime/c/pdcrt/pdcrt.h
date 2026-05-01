@@ -16,6 +16,7 @@
 
 #include "pdcrt_base.h"
 #include "pdcrt_dtrace.h"
+#include "pdcrt_vio.h"
 
 #ifdef PDCRT_INTERNO
 
@@ -24,18 +25,6 @@
 #include <xmmintrin.h>
 #include <smmintrin.h>
 #include <immintrin.h>
-
-int pdcrt_time(struct timespec *out);
-
-typedef struct pdcrt_timediff
-{
-    long dif_s;
-    long dif_ms;
-    long dif_us;
-    long dif_ns;
-} pdcrt_timediff;
-
-void pdcrt_diferencia(struct timespec *primero, struct timespec *segundo, pdcrt_timediff *res);
 
 #define PDCRT_FORMATEAR_BYTES_TAM_BUFFER 80LU
 void pdcrt_formatear_bytes(char *buffer, size_t bytes);
@@ -489,18 +478,10 @@ struct pdcrt_ctx
     jmp_buf continuar;
     bool hay_un_continuar;
 
-    struct
-    {
-        bool time;
-    } capacidades;
-
-    struct
-    {
-        bool gc;
-    } log;
+    pdcrt_vio vio;
 };
 
-pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj);
+pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj, pdcrt_vio vio);
 void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv);
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx);
 

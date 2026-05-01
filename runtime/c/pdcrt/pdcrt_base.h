@@ -115,30 +115,6 @@ __attribute__((format(printf, fmtarg, fromarg)))
 #  define PDCRT_PRINTF_FORMAT(fmtarg, fromarg)
 #endif
 
-
-typedef enum pdcrt_subsistema
-{
-    PDCRT_SUBSISTEMA_GC,
-} pdcrt_subsistema;
-
-#if !PDCRT_LOG_COMPILADO
-// Si no hay ningún logger activo, la función no hace nada. En ese caso,
-// siempre la inlineamos para que el compilador elimine las
-// llamadas. Efectivamente, esto "borra" la función del programa.
-PDCRT_INLINE
-PDCRT_PRINTF_FORMAT(3, 4)
-void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...)
-{
-    (void) ctx;
-    (void) sis;
-    (void) fmt;
-}
-#else
-PDCRT_PRINTF_FORMAT(3, 4)
-void pdcrt_log(pdcrt_ctx *ctx, pdcrt_subsistema sis, const char *fmt, ...);
-#endif
-
-
 #define PDCRT_BUG(cond, msg) do { if(cond) { \
     fprintf(stderr, "%s:%d: BUG: %s\n", __FILE__, __LINE__, msg); \
     abort(); \

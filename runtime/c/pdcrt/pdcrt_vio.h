@@ -39,6 +39,8 @@ typedef struct pdcrt_vio_quirks
 {
     bool rutas_wtf8 : 1;
     bool linea_de_comandos_windows : 1;
+    uint64_t reservado1 : 62;
+    uint64_t reservado2;
 } pdcrt_vio_quirks;
 
 /*********** Fechas y Horas ***********/
@@ -249,7 +251,7 @@ typedef enum pdcrt_io_error
     PDCRT_IO_ERROR_NO_ES_ARCHIVO,
     // El recurso o ruta especificados no es un directorio
     PDCRT_IO_ERROR_NO_ES_DIRECTORIO,
-    // La operación no esta soportada
+    // La operación no está soportada
     PDCRT_IO_ERROR_OPERACION_NO_SOPORTADA,
 } pdcrt_io_error;
 
@@ -258,6 +260,7 @@ typedef struct pdcrt_vio_limites
     size_t ruta_maxima, archivo_maximo, nombre_de_archivo_maximo;
     size_t entorno_maximo, linea_de_comandos_maxima;
     bool entorno_y_linea_de_comandos_compartidos;
+    size_t num_maximo_recursos;
 } pdcrt_vio_limites;
 
 typedef struct pdcrt_vio_vtable

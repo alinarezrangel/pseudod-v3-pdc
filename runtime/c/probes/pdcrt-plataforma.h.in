@@ -7,16 +7,10 @@
 #include <limits.h>
 
 
-#cmakedefine PDCRT_PLATAFORMA_CLOCK_GETTIME_MONOTONIC
-#cmakedefine PDCRT_PLATAFORMA_TIMESPEC_GET_MONOTONIC
-
 #cmakedefine PDCRT_DBG
 #cmakedefine PDCRT_DBG_GC
 #cmakedefine PDCRT_DBG_NO_K
 #cmakedefine PDCRT_EMP_INTR
-
-#cmakedefine PDCRT_LOG
-#cmakedefine PDCRT_LOG_GC
 
 #cmakedefine PDCRT_DTRACE
 
@@ -29,12 +23,6 @@
 
 
 // Opciones derivativas:
-
-#ifdef PDCRT_LOG
-#  define PDCRT_LOG_COMPILADO 1
-#else
-#  define PDCRT_LOG_COMPILADO 0
-#endif
 
 _Static_assert(sizeof(float) == 4, "float debe ser de 32 bits");
 _Static_assert(sizeof(double) == 8, "double debe ser de 64 bits");

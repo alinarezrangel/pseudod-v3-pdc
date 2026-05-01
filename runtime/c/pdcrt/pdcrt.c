@@ -7,36 +7,13 @@
 #define PDCRT_INTERNO
 #include "pdcrt.h"
 #include "pdcrt_ops.h"
+#include "pdcrt_vios/vio_linux.h"
 
 
 extern pdcrt_obj pdcrt_obj_desde_xmm(__m128i r);
 extern __m128i pdcrt_xmm_desde_obj(pdcrt_obj o);
 
-int pdcrt_time(struct timespec *out)
-{
-    struct timespec tmp;
-#ifdef PDCRT_PLATAFORMA_CLOCK_GETTIME_MONOTONIC
-    if(clock_gettime(CLOCK_MONOTONIC, out ? out : &tmp) == 0)
-        return 1;
-#elif PDCRT_PLATAFORMA_TIMESPEC_GET_MONOTONIC
-    if(timespec_get(out ? out : &tmp, TIME_MONOTONIC) != 0)
-        return 1;
-#endif
-    return 0;
-}
-
 #define PDCRT_ABS(n) ((n) < 0 ? -(n) : (n))
-
-void pdcrt_diferencia(struct timespec *primero, struct timespec *segundo, pdcrt_timediff *res)
-{
-    long dif_ns = segundo->tv_nsec - primero->tv_nsec;
-    long dif_us = (dif_ns / 1000L) % 1000;
-    long dif_ms = (dif_ns / 1000000L) % 1000;
-    res->dif_s = segundo->tv_sec - primero->tv_sec;
-    res->dif_ms = PDCRT_ABS(dif_ms);
-    res->dif_us = PDCRT_ABS(dif_us);
-    res->dif_ns = PDCRT_ABS(dif_ns % 1000);
-}
 
 void pdcrt_formatear_bytes(char *buffer, size_t bytes)
 {
@@ -587,7 +564,7 @@ void pdcrt_desalojar_ctx(pdcrt_ctx *ctx, void *ptr, size_t tam_actual)
 }
 
 
-pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
+pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj, pdcrt_vio vio)
 {
     pdcrt_aloj *est = pdcrt_alojador_con_estadisticas(aloj);
     if(!est)
@@ -596,6 +573,8 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
     pdcrt_ctx *ctx = pdcrt_alojar(est, sizeof(pdcrt_ctx));
     if(!ctx)
         return NULL;
+
+    ctx->vio = vio;
 
     ctx->recolector_de_basura_activo = true;
     ctx->alojador = est;
@@ -674,16 +653,6 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj)
 
     ctx->registro_de_espacios_de_nombres = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, 0));
     ctx->registro_de_modulos = pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, NULL, 0));
-
-    ctx->capacidades.time = !!pdcrt_time(NULL);
-
-    ctx->log.gc =
-#ifdef PDCRT_LOG_GC
-        true
-#else
-        false
-#endif
-        ;
 
     return ctx;
 }
@@ -968,7 +937,7 @@ void pdcrt_cargar_dependencia(pdcrt_ctx *ctx, pdcrt_f fmod, const char *nombre, 
 int pdcrt_main(int argc, char **argv, void (*cargar_deps)(pdcrt_ctx *ctx), pdcrt_f f)
 {
     pdcrt_aloj *aloj_malloc = pdcrt_alojador_malloc();
-    pdcrt_ctx *ctx = pdcrt_crear_contexto(aloj_malloc);
+    pdcrt_ctx *ctx = pdcrt_crear_contexto(aloj_malloc, pdcrt_vio_global_para_linux());
     pdcrt_fijar_argv(ctx, argc, argv);
     cargar_deps(ctx);
     pdcrt_ejecutar(ctx, 0, f);

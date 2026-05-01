@@ -33,8 +33,8 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_hash.h
         runtime/c/pdcrt/pdcrt_vio.c
         runtime/c/pdcrt/pdcrt_vio.h
-        runtime/c/pdcrt/vios/vio_linux.c
-        runtime/c/pdcrt/vios/vio_linux.h
+        runtime/c/pdcrt/pdcrt_vios/vio_linux.c
+        runtime/c/pdcrt/pdcrt_vios/vio_linux.h
         runtime/c/pdcrt/pdcrt_gc.c
         runtime/c/pdcrt/pdcrt_tabla.c
         runtime/c/pdcrt/pdcrt_impls.c
@@ -66,8 +66,6 @@ function(feature_test feat_name probe_file)
   endif()
 endfunction()
 
-feature_test(CLOCK_GETTIME_MONOTONIC "clock_gettime_monotonic.c")
-feature_test(TIMESPEC_GET_MONOTONIC "timespec_get_monotonic.c")
 feature_test(PTR_32_BITS "ptr32.c")
 feature_test(PTR_64_BITS "ptr64.c")
 
@@ -87,9 +85,6 @@ cmake_dependent_option(PDCRT_DBG_NO_K "Desactiva el uso de continuaciones" ON PD
 cmake_dependent_option(PDCRT_EMP_INTR "Activa la intercepción de las operaciones de la pila" OFF PDCRT_DBG OFF)
 
 option(PDCRT_DTRACE "Activa la integración con DTrace / SystemTap" OFF)
-
-option(PDCRT_LOG "Activa el sistema de logging del runtime" OFF)
-cmake_dependent_option(PDCRT_LOG_GC "Activa el sistema de logging del recolector de basura" ON PDCRT_LOG OFF)
 
 # NOTA: Cuando actualice mi CMake a 4.1, todo lo siguiente se podría cambiar
 # por un `find_program(... VALIDATE ...)`

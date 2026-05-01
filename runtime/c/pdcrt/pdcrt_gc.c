@@ -626,98 +626,32 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
                                     pdcrt_gc_raices *m,
                                     pdcrt_recoleccion params)
 {
-    struct timespec inicio, marcar, recolectar, total;
-    pdcrt_timediff dif_marcar, dif_recolectar, dif_total;
-    size_t mem_usada_al_inicio = 0, mem_usada_al_final = 0;
-    char buffer[PDCRT_FORMATEAR_BYTES_TAM_BUFFER];
-
     if(PDCRT_DTRACE_COMPILADO)
     {
-        mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        size_t mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
         int tipo_recoleccion = params.tipo == PDCRT_RECOLECCION_SIN_MEMORIA ? 0 : 1;
         PDCRT_PROBE2(gc_entry, mem_usada_al_inicio, tipo_recoleccion);
     }
 
-    if(ctx->log.gc && PDCRT_LOG_COMPILADO)
-    {
-        mem_usada_al_inicio = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
-        pdcrt_formatear_bytes(buffer, mem_usada_al_inicio);
-        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "inicio GC: %s\n", buffer);
-
-        pdcrt_formatear_bytes(buffer, ctx->gc.tam_heap);
-        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "     heap: %s\n", buffer);
-
-        if(ctx->capacidades.time)
-            pdcrt_time(&inicio);
-    }
-
     PDCRT_PROBE0(gc_marcar_entry);
-
     pdcrt_gc_marcar_y_mover_todo(ctx, m, params);
     while(ctx->gc.gris.primero)
     {
         pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
     }
-
     PDCRT_PROBE0(gc_marcar_exit);
 
-    if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
-    {
-        pdcrt_time(&marcar);
-        pdcrt_diferencia(&inicio, &marcar, &dif_marcar);
-        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "marcar: %ld.%03ld (%03ld %03ld)\n", dif_marcar.dif_s, dif_marcar.dif_ms, dif_marcar.dif_us, dif_marcar.dif_ns);
-    }
-
     PDCRT_PROBE0(gc_recolectar_entry);
-
     pdcrt_gc_recolectar(ctx, params);
-
     PDCRT_PROBE0(gc_recolectar_exit);
 
-    if(ctx->log.gc && PDCRT_LOG_COMPILADO && ctx->capacidades.time)
-    {
-        pdcrt_time(&recolectar);
-        pdcrt_diferencia(&inicio, &recolectar, &dif_recolectar);
-        pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "recolectar: %ld.%03ld (%03ld %03ld)\n", dif_recolectar.dif_s, dif_recolectar.dif_ms, dif_recolectar.dif_us, dif_recolectar.dif_ns);
-    }
-
     PDCRT_PROBE0(gc_reset_entry);
-
     pdcrt_gc_mover_negros_a_blancos(ctx, params);
-
     PDCRT_PROBE0(gc_reset_exit);
-
-    if(ctx->log.gc && PDCRT_LOG_COMPILADO)
-    {
-        mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
-        pdcrt_formatear_bytes(buffer, mem_usada_al_final);
-        if(ctx->capacidades.time)
-        {
-            pdcrt_time(&total);
-            pdcrt_diferencia(&inicio, &total, &dif_total);
-            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "total: %ld.%03ld (%03ld %03ld)\n", dif_total.dif_s, dif_total.dif_ms, dif_total.dif_us, dif_total.dif_ns);
-            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       mem: %s\n", buffer);
-        }
-        else
-        {
-            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "total: mem: %s\n", buffer);
-        }
-
-        if(mem_usada_al_final > mem_usada_al_inicio)
-        {
-            pdcrt_formatear_bytes(buffer, mem_usada_al_final - mem_usada_al_inicio);
-            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       delta: +%s\n", buffer);
-        }
-        else
-        {
-            pdcrt_formatear_bytes(buffer, mem_usada_al_inicio - mem_usada_al_final);
-            pdcrt_log(ctx, PDCRT_SUBSISTEMA_GC, "       delta: -%s\n", buffer);
-        }
-    }
 
     if(PDCRT_DTRACE_COMPILADO)
     {
-        mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
+        size_t mem_usada_al_final = pdcrt_alojador_con_estadisticas_obtener_usado(ctx->alojador);
         PDCRT_PROBE1(gc_exit, mem_usada_al_final);
     }
 }
