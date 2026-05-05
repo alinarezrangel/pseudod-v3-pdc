@@ -8,6 +8,7 @@
 #include "pdcrt.h"
 #include "pdcrt_ops.h"
 #include "pdcrt_vios/vio_linux.h"
+#include "pdcrt_impls/archivo.h"
 
 
 extern pdcrt_obj pdcrt_obj_desde_xmm(__m128i r);
@@ -541,6 +542,10 @@ pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     {
         return PDCRT_TOBJ_REUBICADO;
     }
+    else if(o.recv == &pdcrt_recv_archivo)
+    {
+        return PDCRT_TOBJ_VALOP;
+    }
     else
     {
         assert(0 && "inalcanzable");
@@ -599,6 +604,8 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj, pdcrt_vio vio)
     ctx->gc.negro.grupo = PDCRT_TGRP_NEGRO;
     ctx->gc.raices_viejas.primero = ctx->gc.raices_viejas.ultimo = NULL;
     ctx->gc.raices_viejas.grupo = PDCRT_TGRP_RAICES_VIEJAS;
+    ctx->gc.recursos.primero = ctx->gc.recursos.ultimo = NULL;
+    ctx->gc.recursos.grupo = PDCRT_TGRP_RECURSOS;
 
     ctx->gc.tam_heap = 10 * 1024 * 1024; // 10MiB
 
@@ -706,12 +713,23 @@ static void pdcrt_liberar_grupo(pdcrt_ctx *ctx, pdcrt_gc_grupo *grupo)
 
 void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
 {
+    for(pdcrt_cabecera_gc *h = ctx->gc.recursos.primero; h != NULL;)
+    {
+        pdcrt_cabecera_gc *s = h->siguiente;
+        assert(h->grupo == PDCRT_TGRP_RECURSOS);
+        pdcrt_valop *v = (pdcrt_valop *) h;
+        if(v->liberar)
+            (*v->liberar)(ctx, v->datos, v->gc.num_bytes - (sizeof(v->gc) + sizeof(v->liberar)));
+        h = s;
+    }
+
     pdcrt_liberar_grupo(ctx, &ctx->gc.blanco_joven);
     pdcrt_liberar_grupo(ctx, &ctx->gc.blanco_viejo);
     pdcrt_liberar_grupo(ctx, &ctx->gc.blanco_en_la_pila);
     pdcrt_liberar_grupo(ctx, &ctx->gc.gris);
     pdcrt_liberar_grupo(ctx, &ctx->gc.negro);
     pdcrt_liberar_grupo(ctx, &ctx->gc.raices_viejas);
+    pdcrt_liberar_grupo(ctx, &ctx->gc.recursos);
     pdcrt_desalojar_ctx(ctx, ctx->textos, sizeof(pdcrt_texto *) * ctx->cap_textos);
     pdcrt_desalojar_ctx(ctx, ctx->pila, sizeof(pdcrt_obj) * ctx->cap_pila);
     pdcrt_aloj *aloj = ctx->alojador;

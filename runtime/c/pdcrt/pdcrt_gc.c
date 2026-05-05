@@ -121,9 +121,9 @@ void pdcrt_desactivar_recolector_de_basura(pdcrt_ctx *ctx)
 }
 
 void pdcrt_inicializar_obj(pdcrt_ctx *ctx,
-                                  pdcrt_cabecera_gc *h,
-                                  pdcrt_tipo_obj_gc tipo,
-                                  size_t sz)
+                           pdcrt_cabecera_gc *h,
+                           pdcrt_tipo_obj_gc tipo,
+                           size_t sz)
 {
     h->tipo = tipo;
     h->grupo = PDCRT_TGRP_NINGUNO;
@@ -131,6 +131,19 @@ void pdcrt_inicializar_obj(pdcrt_ctx *ctx,
     h->anterior = h->siguiente = NULL;
     h->num_bytes = sz;
     pdcrt_gc_agregar_a_grupo(&ctx->gc.blanco_joven, h);
+}
+
+void pdcrt_inicializar_rsc(pdcrt_ctx *ctx,
+                           pdcrt_cabecera_gc *h,
+                           pdcrt_tipo_obj_gc tipo,
+                           size_t sz)
+{
+    h->tipo = tipo;
+    h->grupo = PDCRT_TGRP_NINGUNO;
+    h->en_la_pila = false;
+    h->anterior = h->siguiente = NULL;
+    h->num_bytes = sz;
+    pdcrt_gc_agregar_a_grupo(&ctx->gc.recursos, h);
 }
 
 void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz)
@@ -142,6 +155,18 @@ void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tip
         pdcrt_error(ctx, u8"No se pudo alojar más memoria");
     pdcrt_inicializar_obj(ctx, h, tipo, sz);
     PDCRT_PROBE0(gc_nuevo_objeto_heap);
+    return h;
+}
+
+void *pdcrt_alojar_rsc(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz)
+{
+    pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, sz);
+    pdcrt_intenta_invocar_al_recolector(ctx, m, params);
+    pdcrt_cabecera_gc *h = pdcrt_alojar_ctx(ctx, sz);
+    if(!h)
+        pdcrt_error(ctx, u8"No se pudo alojar más memoria");
+    pdcrt_inicializar_rsc(ctx, h, tipo, sz);
+    PDCRT_PROBE0(gc_nuevo_recurso_heap);
     return h;
 }
 
@@ -396,7 +421,7 @@ PDCRT_NOINLINE static void pdcrt_gc_marcar(pdcrt_ctx *ctx,
                                    &pdcrt_gc_no_debe_ser_blanco_vis_obj);
 #endif
     }
-    else
+    else if(h->grupo != PDCRT_TGRP_RECURSOS)
     {
         pdcrt_gc_intenta_mover_a_gris(ctx, h, params);
     }
@@ -592,6 +617,19 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx, pdcrt_recoleccion params)
             liberado += pdcrt_gc_liberar_objeto(ctx, h);
             h = s;
         }
+
+        for(pdcrt_cabecera_gc *h = ctx->gc.recursos.primero; h != NULL;)
+        {
+            pdcrt_cabecera_gc *s = h->siguiente;
+            assert(h->grupo == PDCRT_TGRP_RECURSOS);
+            pdcrt_valop *v = (pdcrt_valop *) h;
+            if(!v->liberar)
+            {
+                pdcrt_gc_eliminar_de_grupo(&ctx->gc.recursos, h);
+                liberado += pdcrt_gc_liberar_objeto(ctx, h);
+            }
+            h = s;
+        }
     }
 
     return liberado;
@@ -638,6 +676,18 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
     while(ctx->gc.gris.primero)
     {
         pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
+    }
+    for(pdcrt_cabecera_gc *rsc = ctx->gc.recursos.primero; rsc; rsc = rsc->siguiente)
+    {
+        pdcrt_cabecera_gc *anterior = rsc->anterior, *siguiente = rsc->siguiente;
+        if(((pdcrt_valop *) rsc)->liberar)
+        {
+            pdcrt_gc_marcar_raiz(ctx, &rsc, params);
+            if(anterior)
+                anterior->siguiente = rsc;
+            if(siguiente)
+                siguiente->anterior = rsc;
+        }
     }
     PDCRT_PROBE0(gc_marcar_exit);
 

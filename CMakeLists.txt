@@ -41,7 +41,9 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_ops.c
         runtime/c/pdcrt/pdcrt_ops.h
         runtime/c/pdcrt/pdcrt_dtrace.c
-        runtime/c/pdcrt/pdcrt_dtrace.h)
+        runtime/c/pdcrt/pdcrt_dtrace.h
+        runtime/c/pdcrt/pdcrt_impls/archivo.c
+        runtime/c/pdcrt/pdcrt_impls/archivo.h)
 
 target_include_directories(pdcrt PRIVATE libs/systemtap)
 

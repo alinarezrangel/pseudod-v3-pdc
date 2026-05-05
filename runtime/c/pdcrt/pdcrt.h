@@ -87,6 +87,7 @@ typedef enum pdcrt_gc_tipo_grupo
     PDCRT_TGRP_GRIS,
     PDCRT_TGRP_NEGRO,
     PDCRT_TGRP_RAICES_VIEJAS,
+    PDCRT_TGRP_RECURSOS,
     PDCRT_TGRP_NINGUNO,
 } pdcrt_gc_tipo_grupo;
 
@@ -117,7 +118,7 @@ typedef struct pdcrt_gc_grupo
 typedef struct pdcrt_gc
 {
     pdcrt_gc_grupo blanco_joven, blanco_viejo, blanco_en_la_pila,
-                   gris, negro, raices_viejas;
+                   gris, negro, raices_viejas, recursos;
 
     size_t tam_heap;
     unsigned int num_recolecciones;
@@ -235,13 +236,13 @@ struct pdcrt_bucket
     size_t idc_colision : sizeof(void*) * 8 - 2;
 };
 
+typedef void (*pdcrt_valop_liberar)(pdcrt_ctx *ctx, void *datos, size_t ndatos);
+
 struct pdcrt_valop
 {
     pdcrt_cabecera_gc gc;
-    // Todos los objetos del GC deben ser de al menos un puntero de "ancho" en
-    // bytes.
-    void *padding;
-    char datos[];
+    pdcrt_valop_liberar liberar;
+    _Alignas(_Alignof(void*)) char datos[];
 };
 
 typedef enum pdcrt_corrutina_estado
@@ -420,6 +421,21 @@ typedef enum pdcrt_tipo
     X(recolectar_basura, "recolectarBasura")                            \
     X(vaciar, "vaciar")                                                 \
     X(texto_vacio, "")                                                  \
+    X(abrir_archivo, "abrirArchivo")                                    \
+    X(cerrar, "cerrar")                                                 \
+    X(esta_abierto, "estaAbierto")                                      \
+    X(esta_abierto2, u8"estáAbierto")                                   \
+    X(leer_byte, u8"leerByte")                                          \
+    X(obtener_siguiente_byte, u8"obtenerSiguienteByte")                 \
+    X(escribir_byte, "escribirByte")                                    \
+    X(escribir_texto, "escribirTexto")                                  \
+    X(posicion_actual, "posicionActual")                                \
+    X(posicion_actual2, u8"posiciónActual")                             \
+    X(cambiar_posicion, "cambiarPosicion")                              \
+    X(cambiar_posicion2, u8"cambiarPosición")                           \
+    X(fin_del_archivo, "finDelArchivo")                                 \
+    X(error, "error")                                                   \
+    X(leer_todo, "__leerTodo")                                          \
     X(nulo_como_texto, "NULO")
 
 typedef struct pdcrt_textos
@@ -570,7 +586,12 @@ void pdcrt_inicializar_obj(pdcrt_ctx *ctx,
                            pdcrt_cabecera_gc *h,
                            pdcrt_tipo_obj_gc tipo,
                            size_t sz);
+void pdcrt_inicializar_rsc(pdcrt_ctx *ctx,
+                           pdcrt_cabecera_gc *h,
+                           pdcrt_tipo_obj_gc tipo,
+                           size_t sz);
 void *pdcrt_alojar_obj(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz);
+void *pdcrt_alojar_rsc(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tipo, size_t sz);
 
 typedef struct pdcrt_objeto_generico_gc
 {
@@ -741,6 +762,11 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 #define pdcrt_objeto_corrutina(corrutina) ((pdcrt_obj) { .recv = &pdcrt_recv_corrutina, .coro = (corrutina) })
 #define pdcrt_objeto_instancia(instancia) ((pdcrt_obj) { .recv = &pdcrt_recv_instancia, .inst = (instancia) })
 #define pdcrt_objeto_reubicado(reub) ((pdcrt_obj) { .recv = &pdcrt_recv_reubicado, .reubicado = (reub) })
+
+
+#define PDCRT_CALC_ARGS() (ctx->tam_pila - (args < PDCRT_NN_IMM ? 0 : args - PDCRT_NN_IMM));
+#define PDCRT_SACAR_PRELUDIO() do { if(args >= PDCRT_NN_IMM) pdcrt_eliminar_elementos(ctx, argp, args - PDCRT_NN_IMM); } while(0)
+
 
 #ifdef PDCRT_DBG_NO_K
 // TODO fix:

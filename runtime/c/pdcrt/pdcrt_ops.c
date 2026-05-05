@@ -136,12 +136,17 @@ pdcrt_tabla* pdcrt_crear_tabla(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t capaci
     return tbl;
 }
 
-pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t num_bytes)
+pdcrt_valop* pdcrt_crear_valop(pdcrt_ctx *ctx, pdcrt_gc_raices *m, size_t num_bytes, pdcrt_valop_liberar liberar)
 {
     PDCRT_PROBE0(crear_valop_entry);
-    pdcrt_valop *valop = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_VALOP, sizeof(pdcrt_valop) + num_bytes);
+    pdcrt_valop *valop = NULL;
+    if(liberar)
+        valop = pdcrt_alojar_rsc(ctx, m, PDCRT_TGC_VALOP, sizeof(pdcrt_valop) + num_bytes);
+    else
+        valop = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_VALOP, sizeof(pdcrt_valop) + num_bytes);
     if(!valop)
         pdcrt_enomem(ctx);
+    valop->liberar = liberar;
     memset(valop->datos, 0, num_bytes);
     PDCRT_PROBE0(crear_valop_exit);
     return valop;

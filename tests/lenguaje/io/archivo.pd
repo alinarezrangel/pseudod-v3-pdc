@@ -1,0 +1,17 @@
+variables arch, t
+
+escribir {Escribir}
+nl
+fijar arch a __AbrirArchivo: {io-archivo.txt}, 101
+arch#escribirTexto: {Hola Mundo}
+arch#cerrar
+escribir {Escrito}
+nl
+
+fijar arch a __AbrirArchivo: {io-archivo.txt}, 0
+fijar t a arch#__leerTodo
+arch#cerrar
+escribir {«}
+escribir t
+escribir {»}
+nl

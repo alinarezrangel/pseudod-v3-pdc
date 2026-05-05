@@ -241,7 +241,7 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_archivo(
     }
 
     *out_archivo = malloc(sizeof(pdcrt_archivo));
-    if(*out_archivo)
+    if(!*out_archivo)
     {
         err = PDCRT_IO_ERROR_SIN_MEMORIA;
         goto error;
@@ -481,6 +481,7 @@ static pdcrt_io_error pdcrt_vio_linux_cerrar_archivo(void *ctx, pdcrt_archivo *a
 {
     PDCRT_BUG(ctx != &pdcrt_linux_marca, "ctx inválido");
     close(archivo->fd);
+    free(archivo);
     return PDCRT_IO_OK;
 }
 

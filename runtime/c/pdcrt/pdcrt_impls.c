@@ -6,9 +6,7 @@
 #include "pdcrt.h"
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
-
-#define PDCRT_CALC_ARGS() (ctx->tam_pila - (args < PDCRT_NN_IMM ? 0 : args - PDCRT_NN_IMM));
-#define PDCRT_SACAR_PRELUDIO() do { if(args >= PDCRT_NN_IMM) pdcrt_eliminar_elementos(ctx, argp, args - PDCRT_NN_IMM); } while(0)
+#include "pdcrt_impls/archivo.h"
 
 typedef enum pdcrt_clase
 {
@@ -1445,6 +1443,66 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         PDCRT_CARGAR_RAIZ_K(0, k);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.abrir_archivo))
+    {
+        if(args != 2)
+            pdcrt_error(ctx, "Runtime: abrirArchivo necesita 2 argumentos");
+
+        bool ok = false;
+        pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
+        size_t tam = pdcrt_obtener_tam_texto_obj(ctx, nombre, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "abrirArchivo necesita un texto como su primer argumento (el nombre del archivo)");
+        pdcrt_entero modo = pdcrt_obtener_entero_obj(ctx, pdcrt_obj_desde_xmm(a2), &ok);
+        if(!ok)
+            pdcrt_error(ctx, "abrirArchivo necesita un entero como su segundo argumento (el modo del archivo)");
+
+        pdcrt_intencion_abrir_archivo intencion = 0;
+        pdcrt_accion_crear accion_crear = PDCRT_ACCION_ERROR_NUEVO;
+        if(modo % 10 == 1)
+        {
+            accion_crear = PDCRT_ACCION_CREAR_NUEVO;
+            intencion = PDCRT_ABRIR_ESCRITURA;
+        }
+        else
+        {
+            intencion = PDCRT_ABRIR_LECTURA;
+        }
+
+        modo /= 100;
+        pdcrt_accion_abrir_archivo accion_abrir = PDCRT_ACCION_ABRIR_EXISTENTE;
+        if(modo % 10 == 1)
+            accion_abrir = PDCRT_ACCION_TRUNCAR_EXISTENTE;
+
+        PDCRT_DEFINE_RAICES(3);
+        PDCRT_GUARDAR_RAIZ_K(0, k);
+        PDCRT_GUARDAR_RAIZ_XMM(1, a1);
+        PDCRT_GUARDAR_RAIZ_XMM(2, a2);
+        pdcrt_valop *valop = pdcrt_crear_valop(ctx, PDCRT_GC(), sizeof(pdcrt_rsc_archivo), &pdcrt_liberar_rsc_archivo);
+        PDCRT_CARGAR_RAIZ_K(0, k);
+        PDCRT_CARGAR_RAIZ_XMM(1, a1);
+        PDCRT_CARGAR_RAIZ_XMM(2, a2);
+
+        pdcrt_rsc_archivo *arch = (pdcrt_rsc_archivo *) valop->datos;
+        pdcrt_opciones_abrir_archivo opciones = {
+            .flags = 0,
+            .nombre = { .ptr = nombre.texto->contenido, .tam = tam + 1 },
+            .intencion = intencion,
+            .accion_abrir = accion_abrir,
+            .accion_crear = accion_crear,
+            .permisos_al_crear = PDCRT_PERMISO_LEER | PDCRT_PERMISO_ESCRIBIR,
+            .relativo_a = NULL,
+        };
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_abrir_archivo)(ctx->vio.ctx, &arch->archivo, &opciones);
+        if(ioerr != PDCRT_IO_OK)
+        {
+            arch->archivo = NULL;
+        }
+        arch->eof = false;
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_archivo(valop)));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.crear_instancia))
     {
