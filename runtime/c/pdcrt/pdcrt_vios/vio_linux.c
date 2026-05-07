@@ -102,13 +102,6 @@ static pdcrt_io_error pdcrt_vio_linux_obtener_variable_de_entorno(
     pdcrt_vio_cadena variable,
     pdcrt_vio_buffer *out_valor,
     size_t *tam_valor);
-static pdcrt_io_error pdcrt_vio_linux_fijar_variable_de_entorno(
-    void *ctx,
-    pdcrt_vio_cadena variable,
-    pdcrt_vio_cadena valor);
-static pdcrt_io_error pdcrt_vio_linux_eliminar_variable_de_entorno(
-    void *ctx,
-    pdcrt_vio_cadena variable);
 static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(
     void *ctx,
     pdcrt_subproceso **out_subproceso,
@@ -119,30 +112,31 @@ static pdcrt_io_error pdcrt_vio_linux_estado_de_subproceso(void *ctx,
     pdcrt_subproceso *subproceso,
     pdcrt_estado_de_subproceso *out_estado);
 
-static const pdcrt_vio_vtable pdcrt_linux_vtable = {
-    .limites = {
 #ifdef PATH_MAX
-        .ruta_maxima = PATH_MAX,
+#define PDCRT_LINUX_PATH_MAX PATH_MAX
 #else
-        .ruta_maxima = _POSIX_PATH_MAX,
+#define PDCRT_LINUX_PATH_MAX _POSIX_PATH_MAX
 #endif
 
 #ifdef NAME_MAX
-        .nombre_de_archivo_maximo = NAME_MAX,
+#define PDCRT_LINUX_NAME_MAX NAME_MAX
 #else
-        .nombre_de_archivo_maximo = _POSIX_NAME_MAX,
+#define PDCRT_LINUX_NAME_MAX _POSIX_NAME_MAX
 #endif
-
-        .archivo_maximo = SIZE_MAX,
 
 #ifdef ARG_MAX
-        .entorno_maximo = ARG_MAX,
-        .linea_de_comandos_maxima = ARG_MAX,
+#define PDCRT_LINUX_ARG_MAX ARG_MAX
 #else
-        .entorno_maximo = _POSIX_ARG_MAX,
-        .linea_de_comandos_maxima = _POSIX_ARG_MAX,
+#define PDCRT_LINUX_ARG_MAX _POSIX_ARG_MAX
 #endif
 
+static const pdcrt_vio_vtable pdcrt_linux_vtable = {
+    .limites = {
+        .ruta_maxima = PDCRT_LINUX_PATH_MAX,
+        .nombre_de_archivo_maximo = PDCRT_LINUX_NAME_MAX,
+        .archivo_maximo = SIZE_MAX,
+        .entorno_maximo = PDCRT_LINUX_ARG_MAX,
+        .linea_de_comandos_maxima = PDCRT_LINUX_ARG_MAX,
         .entorno_y_linea_de_comandos_compartidos = true,
     },
 
@@ -172,8 +166,6 @@ static const pdcrt_vio_vtable pdcrt_linux_vtable = {
     .op_fecha_y_hora_gregoriana_local = &pdcrt_vio_linux_fecha_y_hora_gregoriana_local,
     .op_fecha_y_hora_gregoriana_utc = &pdcrt_vio_linux_fecha_y_hora_gregoriana_utc,
     .op_obtener_variable_de_entorno = &pdcrt_vio_linux_obtener_variable_de_entorno,
-    .op_fijar_variable_de_entorno = &pdcrt_vio_linux_fijar_variable_de_entorno,
-    .op_eliminar_variable_de_entorno = &pdcrt_vio_linux_eliminar_variable_de_entorno,
     .op_crear_subproceso = &pdcrt_vio_linux_crear_subproceso,
     .op_esperar_por_subproceso = &pdcrt_vio_linux_esperar_por_subproceso,
     .op_matar_subproceso = &pdcrt_vio_linux_matar_subproceso,
@@ -298,7 +290,7 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_archivo(
 
     int fd = 0;
     if(opciones->relativo_a)
-        fd = openat(dirfd(opciones->relativo_a->dir), opciones->nombre.ptr, oflags, mode);
+        fd = openat(opciones->relativo_a->fd, opciones->nombre.ptr, oflags, mode);
     else
         fd = open(opciones->nombre.ptr, oflags, mode);
 
@@ -405,7 +397,7 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_directorio(
 
     int fd = 0;
     if(opciones->relativo_a)
-        fd = openat(dirfd(opciones->relativo_a->dir), opciones->nombre.ptr, oflags, mode);
+        fd = openat(opciones->relativo_a->fd, opciones->nombre.ptr, oflags, mode);
     else
         fd = open(opciones->nombre.ptr, oflags, mode);
 
@@ -1117,11 +1109,16 @@ static pdcrt_io_error pdcrt_vio_linux_obtener_variable_de_entorno(
     size_t *tam_valor)
 {
     PDCRT_BUG(ctx != &pdcrt_linux_marca, "ctx inválido");
+    PDCRT_BUG(!tam_valor, "tam_valor inválido");
 
     if(!pdcrt_vio_es_cstr(variable))
         return PDCRT_IO_ERROR_ARGUMENTO_INVALIDO;
 
+    // TODO: Debería tener mi propia copia de environ y no usar getenv
     char *env = getenv(variable.ptr);
+    if(env == NULL)
+        return PDCRT_IO_ERROR_NO_EXISTE;
+
     *tam_valor = strlen(env);
     if(out_valor)
     {
@@ -1130,61 +1127,6 @@ static pdcrt_io_error pdcrt_vio_linux_obtener_variable_de_entorno(
         out_valor->tam = nbytes;
     }
     return PDCRT_IO_OK;
-}
-
-static pdcrt_io_error pdcrt_vio_linux_fijar_variable_de_entorno(
-    void *ctx,
-    pdcrt_vio_cadena variable,
-    pdcrt_vio_cadena valor)
-{
-    PDCRT_BUG(ctx != &pdcrt_linux_marca, "ctx inválido");
-
-    if(!pdcrt_vio_es_cstr(variable) || !pdcrt_vio_es_cstr(valor))
-        return PDCRT_IO_ERROR_ARGUMENTO_INVALIDO;
-
-    if(setenv(variable.ptr, valor.ptr, 1) == 0)
-    {
-        return PDCRT_IO_OK;
-    }
-    else
-    {
-        switch(errno)
-        {
-        case ENOMEM:
-            return PDCRT_IO_ERROR_SIN_MEMORIA;
-        case EINVAL:
-            return PDCRT_IO_ERROR_ARGUMENTO_INVALIDO;
-        default:
-            return PDCRT_IO_ERROR_DESCONOCIDO;
-        }
-    }
-}
-
-static pdcrt_io_error pdcrt_vio_linux_eliminar_variable_de_entorno(
-    void *ctx,
-    pdcrt_vio_cadena variable)
-{
-    PDCRT_BUG(ctx != &pdcrt_linux_marca, "ctx inválido");
-
-    if(!pdcrt_vio_es_cstr(variable))
-        return PDCRT_IO_ERROR_ARGUMENTO_INVALIDO;
-
-    if(unsetenv(variable.ptr) == 0)
-    {
-        return PDCRT_IO_OK;
-    }
-    else
-    {
-        switch(errno)
-        {
-        case ENOMEM:
-            return PDCRT_IO_ERROR_SIN_MEMORIA;
-        case EINVAL:
-            return PDCRT_IO_ERROR_ARGUMENTO_INVALIDO;
-        default:
-            return PDCRT_IO_ERROR_DESCONOCIDO;
-        }
-    }
 }
 
 static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(

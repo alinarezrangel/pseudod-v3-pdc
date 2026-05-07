@@ -370,15 +370,6 @@ typedef struct pdcrt_vio_vtable
         pdcrt_vio_buffer *out_valor,
         size_t *tam_valor);
 
-    pdcrt_io_error (*op_fijar_variable_de_entorno)(
-        void *ctx,
-        pdcrt_vio_cadena variable,
-        pdcrt_vio_cadena valor);
-
-    pdcrt_io_error (*op_eliminar_variable_de_entorno)(
-        void *ctx,
-        pdcrt_vio_cadena variable);
-
     pdcrt_io_error (*op_crear_subproceso)(
         void *ctx,
         pdcrt_subproceso **out_subproceso,
