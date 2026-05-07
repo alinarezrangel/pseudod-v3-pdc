@@ -422,7 +422,7 @@ void pdcrt_params(pdcrt_ctx *ctx,
 
         if(m->args != (prefijo + num_args_variadic + sufijo))
             pdcrt_error(ctx, u8"función llamada de forma inválida");
-        assert(p->base.num_params == (prefijo + sufijo + num_param_variadic));
+        PDCRT_ASSERT(p->base.num_params == (prefijo + sufijo + num_param_variadic));
 
         for(size_t i = 0; i < prefijo; i++)
         {
@@ -729,7 +729,7 @@ void pdcrt_prnl(pdcrt_ctx *ctx, pdcrt_marco *m)
 
 pdcrt_tk pdcrt_devolver(pdcrt_ctx *ctx, pdcrt_marco *m, int rets)
 {
-    assert(rets == 1);
+    PDCRT_ASSERT(rets == 1);
     return pdcrt_continuar(ctx, m->k, pdcrt_xmm_desde_obj(pdcrt_sacar(ctx)));
 }
 

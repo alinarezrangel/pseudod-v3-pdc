@@ -254,12 +254,12 @@ pdcrt_tk pdcrt_recv_archivo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(txt)));
     }
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 void pdcrt_liberar_rsc_archivo(pdcrt_ctx *ctx, void *datos, size_t ndatos)
 {
-    assert(ndatos == sizeof(pdcrt_rsc_archivo));
+    PDCRT_ASSERT(ndatos == sizeof(pdcrt_rsc_archivo));
     pdcrt_rsc_archivo *arch = datos;
     if(arch->archivo)
     {

@@ -140,7 +140,7 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
             pdcrt_tabla_fijar(ctx, tbl, b.llave, b.valor, false);
     }
 
-    assert(tbl->num_colisiones <= (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap);
+    PDCRT_ASSERT(tbl->num_colisiones <= (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap);
 
     if(tbl->cap_colisiones > (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1)
     {
@@ -156,7 +156,7 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
 
     PDCRT_PROBE0(tabla_rehashear_exit);
 
-    assert(tbl->buckets_ocupados == buckets_ocupados);
+    PDCRT_ASSERT(tbl->buckets_ocupados == buckets_ocupados);
 }
 
 void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear)
@@ -172,7 +172,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
         PDCRT_PROBE0(tabla_fijar_colision);
         while(true)
         {
-            assert(b->activo);
+            PDCRT_ASSERT(b->activo);
 
             if(pdcrt_igualdad(ctx, b->llave, llave))
             {
@@ -198,7 +198,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
                         pdcrt_enomem(ctx);
                     tbl->cap_colisiones = nueva_cap;
                     PDCRT_PROBE1(tabla_mas_colisiones, nueva_cap);
-                    assert(tbl->num_colisiones < tbl->cap_colisiones);
+                    PDCRT_ASSERT(tbl->num_colisiones < tbl->cap_colisiones);
                 }
 
                 if(vh)
@@ -213,7 +213,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
 
                 tbl->num_colisiones += 1;
                 tbl->buckets_ocupados += 1;
-                assert(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
+                PDCRT_ASSERT(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
                 break;
             }
             else
@@ -235,7 +235,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
         };
 
         tbl->buckets_ocupados += 1;
-        assert(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
+        PDCRT_ASSERT(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
     }
 
     if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)

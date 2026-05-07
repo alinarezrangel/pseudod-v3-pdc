@@ -638,7 +638,7 @@ pdcrt_tk pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
     (void) args;
     (void) k;
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 static bool pdcrt_es_digito(char c)
@@ -825,7 +825,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         {
             PDCRT_DEFINE_RAICES(1);
             char *buffer = pdcrt_alojar_ctx(ctx, longitud);
-            assert(buffer);
+            PDCRT_ASSERT(buffer);
             memcpy(buffer, oyo.texto->contenido + inicio, longitud);
             PDCRT_GUARDAR_RAIZ_K(0, k);
             res = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), buffer, longitud));
@@ -866,7 +866,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         {
             PDCRT_DEFINE_RAICES(1);
             char *buffer = pdcrt_alojar_ctx(ctx, final - inicio);
-            assert(buffer);
+            PDCRT_ASSERT(buffer);
             memcpy(buffer, oyo.texto->contenido + inicio, final - inicio);
             PDCRT_GUARDAR_RAIZ_K(0, k);
             res = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), buffer, final - inicio));
@@ -905,7 +905,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 
         char *buffer = pdcrt_obj_desde_xmm(a2).texto->contenido;
         ssize_t *skip_table = pdcrt_alojar_ctx(ctx, buffer_len * sizeof(ssize_t));
-        assert(skip_table);
+        PDCRT_ASSERT(skip_table);
 
         pdcrt_obj res = pdcrt_objeto_nulo();
 
@@ -1221,7 +1221,7 @@ pdcrt_tk pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     (void) args;
     (void) k;
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 
@@ -1372,8 +1372,8 @@ static pdcrt_tk pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m
 
         size_t buckets = pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara);
 
-        assert(i - buckets < yo.tabla->num_colisiones);
-        assert(yo.tabla->colisiones[i - buckets].activo);
+        PDCRT_ASSERT(i - buckets < yo.tabla->num_colisiones);
+        PDCRT_ASSERT(yo.tabla->colisiones[i - buckets].activo);
 
         return pdcrt_llamar2(ctx, m, &pdcrt_tabla_para_cada_par_k1,
             pdcrt_xmm_desde_obj(iterador), pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
@@ -1702,7 +1702,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
     }
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 pdcrt_tk pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
@@ -1734,7 +1734,7 @@ pdcrt_tk pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(txt));
     }
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 pdcrt_tk pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
@@ -1766,7 +1766,7 @@ pdcrt_tk pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(txt));
     }
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 pdcrt_tk pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
@@ -1942,7 +1942,7 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         }
     }
 
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }
 
 static pdcrt_tk pdcrt_recv_corrutina_avanzar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
@@ -1963,7 +1963,7 @@ static pdcrt_tk pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDC
 #if !NDEBUG
     pdcrt_debe_tener_tipo(ctx, oyo, PDCRT_TOBJ_CLOSURE);
 #endif
-    assert(oyo.closure->num_capturas == 1);
+    PDCRT_ASSERT(oyo.closure->num_capturas == 1);
     pdcrt_obj obj_coro = oyo.closure->capturas[0];
     pdcrt_corrutina *coro = obj_coro.coro;
     if(coro->estado != PDCRT_CORO_EJECUTANDOSE)
@@ -2054,5 +2054,5 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     (void) ctx;
     (void) args;
     (void) k;
-    assert(0 && "sin implementar");
+    PDCRT_ASSERT(0 && "sin implementar");
 }

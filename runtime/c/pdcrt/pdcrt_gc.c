@@ -10,8 +10,8 @@
 
 void pdcrt_gc_eliminar_de_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
 {
-    assert(h->grupo == grupo->grupo);
-    assert(grupo->grupo != PDCRT_TGRP_NINGUNO);
+    PDCRT_ASSERT(h->grupo == grupo->grupo);
+    PDCRT_ASSERT(grupo->grupo != PDCRT_TGRP_NINGUNO);
     if(h->anterior)
         h->anterior->siguiente = h->siguiente;
     if(h->siguiente)
@@ -26,10 +26,10 @@ void pdcrt_gc_eliminar_de_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
 
 void pdcrt_gc_agregar_a_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
 {
-    assert(!h->anterior);
-    assert(!h->siguiente);
-    assert(h->grupo == PDCRT_TGRP_NINGUNO);
-    assert(grupo->grupo != PDCRT_TGRP_NINGUNO);
+    PDCRT_ASSERT(!h->anterior);
+    PDCRT_ASSERT(!h->siguiente);
+    PDCRT_ASSERT(h->grupo == PDCRT_TGRP_NINGUNO);
+    PDCRT_ASSERT(grupo->grupo != PDCRT_TGRP_NINGUNO);
     if(grupo->ultimo)
     {
         grupo->ultimo->siguiente = h;
@@ -38,7 +38,7 @@ void pdcrt_gc_agregar_a_grupo(pdcrt_gc_grupo *grupo, pdcrt_cabecera_gc *h)
     }
     else
     {
-        assert(!grupo->primero);
+        PDCRT_ASSERT(!grupo->primero);
         grupo->primero = grupo->ultimo = h;
     }
     h->grupo = grupo->grupo;
@@ -194,12 +194,12 @@ pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o)
         case PDCRT_TOBJ_REUBICADO:
             return o.gc;
     }
-    assert(0 && "inalcanzable");
+    PDCRT_ASSERT(0 && "inalcanzable");
 }
 
 static pdcrt_cabecera_gc *pdcrt_gc_reubicar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
 {
-    assert(h->grupo == PDCRT_TGRP_BLANCO_VIEJO
+    PDCRT_ASSERT(h->grupo == PDCRT_TGRP_BLANCO_VIEJO
         || h->grupo == PDCRT_TGRP_BLANCO_JOVEN
         || h->grupo == PDCRT_TGRP_BLANCO_EN_LA_PILA);
 
@@ -318,7 +318,7 @@ static void pdcrt_gc_visitar_contenido(
             break;
         }
         default:
-            assert(0 && "inalcanzable");
+            PDCRT_ASSERT(0 && "inalcanzable");
     }
 }
 
@@ -362,7 +362,7 @@ static void pdcrt_gc_intenta_mover_a_gris(pdcrt_ctx *ctx,
     }
     else
     {
-        assert(h->grupo == PDCRT_TGRP_GRIS || h->grupo == PDCRT_TGRP_NEGRO);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_GRIS || h->grupo == PDCRT_TGRP_NEGRO);
     }
 }
 
@@ -373,11 +373,11 @@ static void pdcrt_gc_debe_ser_alcanzable_vis(pdcrt_ctx *ctx, pdcrt_cabecera_gc *
     bool es_mayor = pdcrt_gc_recoleccion_es_mayor(params);
     if(es_mayor)
     {
-        assert(g != PDCRT_TGRP_NEGRO || g != PDCRT_TGRP_GRIS);
+        PDCRT_ASSERT(g != PDCRT_TGRP_NEGRO || g != PDCRT_TGRP_GRIS);
     }
     else
     {
-        assert(g != PDCRT_TGRP_BLANCO_VIEJO || g != PDCRT_TGRP_NEGRO || g != PDCRT_TGRP_GRIS);
+        PDCRT_ASSERT(g != PDCRT_TGRP_BLANCO_VIEJO || g != PDCRT_TGRP_NEGRO || g != PDCRT_TGRP_GRIS);
     }
 }
 
@@ -396,7 +396,7 @@ PDCRT_NOINLINE static void pdcrt_gc_marcar(pdcrt_ctx *ctx,
                                            pdcrt_recoleccion params)
 {
     pdcrt_cabecera_gc *h = *h_ptr;
-    assert(h->grupo != PDCRT_TGRP_NINGUNO);
+    PDCRT_ASSERT(h->grupo != PDCRT_TGRP_NINGUNO);
 
     if(h->tipo == PDCRT_TGC_REUBICADO)
     {
@@ -443,11 +443,11 @@ static void pdcrt_gc_no_debe_ser_blanco_vis(pdcrt_ctx *ctx, pdcrt_cabecera_gc **
     {
         // Los objetos blancos de la segunda generación no son recolectados en colecciones menores, así que está bien
         // que haya referencias a ellos desde los objetos grises
-        assert(g != PDCRT_TGRP_BLANCO_VIEJO || g != PDCRT_TGRP_BLANCO_JOVEN || g != PDCRT_TGRP_BLANCO_EN_LA_PILA);
+        PDCRT_ASSERT(g != PDCRT_TGRP_BLANCO_VIEJO || g != PDCRT_TGRP_BLANCO_JOVEN || g != PDCRT_TGRP_BLANCO_EN_LA_PILA);
     }
     else
     {
-        assert(g != PDCRT_TGRP_BLANCO_JOVEN || g != PDCRT_TGRP_BLANCO_EN_LA_PILA);
+        PDCRT_ASSERT(g != PDCRT_TGRP_BLANCO_JOVEN || g != PDCRT_TGRP_BLANCO_EN_LA_PILA);
     }
 }
 
@@ -462,7 +462,7 @@ PDCRT_NOINLINE static void pdcrt_gc_procesar_gris(pdcrt_ctx *ctx,
                                                   pdcrt_cabecera_gc *h,
                                                   pdcrt_recoleccion params)
 {
-    assert(h->grupo == PDCRT_TGRP_GRIS);
+    PDCRT_ASSERT(h->grupo == PDCRT_TGRP_GRIS);
 
     pdcrt_gc_visitar_contenido(ctx, h, params,
                                &pdcrt_gc_marcar,
@@ -536,7 +536,7 @@ static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdc
     {
         pdcrt_cabecera_gc *s = h->siguiente;
         pdcrt_cabecera_gc *p = h;
-        assert(h->grupo == PDCRT_TGRP_RAICES_VIEJAS);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_RAICES_VIEJAS);
         pdcrt_gc_marcar_raiz(ctx, &p, params);
         h = s;
     }
@@ -544,7 +544,7 @@ static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdc
 
 size_t pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
 {
-    assert(h->grupo == PDCRT_TGRP_NINGUNO);
+    PDCRT_ASSERT(h->grupo == PDCRT_TGRP_NINGUNO);
 
     size_t liberado = 0;
     if(h->tipo == PDCRT_TGC_TEXTO)
@@ -592,7 +592,7 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx, pdcrt_recoleccion params)
     for(pdcrt_cabecera_gc *h = ctx->gc.blanco_en_la_pila.primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
-        assert(h->grupo == PDCRT_TGRP_BLANCO_EN_LA_PILA);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_BLANCO_EN_LA_PILA);
         pdcrt_gc_eliminar_de_grupo(&ctx->gc.blanco_en_la_pila, h);
         liberado += pdcrt_gc_liberar_objeto(ctx, h);
         h = s;
@@ -601,7 +601,7 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx, pdcrt_recoleccion params)
     for(pdcrt_cabecera_gc *h = ctx->gc.blanco_joven.primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
-        assert(h->grupo == PDCRT_TGRP_BLANCO_JOVEN);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_BLANCO_JOVEN);
         pdcrt_gc_eliminar_de_grupo(&ctx->gc.blanco_joven, h);
         liberado += pdcrt_gc_liberar_objeto(ctx, h);
         h = s;
@@ -612,7 +612,7 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx, pdcrt_recoleccion params)
         for(pdcrt_cabecera_gc *h = ctx->gc.blanco_viejo.primero; h != NULL;)
         {
             pdcrt_cabecera_gc *s = h->siguiente;
-            assert(h->grupo == PDCRT_TGRP_BLANCO_VIEJO);
+            PDCRT_ASSERT(h->grupo == PDCRT_TGRP_BLANCO_VIEJO);
             pdcrt_gc_eliminar_de_grupo(&ctx->gc.blanco_viejo, h);
             liberado += pdcrt_gc_liberar_objeto(ctx, h);
             h = s;
@@ -621,7 +621,7 @@ static size_t pdcrt_gc_recolectar(pdcrt_ctx *ctx, pdcrt_recoleccion params)
         for(pdcrt_cabecera_gc *h = ctx->gc.recursos.primero; h != NULL;)
         {
             pdcrt_cabecera_gc *s = h->siguiente;
-            assert(h->grupo == PDCRT_TGRP_RECURSOS);
+            PDCRT_ASSERT(h->grupo == PDCRT_TGRP_RECURSOS);
             pdcrt_valop *v = (pdcrt_valop *) h;
             if(!v->liberar)
             {
@@ -639,7 +639,7 @@ static void pdcrt_gc_marcar_y_mover_todos_los_grises(pdcrt_ctx *ctx, pdcrt_recol
 {
     for(pdcrt_cabecera_gc *h = ctx->gc.gris.primero; h; h = h->siguiente)
     {
-        assert(h->grupo == PDCRT_TGRP_GRIS);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_GRIS);
         pdcrt_gc_procesar_gris(ctx, h, params);
     }
 }
@@ -649,8 +649,8 @@ static void pdcrt_gc_mover_negros_a_blancos(pdcrt_ctx *ctx, pdcrt_recoleccion pa
     (void) params;
     for(pdcrt_cabecera_gc *h = ctx->gc.negro.primero; h;)
     {
-        assert(h->grupo == PDCRT_TGRP_NEGRO);
-        assert(h->tipo != PDCRT_TGC_REUBICADO);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_NEGRO);
+        PDCRT_ASSERT(h->tipo != PDCRT_TGC_REUBICADO);
         pdcrt_cabecera_gc *s = h->siguiente;
         if(h->en_la_pila)
             pdcrt_gc_mover_a_grupo(&ctx->gc.negro, &ctx->gc.blanco_en_la_pila, h);

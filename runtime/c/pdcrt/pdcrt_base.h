@@ -120,6 +120,11 @@ __attribute__((format(printf, fmtarg, fromarg)))
     abort(); \
 } } while(0)
 
+#define PDCRT_ASSERT(cond) do { if(!(cond)) { \
+    fprintf(stderr, "%s:%d: BUG: %s\n", __FILE__, __LINE__, #cond); \
+    abort(); \
+} } while(0)
+
 #define PDCRT_BUG_SI_FUERA_DE_MASCARA(mask, val, msg) \
     PDCRT_BUG(((~(mask)) & (val)) != 0, msg)
 

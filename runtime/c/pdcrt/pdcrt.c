@@ -344,7 +344,7 @@ bool pdcrt_comparar_floats(pdcrt_float a, pdcrt_float b, enum pdcrt_comparacion 
     case PDCRT_IGUAL_A:
         return a == b;
     }
-    assert(0 && "inalcanzable");
+    PDCRT_ASSERT(0 && "inalcanzable");
 }
 
 bool pdcrt_comparar_enteros(pdcrt_entero a, pdcrt_entero b, enum pdcrt_comparacion op)
@@ -362,7 +362,7 @@ bool pdcrt_comparar_enteros(pdcrt_entero a, pdcrt_entero b, enum pdcrt_comparaci
     case PDCRT_IGUAL_A:
         return a == b;
     }
-    assert(0 && "inalcanzable");
+    PDCRT_ASSERT(0 && "inalcanzable");
 }
 
 bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_comparacion op)
@@ -446,7 +446,7 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
 
     int exp = 0;
     PDCRT_FLOAT_FREXP(f_ent, &exp);
-    assert(exp > 0); // `exp > 0` significa que `f_ent` contiene un
+    PDCRT_ASSERT(exp > 0); // `exp > 0` significa que `f_ent` contiene un
                      // entero.
 
     size_t f_bits = exp;
@@ -460,7 +460,7 @@ bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_com
     }
     else
     {
-        assert(f_bits <= PDCRT_ENTERO_BITS);
+        PDCRT_ASSERT(f_bits <= PDCRT_ENTERO_BITS);
         // Ahora sabemos que tienen cantidades comparables de bits, hay que
         // comparar sus magnitudes.
 
@@ -548,7 +548,7 @@ pdcrt_tipo pdcrt_tipo_de_obj(pdcrt_obj o)
     }
     else
     {
-        assert(0 && "inalcanzable");
+        PDCRT_ASSERT(0 && "inalcanzable");
     }
 }
 
@@ -716,7 +716,7 @@ void pdcrt_cerrar_contexto(pdcrt_ctx *ctx)
     for(pdcrt_cabecera_gc *h = ctx->gc.recursos.primero; h != NULL;)
     {
         pdcrt_cabecera_gc *s = h->siguiente;
-        assert(h->grupo == PDCRT_TGRP_RECURSOS);
+        PDCRT_ASSERT(h->grupo == PDCRT_TGRP_RECURSOS);
         pdcrt_valop *v = (pdcrt_valop *) h;
         if(v->liberar)
             (*v->liberar)(ctx, v->datos, v->gc.num_bytes - (sizeof(v->gc) + sizeof(v->liberar)));
@@ -822,7 +822,7 @@ static pdcrt_tk pdcrt_inicio_de_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_k k, PD
 static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool protegido)
 {
     // TODO args > 0 en ejecutar_opt
-    assert(args == 0 && "TODO ejecutar_opt(args > 0)");
+    PDCRT_ASSERT(args == 0 && "TODO ejecutar_opt(args > 0)");
 
     PDCRT_PROBE0(ejecutar_entry);
 
