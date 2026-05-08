@@ -24,6 +24,7 @@ static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
     m->k = k;
     m->num_registros = registros;
     m->debug_srcloc = NULL;
+    m->constantes_del_modulo = NULL;
     for(size_t i = 0; i < registros; i++)
     {
         m->registros[i] = pdcrt_objeto_nulo();
@@ -31,6 +32,9 @@ static void pdcrt_inicializar_marco_impl(pdcrt_ctx *ctx,
 
     if(capturas)
     {
+        pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(m), PDCRT_CABECERA_GC(capturas->constantes_del_modulo));
+        m->constantes_del_modulo = capturas->constantes_del_modulo;
+
         for(size_t i = 0; i < capturas->num_capturas; i++)
         {
             pdcrt_obj val = capturas->capturas[i];
@@ -106,6 +110,7 @@ pdcrt_closure* pdcrt_crear_closure(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_f f
         pdcrt_enomem(ctx);
     c->f = f;
     c->num_capturas = capturas;
+    c->constantes_del_modulo = NULL;
     for(size_t i = 0; i < capturas; i++)
     {
         c->capturas[i] = pdcrt_objeto_nulo();
@@ -866,6 +871,7 @@ pdcrt_tk pdcrt_exportar(pdcrt_ctx *ctx,
                         const char *modulo,
                         size_t tam_modulo)
 {
+    PDCRT_PROBE0(exportar);
     PDCRT_DEFINE_RAICES(2);
     pdcrt_debe_tener_tipo(ctx, ctx->registro_de_espacios_de_nombres, PDCRT_TOBJ_TABLA);
     PDCRT_GUARDAR_RAIZ_CABECERA(0, m);
@@ -922,6 +928,9 @@ pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
     PDCRT_GUARDAR_RAIZ_CABECERA(0, m);
     pdcrt_closure *c = pdcrt_crear_closure(ctx, PDCRT_GC(), f, ncaps);
     PDCRT_CARGAR_RAIZ_CABECERA(0, m);
+
+    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(c), PDCRT_CABECERA_GC(m->constantes_del_modulo));
+    c->constantes_del_modulo = m->constantes_del_modulo;
 
     for(size_t i = 0; i < ncaps; i++)
     {

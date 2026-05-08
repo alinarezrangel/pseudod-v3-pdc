@@ -3,7 +3,7 @@ utilizar bepd/x/puerto (PuertoDeEscritura)
 utilizar bepd/utilidades/texto/ascii (LF)
 utilizar bepd/utilidades/texto (Unir)
 
-utilizar pdc/backend/c/ir (Opcode, FunciónIR, Argumento, Retorno, Parámetro, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Argumento, Retorno, Parámetro, TipoConstante, Constante, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
 
 
 [DOCUMENTA
@@ -226,24 +226,13 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
             finprocedimiento
 
             EmitirLínea: puerto, {size_t llamar_nargs = pdcrt_expandir_varargs(ctx, proto, }, args#longitud, {);}
-
-            EmitirLínea: puerto, «{»
-            EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
-            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
-            EmitirLínea: puerto,
-                         {pdcrt_obj llamar_msj = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), },
-                         (EscaparTexto: msj),
-                         {, },
-                         msj#longitud,
-                         {));}
-            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto, {pdcrt_obj llamar_msj = PDCRT_OBTENER_CONSTANTE(ctx, m, }, msj, {);}
             EmitirLínea: puerto,
                          {return pdcrt_llamarn(ctx, m, },
                          (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
                          {, llamar_nargs, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
                          objReg,
                          {)), pdcrt_xmm_desde_obj(llamar_msj));}
-            EmitirLínea: puerto, «}»
         sino
             variables extraArgs, sufijoLlamar, argsEnLaPila, llamarNargs
             si args#longitud =< 6
@@ -271,16 +260,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
                 finprocedimiento
             finsi
 
-            EmitirLínea: puerto, «{»
-            EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
-            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
-            EmitirLínea: puerto,
-                         {pdcrt_obj llamar_msj = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), },
-                         (EscaparTexto: msj),
-                         {, },
-                         msj#longitud,
-                         {));}
-            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto, {pdcrt_obj llamar_msj = PDCRT_OBTENER_CONSTANTE(ctx, m, }, msj, {);}
             EmitirLínea: puerto,
                          {return pdcrt_llamar}, sufijoLlamar, {(ctx, m, },
                          (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
@@ -288,7 +268,6 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
                          {, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
                          objReg,
                          {)), pdcrt_xmm_desde_obj(llamar_msj)}, extraArgs, {);}
-            EmitirLínea: puerto, «}»
         finsi
     finsi
 
@@ -362,16 +341,36 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
         finsi
     finsi
 
-    si opcode = Opcode#texto
+    si opcode = Opcode#crearConstantes
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(2);}
         EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
-        EmitirLínea: puerto,
-                     {pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), }, (EscaparTexto: (tupla#en: 2)),
-                     {, }, (tupla#en: 2)#longitud, {));}
+        EmitirLínea: puerto, {pdcrt_arreglo *constantes = pdcrt_crear_arreglo_vacio(ctx, PDCRT_GC(), }, (tupla#en: 1)#longitud, {LLU);}
         EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, txt);}
+
+        ParaCadaElemento: (tupla#en: 1), procedimiento: const
+            necesitas const#tipo = TipoConstante#TEXTO
+            EmitirLínea: puerto, «do {»
+            EmitirLínea: puerto, {PDCRT_REINICIAR_RAICES();}
+            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(1, constantes);}
+            EmitirLínea: puerto,
+                         {pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), }, (EscaparTexto: const#valor),
+                         {, }, const#valor#longitud, {));}
+            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
+            EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(1, constantes);}
+
+            EmitirLínea: puerto, {pdcrt_barrera_de_escritura(ctx, pdcrt_objeto_arreglo(constantes), txt);}
+            EmitirLínea: puerto, {constantes->valores[constantes->longitud++] = txt;}
+            EmitirLínea: puerto, «} while(0);»
+        finprocedimiento
+
+        EmitirLínea: puerto, {PDCRT_FIJAR_CONSTANTES(ctx, m, constantes);}
         EmitirLínea: puerto, «} while(0);»
+    finsi
+
+    si opcode = Opcode#texto
+        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, PDCRT_OBTENER_CONSTANTE(ctx, m, }, (tupla#en: 2), {));}
     finsi
 
     si opcode = Opcode#nulo

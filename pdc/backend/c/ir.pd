@@ -1,5 +1,5 @@
 utilizar bepd/builtins
-utilizar bepd/x/enum (EnumConValores)
+utilizar bepd/x/enum (Enum, EnumConValores)
 utilizar bepd/x/datos (TipoDeDatos)
 
 utilizar pdc/tokens (ÁreaTextual)
@@ -110,9 +110,9 @@ la etiqueta a la que saltar.}
 
 @defenum("enviarMensaje_s1"){Envía un mensaje a un objeto. Toma 4 argumentos:
 un arreglo de @pd{Retorno}s con los registros que tendrán los valores de retorno,
-el registro con el objeto que usar, el mensaje a enviar (un @pd{Texto}) y
-el "prototipo" de la llamada (un arreglo de @pd{Argumento}s). Debe ser
-seguido de @code{enviarMensahe_s2}.}
+el registro con el objeto que usar, el mensaje a enviar (un entero que es el
+índice de la constante) y el "prototipo" de la llamada (un arreglo de
+@pd{Argumento}s). Debe ser seguido de @code{enviarMensahe_s2}.}
 
 @defenum("enviarMensaje_s2"){La segunda etapa de @code{enviarMensaje_s1}.}
 
@@ -144,8 +144,8 @@ con los valores a devolver.}
 @defenum("número"){Acepta dos argumentos: el registro a fijar y el @pd{Numero} a
 usar.}
 
-@defenum("texto"){Acepta dos argumentos: el registro a fijar y el texto, que es
-empujado en la pila.}
+@defenum("texto"){Acepta dos argumentos: el registro a fijar y el índice de la
+constante con el texto.}
 
 @defenum("nulo"){Fija un registro (su único argumento) a @pd{NULO}}
 
@@ -203,6 +203,9 @@ parámetros.}
 @defenum("comoEspacioDeNombres"){Acepta dos argumentos: el registro que
 tendrá el espacio de nombres y el registro con el módulo (se debe usar con
 el valor devuelto por el opcode @code{importar}).}
+
+@defenum("crearConstantes"){Acepta un argumento: el arreglo con las
+constantes (véase @pd{Constante}).}
 )
 DOCUMENTA]
 variable Opcode
@@ -238,7 +241,8 @@ fijar Opcode a EnumConValores: {Opcode},
     {extraer_s1},                        VERDADERO,
     {extraer_s2},                        FALSO,
     {obtenerEspacioDeNombresDelRuntime}, FALSO,
-    {comoEspacioDeNombres},              FALSO
+    {comoEspacioDeNombres},              FALSO,
+    {crearConstantes},                   FALSO
 
 [DOCUMENTA
 @brief{Determina si el opcode requiere una continuación.}
@@ -287,6 +291,25 @@ ser expandido en varios valores de retorno adicionales.
 DOCUMENTA]
 variable Retorno
 fijar Retorno a TipoDeDatos: {Retorno}, {esVariadic}, {registro}
+
+
+[DOCUMENTA
+@brief{Constante en la lista de constantes.}
+
+Cada valor será materializado en una constante en el programa.
+@code{tipo} debe ser un @pd{TipoConstante}.
+DOCUMENTA]
+variable Constante
+fijar Constante a TipoDeDatos: {Constante}, {tipo}, {valor}
+
+[DOCUMENTA
+@brief{Tipo de constante en la lista de constantes.}
+
+Actualmente solo pueden haber textos.
+DOCUMENTA]
+variable TipoConstante
+fijar TipoConstante a Enum: {TipoConstante},
+    {TEXTO}
 
 
 [DOCUMENTA

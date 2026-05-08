@@ -190,6 +190,7 @@ static int pdcrt_comparar_str(const char *s1, size_t l1, const char *s2, size_t 
 
 pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *str, size_t len)
 {
+    PDCRT_PROBE0(crear_texto_entry);
     // Al alojar un texto nuevo (en caso de que no exista) se podría invocar al
     // recolector de basura. En ese caso, la lista de textos sobre la que
     // acabamos de buscar cambiaría, invalidando los índices que tenemos y
@@ -251,6 +252,7 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *s
     }
     ctx->textos[exp_ind] = txt; // #1
     ctx->tam_textos += 1;
+    PDCRT_PROBE0(crear_texto_exit);
     return txt;
 }
 

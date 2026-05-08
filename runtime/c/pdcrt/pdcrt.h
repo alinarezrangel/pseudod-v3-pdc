@@ -205,6 +205,7 @@ struct pdcrt_closure
     pdcrt_cabecera_gc gc;
     pdcrt_f f;
     size_t num_capturas;
+    pdcrt_arreglo *constantes_del_modulo;
     pdcrt_obj capturas[];
 };
 
@@ -281,6 +282,7 @@ struct pdcrt_marco
     pdcrt_k k;
     size_t num_registros;
     const char *debug_srcloc;
+    pdcrt_arreglo *constantes_del_modulo;
     pdcrt_obj registros[];
 };
 
@@ -784,6 +786,13 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
     pdcrt_inicializar_marco(ctx, m, sizeof(marco_en_pila), num_regs, args, k, pdcrt_obj_desde_xmm(yo).closure); \
     m->debug_srcloc = srcloc;
 #endif
+
+#define PDCRT_OBTENER_CONSTANTE(ctx, m, n) ((m)->constantes_del_modulo->valores[n])
+#define PDCRT_FIJAR_CONSTANTES(ctx, m, arr) \
+    do { \
+    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(m), PDCRT_CABECERA_GC(arr)); \
+    (m)->constantes_del_modulo = (arr); \
+    } while(0)
 
 // Esta macro debería aceptar cuanta pila necesitamos, en bytes. En su forma actual, aún podríamos causar
 // stack-overflows.

@@ -244,6 +244,8 @@ static void pdcrt_gc_visitar_contenido(
             pdcrt_marco *m = (pdcrt_marco *) h;
             if(m->k.marco)
                 f(ctx, PDCRT_CABECERA_GC_PTR(&m->k.marco), params);
+            if(m->constantes_del_modulo)
+                f(ctx, PDCRT_CABECERA_GC_PTR(&m->constantes_del_modulo), params);
             for(size_t i = 0; i < m->num_registros; i++)
                 f_obj(ctx, &m->registros[i], params);
             break;
@@ -258,6 +260,8 @@ static void pdcrt_gc_visitar_contenido(
         case PDCRT_TGC_CLOSURE:
         {
             pdcrt_closure *c = (pdcrt_closure *) h;
+            if(c->constantes_del_modulo)
+                f(ctx, PDCRT_CABECERA_GC_PTR(&c->constantes_del_modulo), params);
             for(size_t i = 0; i < c->num_capturas; i++)
                 f_obj(ctx, &c->capturas[i], params);
             break;
@@ -544,6 +548,7 @@ static void pdcrt_gc_marcar_y_mover_todo(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdc
 
 size_t pdcrt_gc_liberar_objeto(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
 {
+    PDCRT_PROBE0(gc_liberar_objeto);
     PDCRT_ASSERT(h->grupo == PDCRT_TGRP_NINGUNO);
 
     size_t liberado = 0;
@@ -673,10 +678,6 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
 
     PDCRT_PROBE0(gc_marcar_entry);
     pdcrt_gc_marcar_y_mover_todo(ctx, m, params);
-    while(ctx->gc.gris.primero)
-    {
-        pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
-    }
     for(pdcrt_cabecera_gc *rsc = ctx->gc.recursos.primero; rsc; rsc = rsc->siguiente)
     {
         pdcrt_cabecera_gc *anterior = rsc->anterior, *siguiente = rsc->siguiente;
@@ -688,6 +689,10 @@ void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx,
             if(siguiente)
                 siguiente->anterior = rsc;
         }
+    }
+    while(ctx->gc.gris.primero)
+    {
+        pdcrt_gc_marcar_y_mover_todos_los_grises(ctx, params);
     }
     PDCRT_PROBE0(gc_marcar_exit);
 

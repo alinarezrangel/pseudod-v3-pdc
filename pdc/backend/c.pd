@@ -7,7 +7,7 @@ utilizar pdc/ast como AST
 utilizar pdc/nombres (TablasDeResoluciónDeNombres)
 utilizar pdc/capturas (TablasDeCapturas)
 utilizar pdc/tabla (EscribirTabla)
-utilizar pdc/backend/c/ir (Opcode, FunciónIR, Parámetro, Argumento, Retorno, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Parámetro, Argumento, Retorno, Constante, TipoConstante, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
 utilizar pdc/info (IMPL_COMPILADOR)
 
 
@@ -286,7 +286,9 @@ atributos EstadoDeEmisión#tablasRnAst, EstadoDeEmisión#tablasMcAst,
             3 + empujar -> 4.
            ]
           EstadoDeEmisión#localesTemporales,
-          EstadoDeEmisión#númTotalTemporales
+          EstadoDeEmisión#númTotalTemporales,
+          EstadoDeEmisión#constantesDelMódulo,
+          EstadoDeEmisión#tablaConstantesDelMódulo
 
 metodo estatico EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     devolver yo#crear: tablasRnAst, tablasMcAst, emisor, bdMod
@@ -301,6 +303,8 @@ metodo EstadoDeEmisión#inicializar: tablasRnAst, tablasMcAst, emisor, bdMod
     fijar yo#bdMod a bdMod
     fijar yo#localesTemporales a 0
     fijar yo#númTotalTemporales a 0
+    fijar yo#constantesDelMódulo a Arreglo#vacio
+    fijar yo#tablaConstantesDelMódulo a Diccionario#vacío
 finmetodo
 
 metodo EstadoDeEmisión#subestado: emisor, locales, capturas
@@ -314,7 +318,20 @@ metodo EstadoDeEmisión#subestado: emisor, locales, capturas
     fijar sub#bdMod a yo#bdMod
     fijar sub#localesTemporales a 0
     fijar sub#númTotalTemporales a 0
+    fijar sub#constantesDelMódulo a yo#constantesDelMódulo
+    fijar sub#tablaConstantesDelMódulo a yo#tablaConstantesDelMódulo
     devolver sub
+finmetodo
+
+metodo EstadoDeEmisión#registrarConstanteTextual: texto
+    variable idc
+    fijar idc a yo#tablaConstantesDelMódulo#intentaEn: texto, NULO
+    si EsNulo: idc
+        yo#constantesDelMódulo#agregarAlFinal: (Constante#crear: TipoConstante#TEXTO, texto)
+        fijar idc a yo#constantesDelMódulo#longitud - 1
+        yo#tablaConstantesDelMódulo#fijarEn: texto, idc
+    finsi
+    devolver idc
 finmetodo
 
 metodo EstadoDeEmisión#localARegistro: nLocal
@@ -504,6 +521,7 @@ metodo EstadoDeEmisión#emitir: ast
         variables sub, caps
         fijar caps a ObtenerCapturasYLocales: ast, yo#tablasMcAst
         fijar sub a yo#subestado: yo#emisor, caps#locales, caps#capturas
+        sub#emisor#emitir: Opcode#crearConstantes, sub#constantesDelMódulo, M
         sub#emitir: ast#cuerpo
         sub#emisor#moverAPrograma: sub#númTotalLocales, sub#capturas#longitud, M
         devolver NULO
@@ -626,12 +644,14 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoLiteralTextual
-        yo#emisor#emitir: Opcode#texto, yo#empujar, ast#valor, M
+        variable const
+        fijar const a yo#registrarConstanteTextual: ast#valor
+        yo#emisor#emitir: Opcode#texto, yo#empujar, const, M
         devolver NULO
     finsi
 
     si EsInstancia: ast, AST#NodoEnviarMensaje
-        variables regObj, args, regRet, rets
+        variables regObj, args, regRet, rets, const
         fijar regRet a yo#empujar
         yo#emitir: ast#objeto
         fijar regObj a yo#cima
@@ -640,8 +660,9 @@ metodo EstadoDeEmisión#emitir: ast
             devolver Argumento#crear: arg#esVariadic, yo#cima
         finfuncion
         fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
-        yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regObj, ast#mensaje, args, M
-        yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regObj, ast#mensaje, args, M
+        fijar const a yo#registrarConstanteTextual: ast#mensaje
+        yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
+        yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
         ParaCadaElementoEnReversa: args, procedimiento: arg
             yo#sacarRegistro: arg#registro, M
         finprocedimiento
@@ -727,11 +748,13 @@ metodo EstadoDeEmisión#emitir: ast
             devolver NULO
         finsi
         si ast#nombre = {__Impl}
-            yo#emisor#emitir: Opcode#texto, yo#empujar, IMPL_COMPILADOR, M
+            variable const
+            fijar const a yo#registrarConstanteTextual: IMPL_COMPILADOR
+            yo#emisor#emitir: Opcode#texto, yo#empujar, const, M
             devolver NULO
         finsi
         si (ast#nombre#subTexto: 0, 3) = {rt:}
-            variables nombre, regRt, args, regRet, rets
+            variables nombre, regRt, args, regRet, rets, const
             fijar nombre a ast#nombre#parteDelTexto: 3, ast#nombre#longitud
             fijar regRet a yo#empujar
             fijar regRt a yo#empujar
@@ -741,8 +764,9 @@ metodo EstadoDeEmisión#emitir: ast
                 devolver Argumento#crear: arg#esVariadic, yo#cima
             finprocedimiento
             fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
-            yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regRt, nombre, args, M
-            yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regRt, nombre, args, M
+            fijar const a yo#registrarConstanteTextual: nombre
+            yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regRt, const, args, M
+            yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regRt, const, args, M
             ParaCadaElementoEnReversa: args, procedimiento: arg
                 yo#sacarRegistro: arg#registro, M
             finprocedimiento
