@@ -1,3 +1,5 @@
+[#variables-globales \__RT\]
+
 utilizar bepd/builtins
 utilizar bepd/x/puerto como Puerto
 utilizar bepd/x/puerto/deArchivo como PDA
@@ -67,7 +69,7 @@ procedimiento CrearDirectorio: nombre
            assert(ok or errnum == errno.EEXIST, errmsg)
         end», nombre
     sino
-        __FallarConMensaje: {No se pueden crear directorios}
+        __RT#crearDirectorio: nombre
     finsi
 finprocedimiento
 
@@ -78,7 +80,7 @@ procedimiento BorrarArchivo: nombre
            assert(unistd.unlink(name))
         end», nombre
     sino
-        __FallarConMensaje: {No se pueden borrar archivos}
+        __RT#borrarArchivo: nombre
     finsi
 finprocedimiento
 
@@ -89,6 +91,6 @@ procedimiento BorrarDirectorio: nombre
            assert(unistd.rmdir(name))
         end», nombre
     sino
-        __FallarConMensaje: {No se pueden borrar directorios}
+        __RT#borrarDirectorio: nombre
     finsi
 finprocedimiento

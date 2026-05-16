@@ -3,6 +3,8 @@
 //
 
 #define PDCRT_INTERNO
+#include <unistd.h>
+
 #include "pdcrt.h"
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
@@ -704,6 +706,38 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             res = pdcrt_objeto_booleano(!pdcrt_comparar_textos(oyo.texto, arg.texto));
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(res));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.menor_que)
+        || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_menor_que))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Texto: menorQue / operador_< necesita 1 argumento");
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        if(oyo.texto->longitud < arg.texto->longitud)
+        {
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(true)));
+        }
+        else if(oyo.texto->longitud > arg.texto->longitud)
+        {
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(false)));
+        }
+        else
+        {
+            bool menor = true;
+            for(size_t i = 0; i < oyo.texto->longitud; i++)
+            {
+                if(oyo.texto->contenido[i] >= arg.texto->contenido[i])
+                {
+                    menor = false;
+                    break;
+                }
+            }
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(menor)));
+        }
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_numero_entero))
     {
@@ -1504,6 +1538,238 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_archivo(valop)));
     }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.crear_directorio))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Runtime: crearDirectorio necesita 1 argumento");
+        pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+
+        pdcrt_directorio *dir = NULL;
+        pdcrt_opciones_abrir_directorio opciones = {
+            .relativo_a = NULL,
+            .nombre = { .ptr = nombre.texto->contenido, .tam = nombre.texto->longitud + 1 },
+            .accion_crear = PDCRT_ACCION_CREAR_NUEVO,
+            .intencion = PDCRT_ABRIR_ITERAR,
+            .flags = 0,
+        };
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_abrir_directorio)(ctx->vio.ctx, &dir, &opciones);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al crear el directorio");
+        ioerr = (*ctx->vio.vtable->op_cerrar_directorio)(ctx->vio.ctx, dir);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al cerrar el directorio");
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.borrar_directorio))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Runtime: borrarDirectorio necesita 1 argumento");
+        pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+
+        pdcrt_vio_cadena cnombre = { .ptr = nombre.texto->contenido, .tam = nombre.texto->longitud + 1 };
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_borrar_directorio_por_ruta)(ctx->vio.ctx, NULL, cnombre);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al borrar el directorio");
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.borrar_archivo))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Runtime: borrarArchivo necesita 1 argumento");
+        pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+
+        pdcrt_vio_cadena cnombre = { .ptr = nombre.texto->contenido, .tam = nombre.texto->longitud + 1 };
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_borrar_archivo_por_ruta)(ctx->vio.ctx, NULL, cnombre);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al borrar el archivo");
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.obtener_pid))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Runtime: obtenerPid no necesita argumentos");
+        int pid = getpid(); // TODO: Mover a VIO
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_entero(pid)));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.ejecutar))
+    {
+        if(args != 3)
+            pdcrt_error(ctx, "Runtime: ejecutar necesita 3 argumento");
+        pdcrt_obj ejecutable = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, ejecutable, PDCRT_TOBJ_TEXTO);
+        pdcrt_obj argumentos = pdcrt_obj_desde_xmm(a2);
+        pdcrt_obj entorno = pdcrt_obj_desde_xmm(a3);
+
+        pdcrt_vio_cadena *argv = NULL, cmdline = {0};
+        if(pdcrt_tipo_de_obj(argumentos) == PDCRT_TOBJ_ARREGLO)
+        {
+            argv = malloc(sizeof(pdcrt_vio_cadena) * argumentos.arreglo->longitud);
+            if(!argv)
+                pdcrt_enomem(ctx);
+            for(size_t i = 0; i < argumentos.arreglo->longitud; i++)
+            {
+                pdcrt_debe_tener_tipo(ctx, argumentos.arreglo->valores[i], PDCRT_TOBJ_TEXTO);
+                pdcrt_texto *txt = argumentos.arreglo->valores[i].texto;
+                argv[i] = (pdcrt_vio_cadena) { .ptr = txt->contenido, .tam = txt->longitud + 1 };
+            }
+        }
+        else if(pdcrt_tipo_de_obj(argumentos) == PDCRT_TOBJ_TEXTO)
+        {
+            cmdline.ptr = argumentos.texto->contenido;
+            cmdline.tam = argumentos.texto->longitud + 1;
+        }
+        else
+        {
+            pdcrt_error(ctx, "Runtime: los argumentos del proceso a ejecutar deben ser un arreglo de textos o un texto");
+        }
+
+        pdcrt_variable_de_entorno *envp = NULL;
+        bool heredar_entorno = false;
+        if(pdcrt_tipo_de_obj(entorno) == PDCRT_TOBJ_ARREGLO && entorno.arreglo->longitud > 0)
+        {
+            envp = malloc(sizeof(pdcrt_variable_de_entorno) * entorno.arreglo->longitud);
+            if(!envp)
+                pdcrt_enomem(ctx);
+
+            for(size_t i = 0; i < entorno.arreglo->longitud; i++)
+            {
+                pdcrt_debe_tener_tipo(ctx, entorno.arreglo->valores[i], PDCRT_TOBJ_TEXTO);
+                pdcrt_texto *txt = entorno.arreglo->valores[i].texto;
+                size_t eq = SIZE_MAX;
+                for(size_t j = 0; j < txt->longitud; j++)
+                {
+                    if(txt->contenido[j] == '=')
+                    {
+                        eq = j;
+                        break;
+                    }
+                }
+
+                if(eq == SIZE_MAX)
+                {
+                    envp[i] = (pdcrt_variable_de_entorno) {
+                        .nombre = { .ptr = txt->contenido, .tam = txt->longitud },
+                        .valor = { .ptr = "", .tam = 1 },
+                    };
+                }
+                else
+                {
+                    envp[i] = (pdcrt_variable_de_entorno) {
+                        .nombre = { .ptr = txt->contenido, .tam = eq },
+                        .valor = { .ptr = txt->contenido + eq + 1, .tam = txt->longitud - eq - 1 },
+                    };
+                }
+            }
+        }
+        else if(pdcrt_tipo_de_obj(entorno) == PDCRT_TOBJ_NULO)
+        {
+            heredar_entorno = true;
+        }
+        else
+        {
+            pdcrt_error(ctx, "Runtime: el entorno de ejecutar debe ser un arreglo de textos o NULO");
+        }
+
+        pdcrt_subproceso *sub = NULL;
+        pdcrt_opciones_crear_subproceso opciones = {
+            .directorio_actual = NULL,
+            .ejecutable = { .ptr = ejecutable.texto->contenido, .tam = ejecutable.texto->longitud + 1 },
+            .entorno = heredar_entorno ? NULL : envp,
+            .tam_entorno = heredar_entorno ? 0 : entorno.arreglo->longitud,
+            .heredar_entorno = heredar_entorno,
+        };
+        if(argv)
+        {
+            opciones.tipo_linea_de_comandos = PDCRT_LINEA_DE_COMANDO_UNIX;
+            opciones.linea_de_comandos.como_unix.argc = argumentos.arreglo->longitud;
+            opciones.linea_de_comandos.como_unix.argv = argv;
+        }
+        else
+        {
+            opciones.tipo_linea_de_comandos = PDCRT_LINEA_DE_COMANDO_WINDOWS;
+            opciones.linea_de_comandos.como_windows = cmdline;
+        }
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_crear_subproceso)(ctx->vio.ctx, &sub, &opciones);
+        free(argv);
+        free(envp);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al crear el subproceso");
+
+        ioerr = (*ctx->vio.vtable->op_esperar_por_subproceso)(ctx->vio.ctx, sub);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al esperar por el subproceso");
+
+        pdcrt_estado_de_subproceso estado = {0};
+        ioerr = (*ctx->vio.vtable->op_estado_de_subproceso)(ctx->vio.ctx, sub, &estado);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: error al esperar por el subproceso");
+
+        pdcrt_arreglo *arr = NULL;
+        {
+            PDCRT_DEFINE_RAICES(0);
+            arr = pdcrt_crear_arreglo_vacio(ctx, PDCRT_GC(), 2);
+        }
+
+        if(estado.tipo == PDCRT_ESTADO_OK)
+        {
+            arr->valores[0] = pdcrt_objeto_texto(ctx->textos_globales.ok);
+            arr->valores[1] = pdcrt_objeto_entero(estado.resultado);
+        }
+        else
+        {
+            arr->valores[0] = pdcrt_objeto_texto(ctx->textos_globales.otro);
+            arr->valores[1] = pdcrt_objeto_nulo();
+        }
+        arr->longitud = 2;
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_arreglo(arr)));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.obtener_variable_de_entorno))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Runtime: obtenerVariableDeEntorno necesita 1 argumento");
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        pdcrt_vio_cadena nombre = {
+            .ptr = arg.texto->contenido, .tam = arg.texto->longitud + 1,
+        };
+        size_t tam = 0;
+        pdcrt_io_error ioerr = (*ctx->vio.vtable->op_obtener_variable_de_entorno)(ctx->vio.ctx, nombre, NULL, &tam);
+        if(ioerr != PDCRT_IO_OK)
+            pdcrt_error(ctx, "Runtime: no se pudo obtener la variable de entorno");
+        if(tam > 0)
+        {
+            char *bbuf = malloc(tam);
+            if(!bbuf)
+                pdcrt_enomem(ctx);
+            pdcrt_vio_buffer buf = { .ptr = bbuf, .cap = tam, .tam = 0 };
+            ioerr = (*ctx->vio.vtable->op_obtener_variable_de_entorno)(ctx->vio.ctx, nombre, &buf, &tam);
+            if(tam != buf.tam || ioerr != PDCRT_IO_OK)
+                pdcrt_error(ctx, "Runtime: error al obtener la variable de entorno");
+
+            PDCRT_DEFINE_RAICES(0);
+            pdcrt_texto *txt = pdcrt_crear_texto(ctx, PDCRT_GC(), buf.ptr, buf.tam);
+            free(bbuf);
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(txt)));
+        }
+        else
+        {
+            PDCRT_SACAR_PRELUDIO();
+            return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.texto_vacio)));
+        }
+    }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.crear_instancia))
     {
         if(args != 3)
@@ -1604,6 +1870,14 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         // [texto]
         pdcrt_obj texto = pdcrt_obj_desde_xmm(a1);
         pdcrt_debe_tener_tipo(ctx, texto, PDCRT_TOBJ_TEXTO);
+
+        puts("TRACEBACK:");
+        size_t i = 0;
+        for(pdcrt_marco *m = k.marco; m; m = m->k.marco)
+        {
+            printf("  (%zu): %s\n", i, m->debug_srcloc);
+            i += 1;
+        }
         pdcrt_error(ctx, texto.texto->contenido);
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.leer_caracter))

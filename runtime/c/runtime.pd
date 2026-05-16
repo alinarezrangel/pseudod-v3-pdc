@@ -563,6 +563,30 @@ metodo estatico Texto#crear
     devolver {}
 finmetodo
 
+metodo Texto#mayorQue: otro
+    devolver otro < yo
+finmetodo
+
+metodo Texto#\operador_>\: otro
+    devolver otro < yo
+finmetodo
+
+metodo Texto#menorOIgualA: otro
+    devolver no (otro < yo)
+finmetodo
+
+metodo Texto#\operador_=<\: otro
+    devolver no (otro < yo)
+finmetodo
+
+metodo Texto#mayorOIgualA: otro
+    devolver no (yo < otro)
+finmetodo
+
+metodo Texto#\operador_>=\: otro
+    devolver no (yo < otro)
+finmetodo
+
 variables ESC_LF, ESC_CRLF
 fijar ESC_LF a {~|%}#concatenar: 10#byteComoTexto
 fijar ESC_CRLF a ({~|%}#concatenar: 13#byteComoTexto)#concatenar: 10#byteComoTexto
@@ -645,7 +669,7 @@ finmetodo
 
 __RT#fijarClaseTexto: Texto
 
-funcion __Lua: código
+funcion __Lua: código, ...valores
     __FallarConMensaje: {__Lua: inalcanzable}
 finfuncion
 

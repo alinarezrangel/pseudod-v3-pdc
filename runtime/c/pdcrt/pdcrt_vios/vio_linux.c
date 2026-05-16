@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 
 static pdcrt_io_error pdcrt_vio_linux_abrir_archivo(
@@ -256,9 +257,9 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_archivo(
     if(opciones->accion_crear == PDCRT_ACCION_CREAR_NUEVO)
     {
         oflags |= O_CREAT;
-        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_LEER) ? S_IRUSR : 0;
-        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_ESCRIBIR) ? S_IWUSR : 0;
-        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_EJECUTAR) ? S_IXUSR : 0;
+        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_LEER) ? S_IRUSR | S_IRGRP : 0;
+        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_ESCRIBIR) ? S_IWUSR | S_IWGRP : 0;
+        mode |= (opciones->permisos_al_crear & PDCRT_PERMISO_EJECUTAR) ? S_IXUSR | S_IXGRP : 0;
     }
 
     PDCRT_BUG(
@@ -363,7 +364,8 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_directorio(
         goto error;
     }
 
-    int oflags = O_DIRECTORY, mode = 0;
+    int oflags = O_DIRECTORY;
+    bool mk = false;
 
     PDCRT_BUG_SI_FUERA_DE_MASCARA(PDCRT_ABRIR_ITERAR | PDCRT_ABRIR_REFERENCIAR, opciones->intencion,
                                   "opciones->intencion no es ITERAR o REFERENCIAR");
@@ -383,8 +385,7 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_directorio(
             goto error;
         }
 
-        oflags |= O_CREAT;
-        mode = S_IXUSR | S_IRUSR | S_IWUSR;
+        mk = true;
     }
 
     PDCRT_BUG_SI_FUERA_DE_MASCARA(PDCRT_ABRIR_DIRECTORIO_HEREDABLE,
@@ -395,11 +396,37 @@ static pdcrt_io_error pdcrt_vio_linux_abrir_directorio(
         oflags |= O_CLOEXEC;
     }
 
+    /* En las siguientes líneas no estoy revisando el valor de retorno de mkdir(2), ni estoy asegurandome de que no
+     * tenga errores. Hasta donde tengo entendido esto es lo correcto: en general, si mkdir falla puede ser por uno
+     * de los siguientes motivos:
+     *
+     * 1. El directorio ya existe: entonces el error debería ser ignorado.
+     * 2. Permisos: ignoramos el error, el directorio puede existir o no, en ambos casos openat(2) hace lo correcto
+     *    (fallar porque no existe / abrirlo si tenemos permisos de lectura).
+     * 3. Errores del SO, por ejemplo, EDQUOT, ELOOP, ENAMETOOLONG, ENOSPC, EROFS, etc.: hay una condición de carrera
+     *    entre el mkdir que falló y openat: si alguien más crea el directorio entre las llamadas, openat funcionará
+     *    lo cual es lo correcto, mientras que si nadie crea el directorio openat fallará de todas formas.
+     *
+     * El resultado debería ser una aproximación de si openat tuviese una bandera O_CREAT_DIRECTORY (o si
+     * O_CREAT | O_DIRECTORY funcionara).
+     *
+     * La unica parte mala de todo esto es que si mkdir funciona pero alguien más borra el directorio, openat fallará.
+     * Idealmente las semanticas serían similares a openat + O_CREAT: si alguien borra el directorio debería permanecer
+     * referenciado solo por este proceso.
+     */
     int fd = 0;
     if(opciones->relativo_a)
-        fd = openat(opciones->relativo_a->fd, opciones->nombre.ptr, oflags, mode);
+    {
+        if(mk)
+            mkdirat(opciones->relativo_a->fd, opciones->nombre.ptr, 0755);
+        fd = openat(opciones->relativo_a->fd, opciones->nombre.ptr, oflags);
+    }
     else
-        fd = open(opciones->nombre.ptr, oflags, mode);
+    {
+        if(mk)
+            mkdir(opciones->nombre.ptr, 0755);
+        fd = open(opciones->nombre.ptr, oflags);
+    }
 
     if(fd < 0)
     {

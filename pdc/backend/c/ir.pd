@@ -116,6 +116,9 @@ el registro con el objeto que usar, el mensaje a enviar (un entero que es el
 
 @defenum("enviarMensaje_s2"){La segunda etapa de @code{enviarMensaje_s1}.}
 
+@defenum("enviarMensaje_t"){Como @code{enviarMensaje_s1}, pero realiza un
+@italic{tail call}.}
+
 @defenum("etiqueta"){Marca una etiqueta. Su único argumento debe ser una
 @pd{Etiqueta}.}
 
@@ -215,6 +218,7 @@ fijar Opcode a EnumConValores: {Opcode},
     {saltar},                            VERDADERO,
     {enviarMensaje_s1},                  VERDADERO,
     {enviarMensaje_s2},                  FALSO,
+    {enviarMensaje_t},                   FALSO,
     {etiqueta},                          VERDADERO,
     {fijarRegistro},                     FALSO,
     {caja},                              FALSO,

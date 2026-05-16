@@ -1,4 +1,7 @@
+[#variables-globales \__RT\]
 utilizar bepd/builtins
+
+utilizar bepd/utilidades/arreglo (Insertar)
 
 utilizar bepd/x/enum (Enum)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
@@ -35,7 +38,17 @@ procedimiento Ejecutar: ejecutable, argumentos, opciones
         end», ejecutable, argumentos, argv0
         devolver Modelo#Crear: ResultadoEjecutar#CódigoDeEstado, estado
     sino
-        __FallarConMensaje: {No se pueden ejecutar subprocesos}
+        variables argv0, estado
+        fijar argv0 a OpcionesEjecutar#NombreDelPrograma: opciones, ejecutable
+        si EsInstancia: argumentos, Arreglo
+            Insertar: argumentos, 0, argv0
+        finsi
+        fijar estado a __RT#ejecutar: ejecutable, argumentos, NULO
+        si (estado#en: 0) = {ok}
+            devolver Modelo#Crear: ResultadoEjecutar#CódigoDeEstado, (estado#en: 1)
+        sino
+            devolver Modelo#Crear: ResultadoEjecutar#CódigoDeEstado, 125
+        finsi
     finsi
 finprocedimiento
 
@@ -46,6 +59,6 @@ procedimiento ObtenerPid
                return assert(unistd.getpid())
             end»
     sino
-        __FallarConMensaje: {No se puede obtener el process-id actual}
+        devolver __RT#obtenerPid
     finsi
 finprocedimiento

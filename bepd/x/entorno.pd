@@ -1,3 +1,4 @@
+[#variables-globales \__RT\]
 utilizar bepd/builtins
 
 [DOCUMENTA
@@ -7,7 +8,7 @@ No todas las implementaciones de PseudoD pueden leer las variables de
 entorno.
 DOCUMENTA]
 funcion SoportaVariablesDeEntorno
-    devolver __Impl = {Lua Bootstrap}
+    devolver (__Impl = {Lua Bootstrap}) || (__Impl = {pdc C})
 finfuncion
 
 
@@ -21,6 +22,6 @@ procedimiento ObtenerVariableDeEntorno: nombre
     si __Impl = {Lua Bootstrap}
         devolver __Lua: {os.getenv}, nombre
     sino
-        __FallarConMensaje: {No se puede obtener una variable de entorno en el intérprete en C++}
+        devolver __RT#obtenerVariableDeEntorno: nombre
     finsi
 finprocedimiento

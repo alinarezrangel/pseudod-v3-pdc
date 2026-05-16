@@ -483,6 +483,29 @@ metodo EstadoDeEmisión#prepararDeclaraciónConBinding: binding, idcMetadata
     finsi
 finmetodo
 
+metodo EstadoDeEmisión#emitirEnviarMensaje: ast, tailCall, M
+    variables regObj, args, regRet, rets, const
+    fijar regRet a yo#empujar
+    yo#emitir: ast#objeto
+    fijar regObj a yo#cima
+    fijar args a Mapear: ast#argumentos, funcion: arg
+        yo#emitir: arg#expresión
+        devolver Argumento#crear: arg#esVariadic, yo#cima
+    finfuncion
+    fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
+    fijar const a yo#registrarConstanteTextual: ast#mensaje
+    si tailCall
+        yo#emisor#emitir: Opcode#enviarMensaje_t, rets, regObj, const, args, M
+    sino
+        yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
+        yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
+    finsi
+    ParaCadaElementoEnReversa: args, procedimiento: arg
+        yo#sacarRegistro: arg#registro, M
+    finprocedimiento
+    yo#sacarRegistro: regObj, M
+finmetodo
+
 metodo EstadoDeEmisión#emitir: ast
     variable M
     fijar M a yo#emisor#agregarMetadata: ast#áreaTextual
@@ -564,9 +587,21 @@ metodo EstadoDeEmisión#emitir: ast
     finsi
 
     si EsInstancia: ast, AST#NodoDevolver
-        yo#emitir: ast#expresión
-        yo#emisor#emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, yo#cima)), M
-        yo#sacar: M
+        si EsInstancia: ast#expresión, AST#NodoEnviarMensaje
+            variable M'
+            fijar M' a yo#emisor#agregarMetadata: ast#expresión#áreaTextual
+            yo#emitirEnviarMensaje: ast#expresión, VERDADERO, M'
+            devolver NULO
+        sino
+            yo#emitir: ast#expresión
+            yo#emisor#emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, yo#cima)), M
+            yo#sacar: M
+            devolver NULO
+        finsi
+    finsi
+
+    si EsInstancia: ast, AST#NodoEnviarMensaje
+        yo#emitirEnviarMensaje: ast, FALSO, M
         devolver NULO
     finsi
 
@@ -647,26 +682,6 @@ metodo EstadoDeEmisión#emitir: ast
         variable const
         fijar const a yo#registrarConstanteTextual: ast#valor
         yo#emisor#emitir: Opcode#texto, yo#empujar, const, M
-        devolver NULO
-    finsi
-
-    si EsInstancia: ast, AST#NodoEnviarMensaje
-        variables regObj, args, regRet, rets, const
-        fijar regRet a yo#empujar
-        yo#emitir: ast#objeto
-        fijar regObj a yo#cima
-        fijar args a Mapear: ast#argumentos, funcion: arg
-            yo#emitir: arg#expresión
-            devolver Argumento#crear: arg#esVariadic, yo#cima
-        finfuncion
-        fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regRet)
-        fijar const a yo#registrarConstanteTextual: ast#mensaje
-        yo#emisor#emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
-        yo#emisor#emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
-        ParaCadaElementoEnReversa: args, procedimiento: arg
-            yo#sacarRegistro: arg#registro, M
-        finprocedimiento
-        yo#sacarRegistro: regObj, M
         devolver NULO
     finsi
 

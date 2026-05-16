@@ -203,12 +203,16 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
         EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {, PDCRT_XMM_NULO());}
     finsi
 
-    si opcode = Opcode#enviarMensaje_s1
-        variables rets, args, msj, objReg, tieneArgsVariadic
+    si (opcode = Opcode#enviarMensaje_s1) || (opcode = Opcode#enviarMensaje_t)
+        variables rets, args, msj, objReg, tieneArgsVariadic, k, tailCall
         fijar rets a tupla#en: 1
         fijar objReg a tupla#en: 2
         fijar msj a tupla#en: 3
         fijar args a tupla#en: 4
+        fijar tailCall a opcode = Opcode#enviarMensaje_t
+        si no tailCall
+            fijar k a NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)
+        finsi
         necesitas rets#longitud = 1
         necesitas no (rets#en: 0)#esVariadic
 
@@ -227,12 +231,19 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
 
             EmitirLínea: puerto, {size_t llamar_nargs = pdcrt_expandir_varargs(ctx, proto, }, args#longitud, {);}
             EmitirLínea: puerto, {pdcrt_obj llamar_msj = PDCRT_OBTENER_CONSTANTE(ctx, m, }, msj, {);}
-            EmitirLínea: puerto,
-                         {return pdcrt_llamarn(ctx, m, },
-                         (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
-                         {, llamar_nargs, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
-                         objReg,
-                         {)), pdcrt_xmm_desde_obj(llamar_msj));}
+            si tailCall
+                EmitirLínea: puerto,
+                             {return pdcrt_llamarn(ctx, m->k.marco, m->k.kf, llamar_nargs, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                             objReg,
+                             {)), pdcrt_xmm_desde_obj(llamar_msj));}
+            sino
+                EmitirLínea: puerto,
+                             {return pdcrt_llamarn(ctx, m, },
+                             k,
+                             {, llamar_nargs, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                             objReg,
+                             {)), pdcrt_xmm_desde_obj(llamar_msj));}
+            finsi
         sino
             variables extraArgs, sufijoLlamar, argsEnLaPila, llamarNargs
             si args#longitud =< 6
@@ -261,13 +272,22 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
             finsi
 
             EmitirLínea: puerto, {pdcrt_obj llamar_msj = PDCRT_OBTENER_CONSTANTE(ctx, m, }, msj, {);}
-            EmitirLínea: puerto,
-                         {return pdcrt_llamar}, sufijoLlamar, {(ctx, m, },
-                         (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 5)),
-                         llamarNargs,
-                         {, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
-                         objReg,
-                         {)), pdcrt_xmm_desde_obj(llamar_msj)}, extraArgs, {);}
+            si tailCall
+                EmitirLínea: puerto,
+                             {return pdcrt_llamar}, sufijoLlamar, {(ctx, m->k.marco, m->k.kf},
+                             llamarNargs,
+                             {, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                             objReg,
+                             {)), pdcrt_xmm_desde_obj(llamar_msj)}, extraArgs, {);}
+            sino
+                EmitirLínea: puerto,
+                             {return pdcrt_llamar}, sufijoLlamar, {(ctx, m, },
+                             k,
+                             llamarNargs,
+                             {, pdcrt_xmm_desde_obj(pdcrt_obtener_local(ctx, m, },
+                             objReg,
+                             {)), pdcrt_xmm_desde_obj(llamar_msj)}, extraArgs, {);}
+            finsi
         finsi
     finsi
 

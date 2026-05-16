@@ -438,6 +438,14 @@ typedef enum pdcrt_tipo
     X(fin_del_archivo, "finDelArchivo")                                 \
     X(error, "error")                                                   \
     X(leer_todo, "__leerTodo")                                          \
+    X(crear_directorio, "crearDirectorio")                              \
+    X(borrar_directorio, "borrarDirectorio")                            \
+    X(borrar_archivo, "borrarArchivo")                                  \
+    X(obtener_pid, "obtenerPid")                                        \
+    X(ejecutar, "ejecutar")                                             \
+    X(ok, "ok")                                                         \
+    X(otro, "otro")                                                     \
+    X(obtener_variable_de_entorno, "obtenerVariableDeEntorno")          \
     X(nulo_como_texto, "NULO")
 
 typedef struct pdcrt_textos

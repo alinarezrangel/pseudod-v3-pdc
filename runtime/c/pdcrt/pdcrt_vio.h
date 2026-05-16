@@ -215,6 +215,7 @@ typedef struct pdcrt_opciones_crear_subproceso
 
     pdcrt_variable_de_entorno *entorno;
     size_t tam_entorno;
+    bool heredar_entorno;
 } pdcrt_opciones_crear_subproceso;
 
 typedef enum pdcrt_tipo_estado_de_subproceso
@@ -226,7 +227,7 @@ typedef enum pdcrt_tipo_estado_de_subproceso
 typedef struct pdcrt_estado_de_subproceso
 {
     pdcrt_tipo_estado_de_subproceso tipo;
-    int resultado;
+    int64_t resultado;
 } pdcrt_estado_de_subproceso;
 
 /*********** VIO ***********/
