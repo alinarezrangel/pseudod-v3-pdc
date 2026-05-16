@@ -446,6 +446,8 @@ typedef enum pdcrt_tipo
     X(ok, "ok")                                                         \
     X(otro, "otro")                                                     \
     X(obtener_variable_de_entorno, "obtenerVariableDeEntorno")          \
+    X(redimensionar, "redimensionar")                                   \
+    X(crear_arreglo_vacio, u8"crearArregloVacío")                       \
     X(nulo_como_texto, "NULO")
 
 typedef struct pdcrt_textos
@@ -561,6 +563,7 @@ typedef enum pdcrt_tipo_recoleccion
 typedef struct pdcrt_recoleccion
 {
     pdcrt_tipo_recoleccion tipo;
+    bool mayor;
     union
     {
         struct
@@ -570,8 +573,8 @@ typedef struct pdcrt_recoleccion
     };
 } pdcrt_recoleccion;
 
-pdcrt_recoleccion pdcrt_gc_recoleccion_por_pila(pdcrt_ctx *ctx);
-pdcrt_recoleccion pdcrt_gc_recoleccion_por_memoria(pdcrt_ctx *ctx, size_t memoria_requerida);
+pdcrt_recoleccion pdcrt_gc_recoleccion_por_pila(pdcrt_ctx *ctx, bool mayor);
+pdcrt_recoleccion pdcrt_gc_recoleccion_por_memoria(pdcrt_ctx *ctx, size_t memoria_requerida, bool mayor);
 
 PDCRT_INLINE bool pdcrt_gc_recoleccion_debe_mover_pila(pdcrt_recoleccion r)
 {
@@ -580,12 +583,12 @@ PDCRT_INLINE bool pdcrt_gc_recoleccion_debe_mover_pila(pdcrt_recoleccion r)
 
 PDCRT_INLINE bool pdcrt_gc_recoleccion_es_mayor(pdcrt_recoleccion r)
 {
-    return r.tipo == PDCRT_RECOLECCION_SIN_MEMORIA;
+    return r.mayor;
 }
 
 PDCRT_INLINE bool pdcrt_gc_recoleccion_es_menor(pdcrt_recoleccion r)
 {
-    return r.tipo == PDCRT_RECOLECCION_SIN_PILA;
+    return !r.mayor;
 }
 
 void pdcrt_recolectar_basura_simple(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_recoleccion params);

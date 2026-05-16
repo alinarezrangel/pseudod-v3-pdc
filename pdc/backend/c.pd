@@ -309,13 +309,9 @@ finmetodo
 
 metodo EstadoDeEmisión#subestado: emisor, locales, capturas
     variable sub
-    fijar sub a EstadoDeEmisión#crear
-    fijar sub#tablasRnAst a yo#tablasRnAst
-    fijar sub#tablasMcAst a yo#tablasMcAst
-    fijar sub#emisor a emisor
+    fijar sub a EstadoDeEmisión#crear: yo#tablasRnAst, yo#tablasMcAst, emisor, yo#bdMod
     fijar sub#locales a locales
     fijar sub#capturas a capturas
-    fijar sub#bdMod a yo#bdMod
     fijar sub#localesTemporales a 0
     fijar sub#númTotalTemporales a 0
     fijar sub#constantesDelMódulo a yo#constantesDelMódulo

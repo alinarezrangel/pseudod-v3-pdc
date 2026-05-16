@@ -197,7 +197,7 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *s
     // dañando todo. Para prevenir esto, llamo al recolector ahora mismo y lo
     // desactivo al crear el texto. No debería fallar por memoria, ya que de
     // faltar memoria esta llamada debería abrir espacio.
-    pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, 0);
+    pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, 0, true);
     pdcrt_intenta_invocar_al_recolector(ctx, m, params);
 
     size_t lo = 0, hi = ctx->tam_textos;

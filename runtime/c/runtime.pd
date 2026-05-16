@@ -247,7 +247,11 @@ metodo Objeto#inicializar
 finmetodo
 
 metodo Objeto#\clonar\
-    devolver __ClonarObjeto: yo
+    si __RT#esInstancia: yo
+        devolver __ClonarObjeto: yo
+    sino
+        devolver yo
+    finsi
 finmetodo
 
 metodo Objeto#igualA: otro
@@ -344,6 +348,17 @@ metodo Arreglo#comoTexto
     finmientras
 
     devolver {(Arreglo ~t)}#formatear: (res#unir: {, })
+finmetodo
+
+metodo Arreglo#\clonar\
+    variables arr, i
+    fijar arr a __CrearArreglo
+    fijar i a 0
+    mientras i < yo#longitud
+        arr#agregarAlFinal: (yo#en: i)#\clonar\
+        fijar i a i + 1
+    finmientras
+    devolver arr
 finmetodo
 
 __RT#fijarClaseArreglo: Arreglo
@@ -453,6 +468,15 @@ metodo Tabla#transformar: proc
     tbl#paraCadaPar: procedimiento: llave, valor
         yo#fijarEn: llave, valor
     finprocedimiento
+finmetodo
+
+metodo Tabla#\clonar\
+    variable tbl
+    fijar tbl a Tabla#vacía
+    yo#paraCadaPar: procedimiento: llave, valor
+        tbl#fijarEn: llave, valor#\clonar\
+    finprocedimiento
+    devolver tbl
 finmetodo
 
 metodo Tabla#mapear: proc
@@ -727,7 +751,7 @@ finfuncion
 
 funcion __CompararObjeto: lhs, rhs
     si (no __RT#esInstancia: lhs) || (no __RT#esInstancia: rhs)
-        devolver lhs = rhs
+        devolver FALSO
     finsi
 
     variables numL, numR, metsL, metsR, i

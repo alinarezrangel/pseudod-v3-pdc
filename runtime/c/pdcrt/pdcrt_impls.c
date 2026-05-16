@@ -1171,6 +1171,29 @@ pdcrt_tk pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
     }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.redimensionar))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, "Arreglo: redimensionar necesita 1 argumento");
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        bool ok = false;
+        pdcrt_entero nuevo_tam = pdcrt_obtener_entero_obj(ctx, arg, &ok);
+        if(!ok)
+            pdcrt_error(ctx, "Arreglo#redimensionar necesita un entero");
+        if(nuevo_tam > oyo.arreglo->longitud)
+        {
+            pdcrt_arreglo_abrir_espacio(ctx, k.marco, oyo.arreglo, nuevo_tam - oyo.arreglo->longitud);
+            for(size_t i = oyo.arreglo->longitud; i < nuevo_tam; i++)
+                oyo.arreglo->valores[i] = pdcrt_objeto_nulo();
+            oyo.arreglo->longitud = nuevo_tam;
+        }
+        else if(nuevo_tam < oyo.arreglo->longitud)
+        {
+            oyo.arreglo->longitud = nuevo_tam;
+        }
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
 
     return pdcrt_recv_fallback_a_clase(ctx, args, k, PDCRT_CLASE_ARREGLO, PDCRT_A_IMM);
 }
@@ -1472,7 +1495,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_error(ctx, "Runtime: recolectarBasura no necesita argumentos");
         PDCRT_DEFINE_RAICES(1);
         PDCRT_GUARDAR_RAIZ_K(0, k);
-        pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, 0);
+        pdcrt_recoleccion params = pdcrt_gc_recoleccion_por_memoria(ctx, 0, true);
         pdcrt_recolectar_basura_simple(ctx, PDCRT_GC(), params);
         PDCRT_CARGAR_RAIZ_K(0, k);
         PDCRT_SACAR_PRELUDIO();
@@ -1611,9 +1634,11 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_obj entorno = pdcrt_obj_desde_xmm(a3);
 
         pdcrt_vio_cadena *argv = NULL, cmdline = {0};
+        size_t tam_argv = 0;
         if(pdcrt_tipo_de_obj(argumentos) == PDCRT_TOBJ_ARREGLO)
         {
-            argv = malloc(sizeof(pdcrt_vio_cadena) * argumentos.arreglo->longitud);
+            tam_argv = sizeof(pdcrt_vio_cadena) * argumentos.arreglo->longitud;
+            argv = pdcrt_alojar_ctx(ctx, tam_argv);
             if(!argv)
                 pdcrt_enomem(ctx);
             for(size_t i = 0; i < argumentos.arreglo->longitud; i++)
@@ -1634,10 +1659,12 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         }
 
         pdcrt_variable_de_entorno *envp = NULL;
+        size_t tam_envp = 0;
         bool heredar_entorno = false;
         if(pdcrt_tipo_de_obj(entorno) == PDCRT_TOBJ_ARREGLO && entorno.arreglo->longitud > 0)
         {
-            envp = malloc(sizeof(pdcrt_variable_de_entorno) * entorno.arreglo->longitud);
+            tam_envp = sizeof(pdcrt_variable_de_entorno) * entorno.arreglo->longitud;
+            envp = pdcrt_alojar_ctx(ctx, tam_envp);
             if(!envp)
                 pdcrt_enomem(ctx);
 
@@ -1700,8 +1727,8 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             opciones.linea_de_comandos.como_windows = cmdline;
         }
         pdcrt_io_error ioerr = (*ctx->vio.vtable->op_crear_subproceso)(ctx->vio.ctx, &sub, &opciones);
-        free(argv);
-        free(envp);
+        pdcrt_desalojar_ctx(ctx, argv, tam_argv);
+        pdcrt_desalojar_ctx(ctx, envp, tam_envp);
         if(ioerr != PDCRT_IO_OK)
             pdcrt_error(ctx, "Runtime: error al crear el subproceso");
 
@@ -1750,7 +1777,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_error(ctx, "Runtime: no se pudo obtener la variable de entorno");
         if(tam > 0)
         {
-            char *bbuf = malloc(tam);
+            char *bbuf = pdcrt_alojar_ctx(ctx, tam);
             if(!bbuf)
                 pdcrt_enomem(ctx);
             pdcrt_vio_buffer buf = { .ptr = bbuf, .cap = tam, .tam = 0 };
@@ -1760,7 +1787,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 
             PDCRT_DEFINE_RAICES(0);
             pdcrt_texto *txt = pdcrt_crear_texto(ctx, PDCRT_GC(), buf.ptr, buf.tam);
-            free(bbuf);
+            pdcrt_desalojar_ctx(ctx, bbuf, tam);
             PDCRT_SACAR_PRELUDIO();
             return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(txt)));
         }
@@ -1974,6 +2001,26 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         ctx->clase_tabla = pdcrt_obj_desde_xmm(a1);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+    }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.crear_arreglo_vacio))
+    {
+        if(args != 1)
+            pdcrt_error(ctx, u8"Runtime: crearArregloVacío necesita 1 argumento");
+        pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
+        bool ok = false;
+        pdcrt_entero cap = pdcrt_obtener_entero_obj(ctx, arg, &ok);
+        if(!ok)
+            pdcrt_error(ctx, u8"Runtime#crearArregloVacío necesita un entero");
+        if(cap <= 0)
+            cap = 1;
+
+        PDCRT_DEFINE_RAICES(1);
+        PDCRT_GUARDAR_RAIZ_K(0, k);
+        pdcrt_arreglo *arr = pdcrt_crear_arreglo_vacio(ctx, PDCRT_GC(), cap);
+        PDCRT_CARGAR_RAIZ_K(0, k);
+
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_arreglo(arr)));
     }
 
     PDCRT_ASSERT(0 && "sin implementar");
