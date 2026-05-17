@@ -467,7 +467,7 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
         int p = proto[i];
         if(p == 1)
         {
-            pdcrt_obj val = ctx->pila[ctx->tam_pila - nproto + i];
+            pdcrt_obj val = ctx->pila[ctx->tam_pila - (nproto - i)];
             pdcrt_debe_tener_tipo(ctx, val, PDCRT_TOBJ_ARREGLO);
             nargs_extra += val.arreglo->longitud;
         }
@@ -485,7 +485,7 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
             size_t rem = nproto - i;
             pdcrt_obj val = ctx->pila[ps];
             memmove(ctx->pila + ps + val.arreglo->longitud,
-                    ctx->pila + ps,
+                    ctx->pila + ps + 1,
                     rem * sizeof(pdcrt_obj));
             ctx->tam_pila += val.arreglo->longitud;
             ctx->tam_pila -= 1;
