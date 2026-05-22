@@ -243,5 +243,5 @@ elseif tool == "direct" then
    end
    print(table.concat(deps, ";"))
 else
-   error("unkown tool " .. tool .. ". Use 'rec' or 'direct' instead")
+   error("unknown tool " .. tool .. ". Use 'rec' or 'direct' instead")
 end
