@@ -8,7 +8,7 @@ project(pdcrt
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v3 -Werror=vla")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v3 -Werror=vla -fwrapv")
 
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
@@ -51,9 +51,11 @@ target_link_libraries(pdcrt INTERFACE m)
 
 if(PDCRT_ASAN)
     target_compile_options(pdcrt PUBLIC -fsanitize=address)
+    target_link_options(pdcrt PUBLIC -fsanitize=address)
 endif()
 if(PDCRT_UBSAN)
     target_compile_options(pdcrt PUBLIC -fsanitize=undefined)
+    target_link_options(pdcrt PUBLIC -fsanitize=undefined)
 endif()
 
 function(feature_test feat_name probe_file)
@@ -127,7 +129,7 @@ configure_file(
 )
 
 set_target_properties(pdcrt PROPERTIES
-  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt/pdcrt.h"
+  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt/pdffi.h"
 )
 
 target_include_directories(pdcrt PUBLIC
@@ -156,104 +158,40 @@ add_custom_command(
 
 target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
 
-include("./PseudoD.cmake")
+include("./cmake/PseudoD2.cmake")
+include("./pdc.cmake")
 
-set(INNER_PDC_CGEN_BUILD_DIR "${CMAKE_SOURCE_DIR}/outputs/inner_pdc_cgen"
-    CACHE PATH "Directorio de build compartido para la generación de C de inner_pdc")
-set(INNER_PDC_CGEN_OUTPUT_DIR "${INNER_PDC_CGEN_BUILD_DIR}/cgen")
+message(STATUS "Mounting shared pdc files at ${PSEUDOD_CURRENT_BINARY_DIR}")
+file(MAKE_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}")
 
 ExternalProject_Add(inner_pdc_cgen
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/cmake/inner_pdc"
-        BINARY_DIR "${INNER_PDC_CGEN_BUILD_DIR}"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/inner_pdc"
+        BINARY_DIR "${PSEUDOD_CURRENT_BINARY_DIR}"
         CMAKE_ARGS
         "-DPDC=${PDC}"
-        "-DPSEUDOD_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
-        "-DPSEUDOD_CGEN_OUTPUT_DIR=${INNER_PDC_CGEN_OUTPUT_DIR}"
-        "-DPSEUDOD_COMPILE_OPTIONS=${PSEUDOD_COMPILE_OPTIONS}"
+        "-DPSEUDOD_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DPSEUDOD_CURRENT_BINARY_DIR=${PSEUDOD_CURRENT_BINARY_DIR}"
+        "-DPDC_DEPS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua"
         INSTALL_COMMAND ""
         USES_TERMINAL_BUILD ON
         BUILD_ALWAYS ON
+        BUILD_BYPRODUCTS ${PDC_GEN_FILES}
 )
 
-add_pseudod_executable_from_cfiles(inner_pdc
-        CGEN_OUTPUT_DIR "${INNER_PDC_CGEN_OUTPUT_DIR}"
-        PACKAGES bepd pdc
+add_pseudod_executable(pdc
+        COLLECTIONS col_bepd col_pdc
         ENTRY pdc/inicio
         DEPENDS inner_pdc_cgen
 )
-pseudod_target_cc_compile_options(inner_pdc PUBLIC -ggdb -O1)
+target_compile_options(pdc_int INTERFACE -ggdb -O1 -fno-var-tracking-assignments)
 
 if(PDCRT_ASAN)
-  pseudod_target_cc_compile_options(inner_pdc PUBLIC -fsanitize=address)
-  pseudod_target_link_libraries(inner_pdc PUBLIC -fsanitize=address)
+  target_compile_options(pdc_int INTERFACE -fsanitize=address)
+  target_link_options(pdc_int INTERFACE -fsanitize=address)
 endif()
 if(PDCRT_UBSAN)
-  pseudod_target_cc_compile_options(inner_pdc PUBLIC -fsanitize=undefined)
-  pseudod_target_link_libraries(inner_pdc PUBLIC -fsanitize=undefined)
+  target_compile_options(pdc_int INTERFACE -fsanitize=undefined)
+  target_link_options(pdc_int INTERFACE -fsanitize=undefined)
 endif()
 
-# ============= CPack =============
-
-set(CPACK_PACKAGE_VENDOR "Alejandro Linarez Rangel")
-set(CPACK_PACKAGE_DESCRIPTION "El runtime de PseudoD")
-set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}/docs/logo-128.png")
-set(CPACK_PACKAGE_CHECKSUM SHA256)
-# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
-
-install(
-  TARGETS pdcrt
-  EXPORT pdcrt_targets
-  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-  PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  PUBLIC_HEADER COMPONENT Development
-)
-
-# install(
-#   FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt"
-#   DESTINATION share/doc/pdcrt
-# )
-
-install(
-  EXPORT pdcrt_targets
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
-  NAMESPACE pdcrt_
-  FILE pdcrt-targets.cmake
-)
-
-configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pdcrt-config.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config.cmake"
-  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
-  PATH_VARS INSTALL_PREFIX
-)
-
-write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config-version.cmake"
-  COMPATIBILITY SameMajorVersion
-)
-
-install(
-  FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-config-version.cmake"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pdcrt"
-)
-
-export(
-  EXPORT pdcrt_targets
-  FILE "${CMAKE_CURRENT_BINARY_DIR}/pdcrt-targets.cmake"
-  NAMESPACE pdcrt_
-)
-
-cpack_add_component(
-  Development
-  DISPLAY_NAME "Desarrollo"
-  DESCRIPTION "Archivos necesarios para desarrollar programas en PseudoD"
-  INSTALL_TYPES All Developer
-)
-
-cpack_add_install_type(All DISPLAY_NAME "Todo")
-cpack_add_install_type(Developer DISPLAY_NAME "Desarrollador")
-cpack_add_install_type(User DISPLAY_NAME "Usuario")
+add_custom_target(default_target ALL DEPENDS sexpr pdcrt pdc)
