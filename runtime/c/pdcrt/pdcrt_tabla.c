@@ -164,6 +164,7 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
     if(!pdcrt_es_primitivo(ctx, llave))
         pdcrt_error(ctx, u8"Se trató de agregar un valor no primitivo a una tabla primitiva");
 
+    pdcrt_cabecera_gc *lh = pdcrt_gc_cabecera_de(llave);
     pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
     pdcrt_entero hash = pdcrt_hash(ctx, llave);
     pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
@@ -201,6 +202,8 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
                     PDCRT_ASSERT(tbl->num_colisiones < tbl->cap_colisiones);
                 }
 
+                if(lh)
+                    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), lh);
                 if(vh)
                     pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
                 tbl->colisiones[tbl->num_colisiones] = (pdcrt_bucket) {
@@ -224,6 +227,8 @@ void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_
     }
     else
     {
+        if(lh)
+            pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), lh);
         if(vh)
             pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
         *b = (pdcrt_bucket) {
