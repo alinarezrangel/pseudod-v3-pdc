@@ -511,6 +511,7 @@ static pdcrt_io_error pdcrt_vio_linux_cerrar_directorio(void *ctx, pdcrt_directo
         closedir(directorio->dir);
     else
         close(directorio->fd);
+    free(directorio);
     return PDCRT_IO_OK;
 }
 

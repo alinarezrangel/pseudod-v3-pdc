@@ -1672,7 +1672,7 @@ procedimiento EjecutarCompilador: cli
 
     ParaCadaElemento: opciones#guardarInterfaces, procedimiento: salidaInterfaz
         variable archivo
-        fijar archivo a __AbrirArchivo: salidaInterfaz#rutaAlArchivo, 11
+        fijar archivo a __AbrirArchivo: salidaInterfaz#rutaAlArchivo, 111
         bdMod#guardarEnArchivo: salidaInterfaz#paquete, salidaInterfaz#módulo, archivo
         archivo#cerrar
     finprocedimiento

@@ -828,7 +828,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_error(ctx, "Texto: entero fuera de rango pasado a #byteEn");
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
-            pdcrt_xmm_desde_obj(pdcrt_objeto_entero(oyo.texto->contenido[i])));
+            pdcrt_xmm_desde_obj(pdcrt_objeto_entero((unsigned char) oyo.texto->contenido[i])));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.subtexto))
     {
