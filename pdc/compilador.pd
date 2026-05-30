@@ -1679,5 +1679,3 @@ procedimiento EjecutarCompilador: cli
 
     ParaCadaElementoEnReversa: limpiar, (MétodoComoFunción: {llamar})
 finprocedimiento
-
-EjecutarCompilador: __Argv

@@ -473,7 +473,7 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
         }
     }
 
-    pdcrt_extender_pila(ctx, nargs_extra);
+    pdcrt_extender_pila(ctx, nargs_extra + 1);
 
     size_t total = 0;
     for(size_t i = 0; i < nproto; i++)

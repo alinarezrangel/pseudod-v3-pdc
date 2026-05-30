@@ -1,1 +1,3 @@
-utilizar pdc/compilador
+utilizar pdc/compilador (EjecutarCompilador)
+
+EjecutarCompilador: __Argv

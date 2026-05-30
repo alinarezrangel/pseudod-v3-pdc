@@ -57,6 +57,7 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
 
     if(pdcrt_tipo_de_obj(oclase) == PDCRT_TOBJ_NULO)
     {
+        pdcrt_traceback(ctx, k.marco);
         pdcrt_inspeccionar_texto(omsj.texto);
         pdcrt_error(ctx, "Método no encontrado");
     }
@@ -85,6 +86,7 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
     }
     else
     {
+        pdcrt_traceback(ctx, k.marco);
         pdcrt_inspeccionar_texto(omsj.texto);
         pdcrt_error(ctx, "Método no encontrado");
     }
@@ -1478,6 +1480,13 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(tbl));
     }
+    else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.tabla))
+    {
+        if(args != 0)
+            pdcrt_error(ctx, "Runtime: Tabla no necesita argumentos");
+        PDCRT_SACAR_PRELUDIO();
+        return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(ctx->clase_tabla));
+    }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.crearCorrutina))
     {
         if(args != 1)
@@ -1898,13 +1907,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_obj texto = pdcrt_obj_desde_xmm(a1);
         pdcrt_debe_tener_tipo(ctx, texto, PDCRT_TOBJ_TEXTO);
 
-        puts("TRACEBACK:");
-        size_t i = 0;
-        for(pdcrt_marco *m = k.marco; m; m = m->k.marco)
-        {
-            printf("  (%zu): %s\n", i, m->debug_srcloc);
-            i += 1;
-        }
+        pdcrt_traceback(ctx, k.marco);
         pdcrt_error(ctx, texto.texto->contenido);
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.leer_caracter))

@@ -306,6 +306,9 @@ metodo estatico Arreglo#crearCon: ...valores
 finmetodo
 
 metodo Arreglo#igualA: otro
+    si son diferentes (TipoDe: yo) y (TipoDe: otro)
+        devolver FALSO
+    finsi
     si son diferentes yo#longitud y otro#longitud
         devolver FALSO
     finsi

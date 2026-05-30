@@ -342,7 +342,8 @@ class PdcrtLocateCommand(gdb.Command):
 
             self.queue = []
             self.visited = set()
-            self.parents = {}
+            self.parents = {}  # Maps address -> list of (parent_addr, description)
+            self.target_addr = None
 
             # Determine target address
             obj_type = obj.type
@@ -358,7 +359,7 @@ class PdcrtLocateCommand(gdb.Command):
                 self.add_root(ctx["pila"][i], f"ctx->pila[{i}]")
 
             if m:
-                self.add_root(m, "m (current marco)")
+                self.add_root(m, "m (locals)")
 
             self.add_root(ctx["funcion_igualdad"], "ctx->funcion_igualdad")
             self.add_root(ctx["funcion_hash"], "ctx->funcion_hash")
@@ -375,8 +376,8 @@ class PdcrtLocateCommand(gdb.Command):
             self.add_root(ctx["clase_texto"], "ctx->clase_texto")
             self.add_root(ctx["clase_tipo_nulo"], "ctx->clase_tipo_nulo")
 
-            if ctx["continuacion_actual"]["marco"]:
-                self.add_root(ctx["continuacion_actual"]["marco"], "ctx->continuacion_actual.marco")
+            if ctx["continuacion_actual"]["k"]["marco"]:
+                self.add_root(ctx["continuacion_actual"]["k"]["marco"], "ctx->continuacion_actual.marco")
 
             for field in ctx["textos_globales"].type.fields():
                 self.add_root(ctx["textos_globales"][field.name], f"ctx->textos_globales.{field.name}")
@@ -471,8 +472,20 @@ class PdcrtLocateCommand(gdb.Command):
                 self.explore_instancia(obj, addr)
             elif tname == "pdcrt_cabecera_gc":
                 self.explore_cabecera_gc(obj, addr)
+            elif tname == "pdcrt_gc_raices":
+                self.explore_raices(obj, addr)
 
         return found
+
+    def explore_raices(self, obj, parent_addr, p=""):
+        for i in range(int(obj["num_raices"])):
+            raiz = obj["raices_locales"][i]
+            if not raiz["recv"]:
+                self.add_child(raiz["gc"], f"{p}[{i}].gc", parent_addr)
+            else:
+                self.add_child(raiz, f"{p}[{i}]", parent_addr)
+        if obj["superior"]:
+            self.explore_raices(obj["superior"], parent_addr, p=p + ".superior")
 
     RECVS_TO_FIELDS = {
         "texto": "texto",
@@ -502,9 +515,8 @@ class PdcrtLocateCommand(gdb.Command):
         """Explore a marco's references"""
         if marco["k"]["marco"]:
             self.add_child(marco["k"]["marco"], ".k.marco", parent_addr)
-        num_vars = int(marco["num_locales"]) + int(marco["num_capturas"])
-        for i in range(num_vars):
-            self.add_child(marco["locales_y_capturas"][i], f".locales_y_capturas[{i}]", parent_addr)
+        for i in range(int(marco["num_registros"])):
+            self.add_child(marco["registros"][i], f".registros[{i}]", parent_addr)
 
     def explore_arreglo(self, arreglo, parent_addr):
         """Explore an arreglo's elements"""
@@ -524,17 +536,16 @@ class PdcrtLocateCommand(gdb.Command):
 
     def explore_tabla(self, tabla, parent_addr):
         """Explore a tabla's buckets"""
-        num_buckets = int(tabla["num_buckets"])
-        for i in range(num_buckets):
+        for i in range(int(tabla["mascara"]) + 1):
             bucket = tabla["buckets"][i]
             if bucket["activo"]:
-                j = 0
-                current = bucket.address
-                while current:
-                    self.add_child(current["llave"], f".buckets[{i}][{j}].llave", parent_addr)
-                    self.add_child(current["valor"], f".buckets[{i}][{j}].valor", parent_addr)
-                    current = current["siguiente_colision"]
-                    j += 1
+                self.add_child(bucket["llave"], f".buckets[{i}].llave", parent_addr)
+                self.add_child(bucket["valor"], f".buckets[{i}].valor", parent_addr)
+        for i in range(int(tabla["num_colisiones"])):
+            bucket = tabla["colisiones"][i]
+            if bucket["activo"]:
+                self.add_child(bucket["llave"], f".colisiones[{i}].llave", parent_addr)
+                self.add_child(bucket["valor"], f".colisiones[{i}].valor", parent_addr)
 
     def explore_corrutina(self, coro, parent_addr):
         """Explore a corrutina's state"""
@@ -584,7 +595,8 @@ class PdcrtLocateCommand(gdb.Command):
     def print_all_paths(self):
         """Print all paths from roots to target"""
         paths = []
-        self.find_paths_recursive(self.target_addr, [], paths)
+        visited = set()
+        self.find_paths_recursive(self.target_addr, [], paths, visited)
 
         print(f"\nFound {len(paths)} path(s) to target:\n")
         for i, path in enumerate(paths, 1):
@@ -593,7 +605,7 @@ class PdcrtLocateCommand(gdb.Command):
                 print(f"  {step}")
             print()
 
-    def find_paths_recursive(self, addr, current_path, all_paths):
+    def find_paths_recursive(self, addr, current_path, all_paths, visited):
         """Recursively find all paths from roots to given address"""
         if addr not in self.parents:
             return
@@ -602,10 +614,11 @@ class PdcrtLocateCommand(gdb.Command):
             if parent_addr is None:
                 # Reached a root
                 all_paths.append([desc] + current_path)
-            else:
+            elif int(parent_addr) not in visited:
+                visited.add(int(parent_addr))
                 # Recurse to parent
                 new_path = [f"{hex(parent_addr)}{desc}"] + current_path
-                self.find_paths_recursive(parent_addr, new_path, all_paths)
+                self.find_paths_recursive(parent_addr, new_path, all_paths, visited)
 
 
 # Register commands

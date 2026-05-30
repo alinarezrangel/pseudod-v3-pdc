@@ -609,7 +609,7 @@ procedimiento EscribirElemento: salida, valor, error
     si EsInstancia: valor, Arreglo
         devolver EscribirArreglo: salida, valor, error
     finsi
-    si EsInstancia: valor, Diccionario
+    si Diccionario#esDiccionario: valor
         devolver EscribirObjeto: salida, valor, error
     finsi
 

@@ -448,6 +448,7 @@ typedef enum pdcrt_tipo
     X(obtener_variable_de_entorno, "obtenerVariableDeEntorno")          \
     X(redimensionar, "redimensionar")                                   \
     X(crear_arreglo_vacio, u8"crearArregloVacío")                       \
+    X(tabla, u8"Tabla")                                                 \
     X(nulo_como_texto, "NULO")
 
 typedef struct pdcrt_textos
@@ -687,6 +688,7 @@ bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
 #define pdcrt_crear_texto_desde_cstr(ctx, m, cstr) \
     pdcrt_crear_texto(ctx, m, cstr, strlen(cstr))
 
+void pdcrt_traceback(pdcrt_ctx *ctx, pdcrt_marco *m);
 _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj);
 _Noreturn void pdcrt_enomem(pdcrt_ctx *ctx);
 void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t);

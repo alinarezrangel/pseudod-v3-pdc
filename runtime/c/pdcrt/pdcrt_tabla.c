@@ -131,6 +131,16 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
 
     pdcrt_desalojar_ctx(ctx, viejos_buckets, hasheables_viejos * sizeof(pdcrt_bucket));
 
+    tbl->buckets_ocupados = 0;
+    for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
+    {
+        if(tbl->buckets[i].activo)
+        {
+            tbl->buckets_ocupados += 1;
+            tbl->buckets[i].tiene_colision = false;
+        }
+    }
+
     size_t num_cols = tbl->num_colisiones;
     tbl->num_colisiones = 0;
     for(size_t i = 0; i < num_cols; i++)

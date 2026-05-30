@@ -53,6 +53,18 @@ void pdcrt_formatear_bytes(char *buffer, size_t bytes)
 }
 
 
+void pdcrt_traceback(pdcrt_ctx *ctx, pdcrt_marco *m)
+{
+    (void) ctx;
+    puts("TRACEBACK:");
+    size_t i = 0;
+    for(pdcrt_marco *at = m; at; at = at->k.marco)
+    {
+        printf("  (%zu): %s\n", i, at->debug_srcloc);
+        i += 1;
+    }
+}
+
 _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj)
 {
     ctx->mensaje_de_error = msj;

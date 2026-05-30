@@ -1,3 +1,5 @@
+[#variables-globales \__RT\]
+
 utilizar bepd/builtinsImpl
 
 [DOCUMENTA
@@ -230,4 +232,18 @@ clase IDiccionario
     En cambio, crea una copia, la transforma y luego la devuelve.
     DOCUMENTA]
     metodo mapear: proc
+
+    [DOCUMENTA
+    @brief{Determina si @pd{valor} es un diccionario.}
+    DOCUMENTA]
+    metodo estatico esDiccionario: valor
 finclase
+
+metodo estatico IDiccionario#esDiccionario: valor
+    si __Impl = {pdc C}
+        devolver (EsInstancia: valor, IDiccionario)
+              || (EsInstancia: valor, __RT#Tabla)
+    sino
+        devolver EsInstancia: valor, IDiccionario
+    finsi
+finmetodo
