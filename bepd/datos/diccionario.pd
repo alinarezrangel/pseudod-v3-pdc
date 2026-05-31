@@ -35,6 +35,11 @@ clase Diccionario hereda IDiccionario
     metodo estatico desdePares: ...valores
 finclase
 
+[ TODO: En el compilador a Lua, los métodos estáticos no son heredados. ]
+metodo estatico Diccionario#esDiccionario: valor
+    devolver IDiccionario#esDiccionario: valor
+finmetodo
+
 [ Sobre la implementación en Lua: Las llaves hasheables se mantienen en `_hash`
   mientras que todas las demás están en `_alist`. Esto requiere un poco de
   cuidado en todas las operaciones, pero funciona muy bien.

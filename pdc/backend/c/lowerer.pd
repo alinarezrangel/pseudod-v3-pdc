@@ -303,7 +303,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
     finsi
 
     si opcode = Opcode#fijarRegistro
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {));}
+        EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {));}
     finsi
 
     si opcode = Opcode#caja
@@ -355,9 +355,9 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
         variable n
         fijar n a tupla#en: 2
         si n#techo = n
-            EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_entero(PDCRT_ENTERO_C(}, n, {)));}
+            EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_entero(PDCRT_ENTERO_C(}, n, {)));}
         sino
-            EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_float(PDCRT_FLOAT_C(}, n, {)));}
+            EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_float(PDCRT_FLOAT_C(}, n, {)));}
         finsi
     finsi
 
@@ -394,20 +394,20 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
     finsi
 
     si opcode = Opcode#nulo
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_nulo());}
+        EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_nulo());}
     finsi
 
     si opcode = Opcode#negar
         EmitirLínea: puerto, «do {»
         EmitirLínea: puerto, {pdcrt_obj b = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
         EmitirLínea: puerto, {if(pdcrt_tipo_de_obj(b) != PDCRT_TOBJ_BOOLEANO) pdcrt_error(ctx, "Se esperaba un objeto booleano");}
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_booleano(!b.bval));}
+        EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_booleano(!b.bval));}
         EmitirLínea: puerto, «} while(0);»
     finsi
 
     si opcode = Opcode#sonIdénticos
         EmitirLínea: puerto,
-                     {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1),
+                     {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1),
                      {, pdcrt_objeto_booleano(pdcrt_son_identicos(ctx, m, pdcrt_obtener_local(ctx, m, }, (tupla#en: 2),
                      {), pdcrt_obtener_local(ctx, m, }, (tupla#en: 3), {))));}
     finsi
@@ -462,7 +462,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
     finsi
 
     si opcode = Opcode#obtenerRuntime
-        EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_runtime());}
+        EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_runtime());}
     finsi
 
     si opcode = Opcode#importar_s1

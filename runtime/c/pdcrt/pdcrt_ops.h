@@ -57,6 +57,7 @@ void pdcrt_fijar_pila_interceptar(pdcrt_ctx *ctx, size_t i, pdcrt_obj v);
         (m)->registros[(idx)] = local;                                  \
     }                                                                   \
     while(0)
+#define pdcrt_fijar_local_nb(ctx, m, idx, v) (m)->registros[(idx)] = (v)
 
 pdcrt_obj pdcrt_caja_vacia(pdcrt_ctx *ctx, pdcrt_gc_raices *m);
 
