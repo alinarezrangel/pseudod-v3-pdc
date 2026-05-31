@@ -35,3 +35,27 @@ procedimiento ParaCadaElemento': ...arreglosYCuerpo
         %cuerpo: ...valores
     finprocedimiento, ...arreglos
 finprocedimiento
+
+funcion Máximo: vals
+    necesitas vals#longitud > 0
+    variable max
+    fijar max a vals#en: 0
+    ParaCadaElemento: vals, procedimiento: v
+        si v > max
+            fijar max a v
+        finsi
+    finprocedimiento
+    devolver max
+finfuncion
+
+funcion Mínimo: vals
+    necesitas vals#longitud > 0
+    variable min
+    fijar min a vals#en: 0
+    ParaCadaElemento: vals, procedimiento: v
+        si v < min
+            fijar min a v
+        finsi
+    finprocedimiento
+    devolver min
+finfuncion

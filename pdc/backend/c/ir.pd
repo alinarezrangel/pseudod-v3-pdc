@@ -94,6 +94,18 @@ DOCUMENTA]
 
 
 [DOCUMENTA
+@brief{Datos de un opcode.}
+
+@code{requiereContinuación}: Si el opcode necesita una continuación.
+
+@code{numRaíces}: Número de raíces del GC que el opcode necesita.
+DOCUMENTA]
+variable OpcionesDeOpcode
+fijar OpcionesDeOpcode a TipoDeDatos: {OpcionesDeOpcode},
+      {requiereContinuación}, {numRaíces}
+
+
+[DOCUMENTA
 @brief{El tipo de una instrucción.}
 
 @bold{Nota}: si alguna instrucción requiere una continuación, esto @bold{no}
@@ -213,40 +225,40 @@ constantes (véase @pd{Constante}).}
 DOCUMENTA]
 variable Opcode
 fijar Opcode a EnumConValores: {Opcode},
-    [ Nombre del opcode,                 ¿Requiere una continuación? ]
-    {csaltar},                           VERDADERO,
-    {saltar},                            VERDADERO,
-    {enviarMensaje_s1},                  VERDADERO,
-    {enviarMensaje_s2},                  FALSO,
-    {enviarMensaje_t},                   FALSO,
-    {etiqueta},                          VERDADERO,
-    {fijarRegistro},                     FALSO,
-    {caja},                              FALSO,
-    {fijarCaja},                         FALSO,
-    {valorDeCaja},                       FALSO,
-    {prn},                               FALSO,
-    {prnl},                              FALSO,
-    {assert},                            FALSO,
-    {devolverN},                         FALSO,
-    {número},                            FALSO,
-    {texto},                             FALSO,
-    {nulo},                              FALSO,
-    {negar},                             FALSO,
-    {sonIdénticos},                      FALSO,
-    {obtenerObjeto},                     FALSO,
-    {mkclz},                             FALSO,
-    {continuar},                         FALSO,
-    {espacioDeNombres},                  FALSO,
-    {agregarNombre},                     VERDADERO,
-    {exportar},                          FALSO,
-    {obtenerRuntime},                    FALSO,
-    {importar_s1},                       VERDADERO,
-    {importar_s2},                       FALSO,
-    {extraer_s1},                        VERDADERO,
-    {extraer_s2},                        FALSO,
-    {obtenerEspacioDeNombresDelRuntime}, FALSO,
-    {comoEspacioDeNombres},              FALSO,
-    {crearConstantes},                   FALSO
+    [ Nombre del opcode,                       ¿Requiere una continuación?   Núm. raíces ]
+    {csaltar},                           (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {saltar},                            (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {enviarMensaje_s1},                  (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {enviarMensaje_s2},                  (OpcionesDeOpcode#crear: FALSO,     0),
+    {enviarMensaje_t},                   (OpcionesDeOpcode#crear: FALSO,     0),
+    {etiqueta},                          (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {fijarRegistro},                     (OpcionesDeOpcode#crear: FALSO,     0),
+    {caja},                              (OpcionesDeOpcode#crear: FALSO,     1),
+    {fijarCaja},                         (OpcionesDeOpcode#crear: FALSO,     0),
+    {valorDeCaja},                       (OpcionesDeOpcode#crear: FALSO,     0),
+    {prn},                               (OpcionesDeOpcode#crear: FALSO,     0),
+    {prnl},                              (OpcionesDeOpcode#crear: FALSO,     0),
+    {assert},                            (OpcionesDeOpcode#crear: FALSO,     0),
+    {devolverN},                         (OpcionesDeOpcode#crear: FALSO,     0),
+    {número},                            (OpcionesDeOpcode#crear: FALSO,     0),
+    {texto},                             (OpcionesDeOpcode#crear: FALSO,     0),
+    {nulo},                              (OpcionesDeOpcode#crear: FALSO,     0),
+    {negar},                             (OpcionesDeOpcode#crear: FALSO,     0),
+    {sonIdénticos},                      (OpcionesDeOpcode#crear: FALSO,     0),
+    {obtenerObjeto},                     (OpcionesDeOpcode#crear: FALSO,     0),
+    {mkclz},                             (OpcionesDeOpcode#crear: FALSO,     1),
+    {continuar},                         (OpcionesDeOpcode#crear: FALSO,     0),
+    {espacioDeNombres},                  (OpcionesDeOpcode#crear: FALSO,     1),
+    {agregarNombre},                     (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {exportar},                          (OpcionesDeOpcode#crear: FALSO,     0),
+    {obtenerRuntime},                    (OpcionesDeOpcode#crear: FALSO,     0),
+    {importar_s1},                       (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {importar_s2},                       (OpcionesDeOpcode#crear: FALSO,     0),
+    {extraer_s1},                        (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {extraer_s2},                        (OpcionesDeOpcode#crear: FALSO,     0),
+    {obtenerEspacioDeNombresDelRuntime}, (OpcionesDeOpcode#crear: FALSO,     0),
+    {comoEspacioDeNombres},              (OpcionesDeOpcode#crear: FALSO,     0),
+    {crearConstantes},                   (OpcionesDeOpcode#crear: FALSO,     2)
 
 [DOCUMENTA
 @brief{Determina si el opcode requiere una continuación.}
@@ -257,9 +269,15 @@ de la continuación (un entero) a la que saltar.
 @devuelve{@pd{VERDADERO} o @pd{FALSO}}.
 DOCUMENTA]
 metodo Opcode#requiereContinuación
-    devolver yo#valor
+    devolver yo#valor#requiereContinuación
 finmetodo
 
+[DOCUMENTA
+@brief{Devuelve el número de raíces del GC que el opcode necesita.}
+DOCUMENTA]
+metodo Opcode#numRaíces
+    devolver yo#valor#numRaíces
+finmetodo
 
 [DOCUMENTA
 @brief{Representa un parámetro de una función en el IR.}

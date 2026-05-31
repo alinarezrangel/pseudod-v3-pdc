@@ -2,6 +2,7 @@ utilizar bepd/builtins
 utilizar bepd/x/puerto (PuertoDeEscritura)
 utilizar bepd/utilidades/texto/ascii (LF)
 utilizar bepd/utilidades/texto (Unir)
+utilizar bepd/utilidades/iteración como Iter
 
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, Argumento, Retorno, Parámetro, TipoConstante, Constante, ContinuaciónIR, ProgramaIR, Etiqueta, EscribirPrograma)
 
@@ -143,7 +144,7 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
 
     [ FIXME: Como no hay un `VERIFICA_PILA` aquí, podríamos causar un stack-overflow ]
     EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, args, k, func_srcloc);}
-    variables fid, idcVariadic
+    variables fid, idcVariadic, numRaíces
     fijar fid a NombreDeLaEstructuraConParámetros: identificadorDelMódulo, func#id
     EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
     fijar idcVariadic a BuscarPredicado: 0, func#parámetros, (MétodoComoFunción: {esVariadic})
@@ -155,6 +156,12 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
                  «, }, .params = {», (Unir: (Mapear: func#parámetros, funcion: p devolver «{~t}»#formatear: p#registro finfuncion), {, }),
                  «} };»
     EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
+    fijar numRaíces a Iter#Máximo: (Mapear: func#instrucciones, funcion: tupla
+        devolver (tupla#en: 0)#numRaíces
+    finfuncion)
+    si numRaíces > 0
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(}, numRaíces, {);}
+    finsi
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
@@ -162,11 +169,17 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
 finprocedimiento
 
 procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k, metadataGlobal
-    variable nombre
+    variables nombre, numRaíces
     fijar nombre a NombreDeLaContinuación: identificadorDelMódulo, k#id
     EmitirLínea: puerto, {static pdcrt_tk }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m, __m128i res)}
     EmitirLínea: puerto, «{»
     EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, res, }, nombre, {);}
+    fijar numRaíces a Iter#Máximo: (Mapear: k#instrucciones, funcion: tupla
+        devolver (tupla#en: 0)#numRaíces
+    finfuncion)
+    si numRaíces > 0
+        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(}, numRaíces, {);}
+    finsi
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
@@ -308,7 +321,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
 
     si opcode = Opcode#caja
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_REINICIAR_RAICES();}
         EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_obj caja = pdcrt_objeto_caja(pdcrt_crear_caja(ctx, PDCRT_GC()));}
         EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
@@ -363,7 +376,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
 
     si opcode = Opcode#crearConstantes
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(2);}
+        EmitirLínea: puerto, {PDCRT_REINICIAR_RAICES();}
         EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_arreglo *constantes = pdcrt_crear_arreglo_vacio(ctx, PDCRT_GC(), }, (tupla#en: 1)#longitud, {LLU);}
         EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
@@ -424,7 +437,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
                      «static const pdcrt_captura caps[] = {»,
                      (Unir: (Mapear: caps, funcion: reg devolver «{~t}»#formatear: reg finfuncion), {, }),
                      «};»
-        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_REINICIAR_RAICES();}
         EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto,
                      {pdcrt_obj cl = pdcrt_mk_closure(ctx, m, PDCRT_GC(), }, (NombreDeLaFunción: identificadorDelMódulo, (tupla#en: 2)),
@@ -436,7 +449,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
 
     si opcode = Opcode#espacioDeNombres
         EmitirLínea: puerto, «do {»
-        EmitirLínea: puerto, {PDCRT_DEFINE_RAICES(1);}
+        EmitirLínea: puerto, {PDCRT_REINICIAR_RAICES();}
         EmitirLínea: puerto, {PDCRT_GUARDAR_RAIZ_CABECERA(0, m);}
         EmitirLínea: puerto, {pdcrt_obj cons = pdcrt_crear_espacio_de_nombres_cons(ctx, PDCRT_GC());}
         EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
