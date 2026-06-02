@@ -364,7 +364,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
     if(!p->base.tiene_variadic)
     {
         if(m->args != p->base.num_params)
-            pdcrt_error(ctx, u8"función llamada de forma inválida");
+        {
+            pdcrt_errortb(ctx, m, u8"función llamada de forma inválida");
+        }
 
         if(p->base.num_params >= 1)
             m->registros[p->params[0].reg] = pdcrt_obj_desde_xmm(a1);
@@ -418,7 +420,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
         size_t sufijo = p->base.num_params - p->base.idc_variadic - 1;
 
         if(m->args < prefijo + sufijo)
-            pdcrt_error(ctx, u8"función llamada de forma inválida");
+        {
+            pdcrt_errortb(ctx, m, u8"función llamada de forma inválida");
+        }
 
         // Núm. argumentos variadic
         size_t num_args_variadic = m->args - prefijo - sufijo;
@@ -426,7 +430,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
         size_t num_param_variadic = 1;
 
         if(m->args != (prefijo + num_args_variadic + sufijo))
-            pdcrt_error(ctx, u8"función llamada de forma inválida");
+        {
+            pdcrt_errortb(ctx, m, u8"función llamada de forma inválida");
+        }
         PDCRT_ASSERT(p->base.num_params == (prefijo + sufijo + num_param_variadic));
 
         for(size_t i = 0; i < prefijo; i++)
@@ -447,7 +453,9 @@ void pdcrt_params(pdcrt_ctx *ctx,
         {
             pdcrt_obj val = ctx->pila[ctx->tam_pila - m->args + prefijo + i];
             if(arr.arreglo->longitud >= arr.arreglo->capacidad)
-                pdcrt_error(ctx, u8"arreglo de variadics demasiado pequeño");
+            {
+                pdcrt_errortb(ctx, m, u8"arreglo de variadics demasiado pequeño");
+            }
             arr.arreglo->valores[arr.arreglo->longitud++] = val;
         }
         m->registros[p->params[p->base.idc_variadic].reg] = arr;
@@ -769,7 +777,7 @@ pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size
         if(!contiene)
         {
             pdcrt_inspeccionar_texto(onombre.texto);
-            pdcrt_error(ctx, u8"Módulo no exíste");
+            pdcrt_errortb(ctx, m, u8"Módulo no exíste");
         }
 
         PDCRT_REINICIAR_RAICES();
@@ -796,7 +804,7 @@ static pdcrt_tk pdcrt_importar_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m128i res)
     }
     else
     {
-        pdcrt_error(ctx, u8"Módulo no guardo su espacio de nombres");
+        pdcrt_errortb(ctx, m, u8"Módulo no guardo su espacio de nombres");
     }
 }
 
@@ -823,13 +831,13 @@ pdcrt_tk pdcrt_extraerv(pdcrt_ctx *ctx,
     {
         pdcrt_debe_tener_tipo(ctx, ovalor, PDCRT_TOBJ_ARREGLO);
         if(ovalor.arreglo->longitud != 2)
-            pdcrt_error(ctx, u8"Extraerv: el valor de un módulo no es un arreglo de 2 elementos");
+            pdcrt_errortb(ctx, m, u8"Extraerv: el valor de un módulo no es un arreglo de 2 elementos");
         return (*kf)(ctx, m, pdcrt_xmm_desde_obj(ovalor.arreglo->valores[0]));
     }
     else
     {
         pdcrt_inspeccionar_texto(onombre.texto);
-        pdcrt_error(ctx, u8"Módulo no contiene el nombre dado");
+        pdcrt_errortb(ctx, m, u8"Módulo no contiene el nombre dado");
     }
 }
 
@@ -857,7 +865,7 @@ pdcrt_tk pdcrt_agregar_nombre(pdcrt_ctx *ctx,
     PDCRT_CARGAR_RAIZ(3, onombre);
 
     if(arr.arreglo->capacidad < 2)
-        pdcrt_error(ctx, u8"Arreglo debe tener capacidad mínima de 2");
+        pdcrt_errortb(ctx, m, u8"Arreglo debe tener capacidad mínima de 2");
     arr.arreglo->valores[0] = valor;
     arr.arreglo->valores[1] = pdcrt_objeto_booleano(autoejec);
     arr.arreglo->longitud = 2;

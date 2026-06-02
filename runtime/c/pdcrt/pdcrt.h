@@ -691,6 +691,7 @@ bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
 void pdcrt_traceback(pdcrt_ctx *ctx, pdcrt_marco *m);
 _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj);
 _Noreturn void pdcrt_enomem(pdcrt_ctx *ctx);
+_Noreturn void pdcrt_errortb(pdcrt_ctx *ctx, pdcrt_marco *m, const char* msj);
 void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t);
 
 bool pdcrt_son_identicos(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj x, pdcrt_obj y);
@@ -783,12 +784,27 @@ pdcrt_tk pdcrt_recv_reubicado(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 #define PDCRT_SACAR_PRELUDIO() do { if(args >= PDCRT_NN_IMM) pdcrt_eliminar_elementos(ctx, argp, args - PDCRT_NN_IMM); } while(0)
 
 
+#define PDCRT_EMPUJAR_IMM(ctx) \
+    pdcrt_extender_pila(ctx, PDCRT_N_IMM + 1); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(yo)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(msj)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a1)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a2)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a3)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a4)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a5)); \
+    pdcrt_empujar(ctx, pdcrt_obj_desde_xmm(a6)); \
+    pdcrt_empujar(ctx, pdcrt_objeto_marco(k.marco));
+
+#define PDCRT_SACAR_IMM(ctx) (ctx)->tam_pila -= PDCRT_N_IMM + 1;
+
 #ifdef PDCRT_DBG_NO_K
-// TODO fix:
 #define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k, srcloc)     \
     pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(yo), PDCRT_TOBJ_CLOSURE); \
-    pdcrt_marco *m = pdcrt_crear_marco(ctx, num_regs, args, k, pdcrt_obj_desde_xmm(yo).closure); \
-    m->debug_srcloc = srcloc;
+    PDCRT_EMPUJAR_IMM(ctx) \
+    pdcrt_marco *m = pdcrt_crear_marco(ctx, NULL, num_regs, args, k, pdcrt_obj_desde_xmm(yo).closure); \
+    m->debug_srcloc = srcloc; \
+    PDCRT_SACAR_IMM(ctx)
 #else
 #define PDCRT_ALOJAR_MARCO(ctx, num_regs, args, k, srcloc)     \
     pdcrt_debe_tener_tipo(ctx, pdcrt_obj_desde_xmm(yo), PDCRT_TOBJ_CLOSURE); \

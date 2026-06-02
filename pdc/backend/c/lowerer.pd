@@ -201,7 +201,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
 
     si opcode = Opcode#csaltar
         EmitirLínea: puerto, {pdcrt_obj csaltar_obj = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
-        EmitirLínea: puerto, {if(pdcrt_tipo_de_obj(csaltar_obj) != PDCRT_TOBJ_BOOLEANO) pdcrt_error(ctx, "Se esperaba un objeto de tipo Boole");}
+        EmitirLínea: puerto, {if(csaltar_obj.recv != &pdcrt_recv_booleano) pdcrt_error(ctx, "Se esperaba un objeto de tipo Boole");}
         EmitirLínea: puerto, {if(csaltar_obj.bval)}
         EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {, PDCRT_XMM_NULO());}
         EmitirLínea: puerto, {else}

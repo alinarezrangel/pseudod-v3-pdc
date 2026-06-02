@@ -87,7 +87,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
                 fijar áreaTextual a reg#nodo#áreaTextual
             finsi
 
-            fijar id a AST#NodoIdentificador#crear: áreaTextual, nombre
+            fijar id a AST#NodoIdentificador#crear: áreaTextual, nombre, VERDADERO, FALSO
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, datos#binding)
             finprocedimiento
@@ -145,7 +145,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         variables cuerpo, base
         funcion usoNombre
             variable usoNombre', reg
-            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
+            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre, VERDADERO, FALSO
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: usoNombre'#id, reg#binding)
@@ -200,7 +200,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         variables fn, ámbito
         funcion usoNombre
             variable usoNombre', reg
-            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre
+            fijar usoNombre' a AST#NodoIdentificador#crear: nodoCst#nombre#áreaTextual, nodoCst#nombre#nombre, VERDADERO, FALSO
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#nombre#id
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: usoNombre'#id, reg#binding)
@@ -255,7 +255,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
 
     si EsInstancia: nodoCst, CST#NodoMétodo
         variables reg, binding, yo, ámbito, met
-        fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}
+        fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}, FALSO, VERDADERO
         fijar reg a tablasRnCst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodoCst#id
         fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
         registrarParche: procedimiento
@@ -378,7 +378,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         finsi
 
         variables binding, reg, id, builtin
-        fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre
+        fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre, VERDADERO, FALSO
         fijar reg a tablasRnCst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoCst#id
         si no EsNulo: reg
             fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
@@ -458,8 +458,8 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
             fijar ámbito a Ámbito#desde: ámbitoActual
             fijar reg a ámbito#crear: nombreParam, FALSO
 
-            fijar idParam a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam
-            fijar idArg a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam
+            fijar idParam a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam, FALSO, VERDADERO
+            fijar idArg a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreParam, VERDADERO, FALSO
 
             fijar mensajes a Reducir: (abstraer: nodoCst#base), funcion: acc, mensaje
                 devolver AST#NodoEnviarMensaje#crear: mensaje#áreaTextual, acc, mensaje#contenido, Arreglo#vacio
@@ -492,7 +492,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         fijar yo' a Arreglo#vacio
         si nodoCst#esMétodo
             variables yo, reg, binding
-            fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}
+            fijar yo a AST#NodoIdentificador#crear: nodoCst#áreaTextual, {yo}, FALSO, VERDADERO
             yo'#agregarAlFinal:
                 (AST#NodoParámetro#crear: nodoCst#áreaTextual, yo, FALSO)
 
@@ -554,11 +554,11 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         fijar subámbito a Ámbito#desde: ámbito
         fijar reg a ámbito#crear: nombreVar, FALSO
 
-        fijar defVar a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar
+        fijar defVar a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar, FALSO, VERDADERO
 
         funcion usoVar
             variable id
-            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar
+            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nombreVar, VERDADERO, FALSO
             registrarParche: procedimiento
                 tablasRnAst#tablaUsos#agregar: (UsoDeNombre#crear: id#id, reg#binding)
             finprocedimiento

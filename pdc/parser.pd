@@ -262,6 +262,8 @@ fijar grId a
                 nombre: res#contenido
                 esLiteral: FALSO
                 aplicaAutoejecución: FALSO
+                esDefinición: FALSO
+                esDefiniciónAutoejecutable: FALSO
             finclonar
         finfuncion,
         id

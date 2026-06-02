@@ -85,6 +85,12 @@ _Noreturn void pdcrt_enomem(pdcrt_ctx *ctx)
     pdcrt_error(ctx, "Sin memoria");
 }
 
+_Noreturn void pdcrt_errortb(pdcrt_ctx *ctx, pdcrt_marco *m, const char* msj)
+{
+    pdcrt_traceback(ctx, m);
+    pdcrt_error(ctx, msj);
+}
+
 void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
 {
     if(pdcrt_tipo_de_obj(obj) != t)

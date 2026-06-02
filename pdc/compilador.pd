@@ -231,7 +231,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     ParaCadaElemento: dependencias, funcion: dep
         variable mod
         fijar mod a bdMod#buscarMódulo: dep#paquete, dep#módulo
-        prefijosTransitivos'#fijarEn: mod#prefijoDelMódulo
+        prefijosTransitivos'#fijarEn: mod#prefijoDelMódulo, VERDADERO
         ParaCadaElemento: mod#prefijosDeLosMódulosTransitivos, procedimiento: t
             prefijosTransitivos'#fijarEn: t, VERDADERO
         finprocedimiento

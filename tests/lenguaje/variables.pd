@@ -1,0 +1,5 @@
+variables X, Y
+fijar X a {hola}
+fijar Y a X#concatenar: { mundo}
+escribir Y
+nl

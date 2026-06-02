@@ -8,7 +8,7 @@ project(pdcrt
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v3 -Werror=vla -fwrapv")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v3 -Werror=vla -fwrapv -O1")
 
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
