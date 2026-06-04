@@ -8,7 +8,7 @@ project(pdcrt
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v3 -Werror=vla -fwrapv -O1")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64-v4 -Werror=vla -fwrapv")
 
 include(CheckCSourceCompiles)
 include(CMakeDependentOption)
@@ -16,6 +16,7 @@ include(CPack)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(ExternalProject)
+include("./cmake/PseudoD2.cmake")
 
 add_subdirectory(build-stage0)
 
@@ -46,6 +47,7 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_impls/archivo.h)
 
 target_include_directories(pdcrt PRIVATE libs/systemtap)
+target_compile_options(pdcrt PRIVATE $<$<CONFIG:Debug>:-O1>)
 
 target_link_libraries(pdcrt INTERFACE m)
 
@@ -156,9 +158,11 @@ add_custom_command(
   VERBATIM
 )
 
+set_source_files_properties("${PDCRT_RUNTIME_OUT}" PROPERTIES
+        GENERATED TRUE
+        COMPILE_OPTIONS "${PSEUDOD_CFLAGS}")
 target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
 
-include("./cmake/PseudoD2.cmake")
 include("./pdc.cmake")
 
 message(STATUS "Mounting shared pdc files at ${PSEUDOD_CURRENT_BINARY_DIR}")
@@ -167,11 +171,13 @@ file(MAKE_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}")
 ExternalProject_Add(inner_pdc_cgen
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/inner_pdc"
         BINARY_DIR "${PSEUDOD_CURRENT_BINARY_DIR}"
-        CMAKE_ARGS
-        "-DPDC=${PDC}"
-        "-DPSEUDOD_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DPSEUDOD_CURRENT_BINARY_DIR=${PSEUDOD_CURRENT_BINARY_DIR}"
-        "-DPDC_DEPS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua"
+        CMAKE_CACHE_ARGS
+        "-DPDC:STRING=${PDC}"
+        "-DPSEUDOD_CFLAGS:STRING=${PSEUDOD_CFLAGS}"
+        "-DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}"
+        "-DPSEUDOD_SOURCE_DIR:STRING=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DPSEUDOD_CURRENT_BINARY_DIR:STRING=${PSEUDOD_CURRENT_BINARY_DIR}"
+        "-DPDC_DEPS_SCRIPT:STRING=${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua"
         INSTALL_COMMAND ""
         USES_TERMINAL_BUILD ON
         BUILD_ALWAYS ON
@@ -183,7 +189,6 @@ add_pseudod_executable(pdc
         ENTRY pdc/inicio
         DEPENDS inner_pdc_cgen
 )
-target_compile_options(pdc_int INTERFACE -ggdb -O1 -fno-var-tracking-assignments)
 
 if(PDCRT_ASAN)
   target_compile_options(pdc_int INTERFACE -fsanitize=address)
@@ -194,4 +199,4 @@ if(PDCRT_UBSAN)
   target_link_options(pdc_int INTERFACE -fsanitize=undefined)
 endif()
 
-add_custom_target(default_target ALL DEPENDS sexpr pdcrt pdc)
+add_custom_target(default_target ALL DEPENDS pdcrt pdc)

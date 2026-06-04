@@ -13,6 +13,8 @@ set(PSEUDOD_CURRENT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/pd" CACHE PATH
         "Directory where the generated PseudoD files will be placed")
 set(PSEUDOD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH
         "Directory under which the PseudoD modules live")
+set(PSEUDOD_CFLAGS "-O1;-fno-var-tracking-assignments" CACHE STRING
+        "Compiler options used to compile PseudoD-generated C files")
 
 # Path to the deps.lua script
 set(PDC_DEPS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua" CACHE FILEPATH
@@ -181,6 +183,7 @@ function(add_pseudod_executable cc_new_target_name)
     set_source_files_properties(${other_cfiles} ${entry_cfile} PROPERTIES GENERATED TRUE)
 
     add_library("${cc_new_target_name}_int" INTERFACE)
+    target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS})
     add_library("${cc_new_target_name}_obj" OBJECT ${entry_cfile})
     target_compile_definitions("${cc_new_target_name}_obj" PRIVATE PDCRT_MAIN)
     target_link_libraries("${cc_new_target_name}_obj" PUBLIC pdcrt "${cc_new_target_name}_int")
