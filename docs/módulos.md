@@ -34,7 +34,7 @@ En la mayoría de los lenguajes de programación, el "nombre interno" de la bibl
 "nombre externo". En C, si una cabecera incluye `<libxml/dom.h>` entonces la biblioteca debe ser instalada como
 `libxml` o la cabecera no podrá encontrarla. PseudoD tiene un sistema de módulos descentralizado, similar al de Rust.
 En este sistema, la biblioteca puede ser instalada bajo cualquier nombre que el usuario desee. Por ejemplo, podríamos
-instalar `libxml` como `la-biblioteca-xml`, en cuyo caso nuestro código sería `utilizar la-biblioteca-xml/dom.pd`.
+instalar `libxml` como `la-biblioteca-xml`, en cuyo caso nuestro código sería `utilizar la-biblioteca-xml/dom`.
 **Esto no afecta como el código de la biblioteca está escrito**. Dentro de `libxml`, `dom.pd` siempre sería importado
 como `utilizar libxml/dom`.
 

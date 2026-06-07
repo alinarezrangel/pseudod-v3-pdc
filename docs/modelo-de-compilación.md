@@ -8,10 +8,10 @@ las cabeceras (`.h`): esto es debido a que todos los archivos forman parte de un
 
 En PseudoD, el modelo de compilación es mucho más hermético: los archivos PseudoD (`.pd`) tienen dependencias en otros
 módulos, pero dichos archivos no son abiertos automáticamente por el compilador: cada dependencia debe ser especificada
-en la línea de comandos explícitamente, y si no lo es el compilador fallará con un error de que el módulo no exíste
-(¡incluso si el archivo si exíste!). Estas dependencias directas corresponden a archivos `.ipd` (*interfaz pseudod*).
-Al compilar un archivo, no solo generas un archivo `.c` / `.o`, sino también un archivo `.ipd` para el módulo
-compilado.
+en la línea de comandos explícitamente, y si no lo es el compilador fallará con un error indicando que el módulo no
+exíste (¡incluso si el archivo si exíste!). Estas dependencias directas corresponden a archivos `.ipd` (*interfaz
+pseudod*).  Al compilar un archivo, no solo generas un archivo `.c` / `.o`, sino también un archivo `.ipd` para el
+módulo compilado.
 
 Los archivos `.ipd` corresponden, más o menos, con las cabeceras de C o los *signatures* de SML. Cada `.ipd` tiene
 información de la API y la ABI del módulo correspondiente. Críticamente: al compilar un `.pd` las opciones de

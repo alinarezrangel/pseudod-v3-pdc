@@ -37,6 +37,8 @@ para cada variable de un módulo. Cada ámbito del programa es *cosificado* [^1]
 en una clase `Ámbito` y asociado a su respectivo nodo del CST. Similarmente,
 este pase lleva registro de que variables son *autoejecutables*
 
+[^1]: Del inglés *reify*.
+
 ## Abstractor ##
 
 [Este pase](../pdc/abstraer.pd) abstrae el CST, convirtiéndolo en un
@@ -63,7 +65,15 @@ El IR está basado en [tuplas](https://cs.lmu.edu/~ray/notes/squid/), donde cada
 instrucción es una tupla cuyo primer elemento es el opcode y los demás son los
 argumentos.
 
-[^1]: Del inglés *reify*.
+## Otras cosas ##
+
+[`pdc/dependencias.pd`](../pdc/dependencias.pd) extráe las dependencias de un
+módulo de forma que el compilador pueda verificar que todos los módulos
+importados exísten antes de continuar con la compilación.
+
+[`pdc/validación.pd`](../pdc/validación.pd) contiene un par de funciones que
+verifican ciertos aspectos del lenguaje (como que no hay ningún `devolver` fuera
+de una función, etc.).
 
 ## El runtime ##
 
