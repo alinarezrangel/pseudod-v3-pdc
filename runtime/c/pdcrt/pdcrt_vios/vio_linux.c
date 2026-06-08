@@ -1181,20 +1181,31 @@ static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(
         {
             args_y_env_sz += opciones->linea_de_comandos.como_unix.argv[i].tam + 1;
         }
-        for(size_t i = 0; i < opciones->tam_entorno; i++)
+        if(!opciones->heredar_entorno)
         {
-            args_y_env_sz += opciones->entorno[i].nombre.tam + 1 + opciones->entorno[i].valor.tam + 1;
+            for(size_t i = 0; i < opciones->tam_entorno; i++)
+            {
+                args_y_env_sz += opciones->entorno[i].nombre.tam + 1 + opciones->entorno[i].valor.tam + 1;
+            }
         }
 
         char **argv = malloc(sizeof(char *) * (opciones->linea_de_comandos.como_unix.argc + 1));
         if(!argv)
             return PDCRT_IO_ERROR_SIN_MEMORIA;
 
-        char **envp = malloc(sizeof(char *) * (opciones->tam_entorno + 1));
-        if(!envp)
+        char **envp;
+        if(opciones->heredar_entorno)
         {
-            free(argv);
-            return PDCRT_IO_ERROR_SIN_MEMORIA;
+            envp = environ;
+        }
+        else
+        {
+            envp = malloc(sizeof(char *) * (opciones->tam_entorno + 1));
+            if(!envp)
+            {
+                free(argv);
+                return PDCRT_IO_ERROR_SIN_MEMORIA;
+            }
         }
 
         char *args_y_env = malloc(args_y_env_sz);
@@ -1220,23 +1231,26 @@ static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(
         }
         argv[opciones->linea_de_comandos.como_unix.argc] = NULL;
 
-        for(size_t i = 0; i < opciones->tam_entorno; i++)
+        if(!opciones->heredar_entorno)
         {
+            for(size_t i = 0; i < opciones->tam_entorno; i++)
+            {
 
-            PDCRT_BUG(cptr + opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 2 > args_y_env_sz,
-                      "sin memoria");
-            memcpy(args_y_env + cptr,
-                   opciones->entorno[i].nombre.ptr,
-                   opciones->entorno[i].nombre.tam);
-            args_y_env[cptr] = '=';
-            memcpy(args_y_env + cptr + 1 + opciones->entorno[i].nombre.tam,
-                   opciones->entorno[i].valor.ptr,
-                   opciones->entorno[i].valor.tam);
-            args_y_env[cptr + opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 1] = 0;
-            envp[i] = args_y_env + cptr;
-            cptr += opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 1;
+                PDCRT_BUG(cptr + opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 2 > args_y_env_sz,
+                          "sin memoria");
+                memcpy(args_y_env + cptr,
+                       opciones->entorno[i].nombre.ptr,
+                       opciones->entorno[i].nombre.tam);
+                args_y_env[cptr] = '=';
+                memcpy(args_y_env + cptr + 1 + opciones->entorno[i].nombre.tam,
+                       opciones->entorno[i].valor.ptr,
+                       opciones->entorno[i].valor.tam);
+                args_y_env[cptr + opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 1] = 0;
+                envp[i] = args_y_env + cptr;
+                cptr += opciones->entorno[i].nombre.tam + opciones->entorno[i].valor.tam + 1;
+            }
+            envp[opciones->tam_entorno] = NULL;
         }
-        envp[opciones->tam_entorno] = NULL;
 
         pid_t cpid = fork();
         if(cpid == 0)
@@ -1248,7 +1262,8 @@ static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(
         else if(cpid > 0)
         {
             free(argv);
-            free(envp);
+            if(!opciones->heredar_entorno)
+                free(envp);
             free(args_y_env);
 
             *out_subproceso = malloc(sizeof(pdcrt_subproceso));
@@ -1264,7 +1279,8 @@ static pdcrt_io_error pdcrt_vio_linux_crear_subproceso(
         else
         {
             free(argv);
-            free(envp);
+            if(!opciones->heredar_entorno)
+                free(envp);
             free(args_y_env);
 
             switch(errno)
