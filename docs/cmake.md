@@ -3,12 +3,28 @@
 Actualmente, este proyecto utiliza el sistema de construcción [cmake](https://cmake.org) para compilar los programas
 y bibliotecas.
 
+## `PSEUDOD_TOOLCHAIN` ##
+
+Esta variable de cmake contiene la ruta al toolchain de PseudoD a usar para compilar el proyecto. Necesitas
+instalar una versión de arranque desde [alinarezrangel/pdc-rebootstrap][reboot] (para saber qué versión de
+arranque debes instalar, revisa el archivo [DIST_BOOTSTRAP](../DIST_BOOTSTRAP)). Al instalar la
+versión de arranque, se instalará también un archivo `toolchain.txt`. La ruta a este archivo es la que debes
+usar en `PSEUDOD_TOOLCHAIN`.
+
+[reboot]: https://github.com/alinarezrangel/pdc-rebootstrap
+
+Por ejemplo, `-DPSEUDOD_TOOLCHAIN=/usr/local/share/bt1-pdc/toolchain.txt` compilará con el toolchain
+`/usr/local/share/bt1-pdc/toolchain.txt`.
+
 ## Variables útiles ##
 
 Puedes especificar las siguientes variables al ejecutar cmake (`cmake -DFOO=BAR ...`) para configurar distíntos
 aspectos de la compilación.
 
-- `PDC`: Ruta al compilador de PseudoD a usar.
+- `TOOL_PREFIX`: Prefijo a agregar a los programas y bibliotecas del proyecto cuando se instálen. Por ejemplo, si
+    tiene como valor `mi-`, entonces el programa `pdc` será instalado como `mi-pdc`, `libpdcrt.a` será
+    `libmi-pdcrt.a`, etc.
+- `PSEUDOD_TOOLCHAIN`: Toolchain a usar.
 - `LUA_EXECUTABLE`: Ejecutable de Lua 5.4 a usar.
 - `PSEUDOD_CURRENT_BINARY_DIR`: Ruta al directorio donde se guardarán las salidas de compilación de PseudoD.
     Véase la sección "Configuraciones".

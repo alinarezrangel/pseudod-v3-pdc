@@ -15,10 +15,47 @@ set(PSEUDOD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH
         "Directory under which the PseudoD modules live")
 set(PSEUDOD_CFLAGS "-O1;-fno-var-tracking-assignments" CACHE STRING
         "Compiler options used to compile PseudoD-generated C files")
+set(PSEUDOD_LDFLAGS "" CACHE STRING
+        "Compiler options used to link PseudoD-generated C files")
+set(PSEUDOD_LIBS "" CACHE STRING
+        "Libraries to link into PseudoD-generated C files")
 
 # Path to the deps.lua script
 set(PDC_DEPS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua" CACHE FILEPATH
         "Path to deps.lua script")
+
+if(NOT DEFINED PSEUDOD_CURRENT_TOOLCHAIN)
+    set(PSEUDOD_CURRENT_TOOLCHAIN PSEUDOD_INFER_TOOLCHAIN)
+endif()
+
+set(PSEUDOD_INFER_TOOLCHAIN_NAME "Toolchain Inferido")
+set(PSEUDOD_INFER_TOOLCHAIN_DESC "Debes configurar PSEUDOD_CURRENT_TOOLCHAIN para usar otro toolchain")
+set(PSEUDOD_INFER_TOOLCHAIN_PDC "${PDC_EXECUTABLE}")
+set(PSEUDOD_INFER_TOOLCHAIN_C_LIBS "-lpdcrt")
+
+function(pseudod_load_toolchain prefix contents)
+    set(rest "${contents}")
+    set("${prefix}_NAME" "<nombre desconocido>" PARENT_SCOPE)
+    set("${prefix}_PDC" "<>" PARENT_SCOPE)
+    while(rest)
+        string(REGEX MATCH "^([^\n]*)\n?(.*)$" _ "${rest}")
+        set(line "${CMAKE_MATCH_1}")
+        set(rest "${CMAKE_MATCH_2}")
+
+        if(line MATCHES "^([-a-zA-Z0-9_]+)[ \t]*:[ \t]*(.*)$")
+            set(key "${CMAKE_MATCH_1}")
+            set(value "${CMAKE_MATCH_2}")
+            string(TOUPPER "${key}" KEY)
+            set("${prefix}_${KEY}" "${value}" PARENT_SCOPE)
+        elseif(line MATCHES "^[ \t]*$")
+            # Ignore empty line
+        elseif(line MATCHES "^[ \t]*#.*$")
+            # Ignore comment
+        else()
+            message(WARNING "Invalid line in PseudoD toolchain file: '${line}'")
+        endif()
+    endwhile()
+endfunction()
 
 function(_pseudod_get_direct_dependencies source_file outvar)
     execute_process(
@@ -77,7 +114,7 @@ function(pseudod_collection pdcoll)
 endfunction()
 
 function(add_pseudod_compile new_target_name)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "ALL" "ENTRY" "COLLECTIONS")
+    cmake_parse_arguments(PARSE_ARGV 0 arg "ALL" "" "COLLECTIONS")
 
     set(all_cfiles "")
 
@@ -115,7 +152,7 @@ function(add_pseudod_compile new_target_name)
 
             add_custom_command(
                     OUTPUT "${ifile}" "${cfile}"
-                    COMMAND ${PDC_EXECUTABLE}
+                    COMMAND ${${PSEUDOD_CURRENT_TOOLCHAIN}_PDC}
                     -Sc
                     -Zid "pdzi${module_id}"
                     "${package}/${module}:${sfile}"
@@ -183,12 +220,16 @@ function(add_pseudod_executable cc_new_target_name)
     set_source_files_properties(${other_cfiles} ${entry_cfile} PROPERTIES GENERATED TRUE)
 
     add_library("${cc_new_target_name}_int" INTERFACE)
-    target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS})
+    target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_CFLAGS})
+    target_include_directories("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_INCLUDEDIRS})
+    target_link_libraries("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LIBS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBNAMES})
+    target_link_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBDIRS})
+    target_link_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LDFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LDFLAGS})
     add_library("${cc_new_target_name}_obj" OBJECT ${entry_cfile})
     target_compile_definitions("${cc_new_target_name}_obj" PRIVATE PDCRT_MAIN)
-    target_link_libraries("${cc_new_target_name}_obj" PUBLIC pdcrt "${cc_new_target_name}_int")
+    target_link_libraries("${cc_new_target_name}_obj" PUBLIC "${cc_new_target_name}_int")
     add_executable("${cc_new_target_name}" ${other_cfiles} $<TARGET_OBJECTS:${cc_new_target_name}_obj>)
-    target_link_libraries("${cc_new_target_name}" PUBLIC pdcrt "${cc_new_target_name}_int")
+    target_link_libraries("${cc_new_target_name}" PUBLIC "${cc_new_target_name}_int")
 
     if(arg_DEPENDS)
         add_dependencies("${cc_new_target_name}" "${arg_DEPENDS}")

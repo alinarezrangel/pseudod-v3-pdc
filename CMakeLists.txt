@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
-project(pdcrt
+project(pseudod-pdc
   VERSION 1.0.0
-  DESCRIPTION "El runtime de PseudoD"
+  DESCRIPTION "Compilador y runtime de PseudoD"
   HOMEPAGE_URL "https://github.com/alinarezrangel/pseudod-v3-pdc"
   LANGUAGES C
 )
@@ -18,12 +18,24 @@ include(CMakePackageConfigHelpers)
 include(ExternalProject)
 include("./cmake/PseudoD2.cmake")
 
-add_subdirectory(build-stage0)
+set(TOOL_PREFIX "" CACHE STRING
+        "Variable con el prefijo de las bibliotecas y ejecutables.")
+
+set(PSEUDOD_TOOLCHAIN "" CACHE STRING
+        "Determina que toolchain de PseudoD será utilizado. Véase `docs/cmake.md` para más información.")
+
+if(NOT PSEUDOD_TOOLCHAIN STREQUAL "")
+    file(READ "${PSEUDOD_TOOLCHAIN}" toolchain)
+    pseudod_load_toolchain(CUSTOM_PSEUDOD_TOOLCHAIN "${toolchain}")
+    set(PSEUDOD_CURRENT_TOOLCHAIN CUSTOM_PSEUDOD_TOOLCHAIN)
+else()
+    message(NOTICE "PSEUDOD_TOOLCHAIN no fue especificado, usando el toolchain inferido")
+endif()
 
 option(PDCRT_ASAN "Activa ASan" OFF)
 option(PDCRT_UBSAN "Activa UBSan" OFF)
 
-add_library(pdcrt STATIC
+add_library(pdcrt_lib STATIC
         runtime/c/pdcrt/pdcrt.c
         runtime/c/pdcrt/pdcrt.h
         runtime/c/pdcrt/pdcrt_base.c
@@ -46,18 +58,20 @@ add_library(pdcrt STATIC
         runtime/c/pdcrt/pdcrt_impls/archivo.c
         runtime/c/pdcrt/pdcrt_impls/archivo.h)
 
-target_include_directories(pdcrt PRIVATE libs/systemtap)
-target_compile_options(pdcrt PRIVATE $<$<CONFIG:Debug>:-O1>)
+set_target_properties(pdcrt_lib PROPERTIES OUTPUT_NAME "${TOOL_PREFIX}pdcrt")
 
-target_link_libraries(pdcrt INTERFACE m)
+target_include_directories(pdcrt_lib PRIVATE libs/systemtap)
+target_compile_options(pdcrt_lib PRIVATE $<$<CONFIG:Debug>:-O1>)
+
+target_link_libraries(pdcrt_lib INTERFACE m)
 
 if(PDCRT_ASAN)
-    target_compile_options(pdcrt PUBLIC -fsanitize=address)
-    target_link_options(pdcrt PUBLIC -fsanitize=address)
+    target_compile_options(pdcrt_lib PUBLIC -fsanitize=address)
+    target_link_options(pdcrt_lib PUBLIC -fsanitize=address)
 endif()
 if(PDCRT_UBSAN)
-    target_compile_options(pdcrt PUBLIC -fsanitize=undefined)
-    target_link_options(pdcrt PUBLIC -fsanitize=undefined)
+    target_compile_options(pdcrt_lib PUBLIC -fsanitize=undefined)
+    target_link_options(pdcrt_lib PUBLIC -fsanitize=undefined)
 endif()
 
 function(feature_test feat_name probe_file)
@@ -90,35 +104,7 @@ cmake_dependent_option(PDCRT_DBG_GC "Activa la depuración del recolector de bas
 cmake_dependent_option(PDCRT_DBG_NO_K "Desactiva el uso de continuaciones" ON PDCRT_DBG OFF)
 cmake_dependent_option(PDCRT_EMP_INTR "Activa la intercepción de las operaciones de la pila" OFF PDCRT_DBG OFF)
 
-option(PDCRT_DTRACE "Activa la integración con DTrace / SystemTap" OFF)
-
-# NOTA: Cuando actualice mi CMake a 4.1, todo lo siguiente se podría cambiar
-# por un `find_program(... VALIDATE ...)`
-set(PDC "PDC-NOTFOUND" CACHE STRING "Compilador de PseudoD a utilizar")
-
-if(PDC STREQUAL "PDC-NOTFOUND")
-  message(STATUS "Finding default PDC")
-
-  find_program(PDC_PATH pdc NO_CACHE)
-
-  execute_process(
-    COMMAND "${PDC_PATH}" -I backends
-    RESULT_VARIABLE PDC_STATUS
-    OUTPUT_VARIABLE PDC_BACKENDS
-  )
-
-  set(FOUND_PDC OFF)
-  if(NOT PDC_STATUS)  # 0 if ok
-    if(PDC_BACKENDS MATCHES "(^|\n)cc($|\n)")
-      set(PDC "${PDC_PATH}" CACHE STRING "Compilador de PseudoD a utilizar" FORCE)
-      set(FOUND_PDC ON)
-    endif()
-  endif()
-
-  if(NOT FOUND_PDC)
-    message(FATAL_ERROR "No pude detectar un compilador de PseudoD que pueda compilar a C. Configura manualmente la variable PDC")
-  endif()
-endif()
+option(PDCRT_DTRACE "Activa la integración con DTrace / SystemTap" ON)
 
 set(PDCRT_PUBLIC_INCLUDES "${CMAKE_CURRENT_BINARY_DIR}/public-includes")
 
@@ -130,11 +116,7 @@ configure_file(
   @ONLY
 )
 
-set_target_properties(pdcrt PROPERTIES
-  PUBLIC_HEADER "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h;${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/pdcrt/pdffi.h"
-)
-
-target_include_directories(pdcrt PUBLIC
+target_include_directories(pdcrt_lib PUBLIC
   "$<BUILD_INTERFACE:${PDCRT_PUBLIC_INCLUDES}>"
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtime/c/>"
   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
@@ -145,7 +127,7 @@ set(PDCRT_RUNTIME_OUT "${CMAKE_CURRENT_BINARY_DIR}/runtime.c")
 
 add_custom_command(
   OUTPUT "${PDCRT_RUNTIME_OUT}"
-  COMMAND ${PDC}
+  COMMAND $<TARGET_FILE:pdc>
         -Sc
         -Zid pdcrt_runtime
         -fno-builtin
@@ -161,7 +143,7 @@ add_custom_command(
 set_source_files_properties("${PDCRT_RUNTIME_OUT}" PROPERTIES
         GENERATED TRUE
         COMPILE_OPTIONS "${PSEUDOD_CFLAGS}")
-target_sources(pdcrt PRIVATE "${PDCRT_RUNTIME_OUT}")
+target_sources(pdcrt_lib PRIVATE "${PDCRT_RUNTIME_OUT}")
 
 include("./pdc.cmake")
 
@@ -171,13 +153,19 @@ file(MAKE_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}")
 ExternalProject_Add(inner_pdc_cgen
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/inner_pdc"
         BINARY_DIR "${PSEUDOD_CURRENT_BINARY_DIR}"
+        CMAKE_ARGS
+        "-DPSEUDOD_TOOLCHAIN=${PSEUDOD_TOOLCHAIN}"
         CMAKE_CACHE_ARGS
-        "-DPDC:STRING=${PDC}"
         "-DPSEUDOD_CFLAGS:STRING=${PSEUDOD_CFLAGS}"
         "-DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}"
         "-DPSEUDOD_SOURCE_DIR:STRING=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DPSEUDOD_CURRENT_BINARY_DIR:STRING=${PSEUDOD_CURRENT_BINARY_DIR}"
         "-DPDC_DEPS_SCRIPT:STRING=${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua"
+        "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
+        "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
+        "-DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}"
+        "-DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}"
+        "-DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}"
         INSTALL_COMMAND ""
         USES_TERMINAL_BUILD ON
         BUILD_ALWAYS ON
@@ -190,6 +178,8 @@ add_pseudod_executable(pdc
         DEPENDS inner_pdc_cgen
 )
 
+set_target_properties(pdc PROPERTIES OUTPUT_NAME "${TOOL_PREFIX}pdc")
+
 if(PDCRT_ASAN)
   target_compile_options(pdc_int INTERFACE -fsanitize=address)
   target_link_options(pdc_int INTERFACE -fsanitize=address)
@@ -199,4 +189,40 @@ if(PDCRT_UBSAN)
   target_link_options(pdc_int INTERFACE -fsanitize=undefined)
 endif()
 
-add_custom_target(default_target ALL DEPENDS pdcrt pdc)
+configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain.txt.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/toolchain.txt"
+        @ONLY
+)
+
+configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/local-toolchain.txt.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/local-toolchain.txt"
+        @ONLY
+)
+
+add_custom_target(default_target ALL DEPENDS pdcrt_lib pdc)
+
+# ===================================================================
+
+install(TARGETS pdc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(TARGETS pdcrt_lib
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TOOL_PREFIX}pdc
+)
+
+install(DIRECTORY runtime/c/pdcrt/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TOOL_PREFIX}pdc/pdcrt
+        FILES_MATCHING PATTERN "*.h"
+)
+
+install(FILES "${PDCRT_PUBLIC_INCLUDES}/pdcrt-plataforma.h"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TOOL_PREFIX}pdc/
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/toolchain.txt"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/${TOOL_PREFIX}pdc
+)
