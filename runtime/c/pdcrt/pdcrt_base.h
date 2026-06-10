@@ -76,6 +76,13 @@ void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
 #  else
 #    define PDCRT_INALCANZABLE() abort()
 #  endif
+#  if __has_builtin(__builtin_expect)
+#    define PDCRT_MUY_PROBABLE(cond) __builtin_expect((cond), 1)
+#    define PDCRT_POCO_PROBABLE(cond) __builtin_expect((cond), 0)
+#  else
+#    define PDCRT_MUY_PROBABLE(cond) (cond)
+#    define PDCRT_POCO_PROBABLE(cond) (cond)
+#  endif
 #else
 #  error builtins needed
 #endif

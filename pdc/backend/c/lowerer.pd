@@ -146,16 +146,24 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
     EmitirLínea: puerto, {PDCRT_ALOJAR_MARCO(ctx, }, func#númRegistros, {, args, k, func_srcloc);}
     variables fid, idcVariadic, numRaíces
     fijar fid a NombreDeLaEstructuraConParámetros: identificadorDelMódulo, func#id
-    EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
     fijar idcVariadic a BuscarPredicado: 0, func#parámetros, (MétodoComoFunción: {esVariadic})
-    EmitirLínea: puerto,
-                 «static const struct », fid,
-                 « pdc_params = { .base = { .num_params = », func#parámetros#longitud,
-                 «, .tiene_variadic = », ((no EsNulo: idcVariadic)#escoger: {true}, {false}),
-                 «, .idc_variadic = », ((EsNulo: idcVariadic)#escoger: 0, idcVariadic),
-                 «, }, .params = {», (Unir: (Mapear: func#parámetros, funcion: p devolver «{~t}»#formatear: p#registro finfuncion), {, }),
-                 «} };»
-    EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
+    si (func#parámetros#longitud =< 6) && (EsNulo: idcVariadic)
+        EmitirLínea: puerto, {if(PDCRT_POCO_PROBABLE(args != }, func#parámetros#longitud, {)) pdcrt_errortb(ctx, m, u8"función llamada de forma inválida");}
+        ParaCadaElementoConÍndice: func#parámetros, procedimiento: p, i
+            [ TODO: barrera de escritura ]
+            EmitirLínea: puerto, {m->registros[}, p#registro, {] = pdcrt_obj_desde_xmm(a}, (i + 1), {);}
+        finprocedimiento
+    sino
+        EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
+        EmitirLínea: puerto,
+                     «static const struct », fid,
+                     « pdc_params = { .base = { .num_params = », func#parámetros#longitud,
+                     «, .tiene_variadic = », ((no EsNulo: idcVariadic)#escoger: {true}, {false}),
+                     «, .idc_variadic = », ((EsNulo: idcVariadic)#escoger: 0, idcVariadic),
+                     «, }, .params = {», (Unir: (Mapear: func#parámetros, funcion: p devolver «{~t}»#formatear: p#registro finfuncion), {, }),
+                     «} };»
+        EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
+    finsi
     fijar numRaíces a Iter#Máximo: (Mapear: func#instrucciones, funcion: tupla
         devolver (tupla#en: 0)#numRaíces
     finfuncion)

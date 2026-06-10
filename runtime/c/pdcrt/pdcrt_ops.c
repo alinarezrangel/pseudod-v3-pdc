@@ -361,6 +361,7 @@ void pdcrt_params(pdcrt_ctx *ctx,
                   pdcrt_params_data *restrict p,
                   PDCRT_F_IMM)
 {
+    // TODO: barrera de escritura
     if(!p->base.tiene_variadic)
     {
         if(m->args != p->base.num_params)

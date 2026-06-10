@@ -49,6 +49,14 @@ typedef struct pdcrt_tk pdcrt_tk;
 #define PDCRT_N_IMM 8
 #define PDCRT_NN_IMM 6
 
+#ifdef PDCRT_DBG_NO_K
+#define PDCRT_FUNC_DECL
+#define PDCRT_K_DECL
+#else
+#define PDCRT_FUNC_DECL _Noreturn
+#define PDCRT_K_DECL _Noreturn
+#endif
+
 typedef pdcrt_tk (*pdcrt_f)(pdcrt_ctx *, int args, pdcrt_k k, PDCRT_F_IMM);
 typedef pdcrt_tk (*pdcrt_kf)(pdcrt_ctx *, pdcrt_marco *, __m128i res);
 
