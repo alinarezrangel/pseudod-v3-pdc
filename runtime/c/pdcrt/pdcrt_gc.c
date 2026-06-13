@@ -174,29 +174,19 @@ void *pdcrt_alojar_rsc(pdcrt_ctx *ctx, pdcrt_gc_raices *m, pdcrt_tipo_obj_gc tip
 
 pdcrt_cabecera_gc *pdcrt_gc_cabecera_de(pdcrt_obj o)
 {
-    switch(pdcrt_tipo_de_obj(o))
+    if(o.recv == &pdcrt_recv_nulo
+        || o.recv == &pdcrt_recv_entero
+        || o.recv == &pdcrt_recv_float
+        || o.recv == &pdcrt_recv_booleano
+        || o.recv == &pdcrt_recv_runtime
+        || o.recv == &pdcrt_recv_voidptr)
     {
-        case PDCRT_TOBJ_NULO:
-        case PDCRT_TOBJ_ENTERO:
-        case PDCRT_TOBJ_FLOAT:
-        case PDCRT_TOBJ_BOOLEANO:
-        case PDCRT_TOBJ_RUNTIME:
-        case PDCRT_TOBJ_VOIDPTR:
-            return NULL;
-        case PDCRT_TOBJ_MARCO:
-        case PDCRT_TOBJ_TEXTO:
-        case PDCRT_TOBJ_ARREGLO:
-        case PDCRT_TOBJ_CLOSURE:
-        case PDCRT_TOBJ_CAJA:
-        case PDCRT_TOBJ_TABLA:
-        case PDCRT_TOBJ_ESPACIO_DE_NOMBRES:
-        case PDCRT_TOBJ_VALOP:
-        case PDCRT_TOBJ_CORRUTINA:
-        case PDCRT_TOBJ_INSTANCIA:
-        case PDCRT_TOBJ_REUBICADO:
-            return o.gc;
+        return NULL;
     }
-    PDCRT_ASSERT(0 && "inalcanzable");
+    else
+    {
+        return o.gc;
+    }
 }
 
 static pdcrt_cabecera_gc *pdcrt_gc_reubicar(pdcrt_ctx *ctx, pdcrt_cabecera_gc *h)
