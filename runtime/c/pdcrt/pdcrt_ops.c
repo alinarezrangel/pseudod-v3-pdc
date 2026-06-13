@@ -220,12 +220,12 @@ extern pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt_gc_ra
 pdcrt_entero pdcrt_obtener_entero_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
 {
     *ok = false;
-    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_ENTERO)
+    if(o.recv == &pdcrt_recv_entero)
     {
         *ok = true;
         return o.ival;
     }
-    else if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_FLOAT)
+    else if(o.recv == &pdcrt_recv_float)
     {
         int exp = 0;
         PDCRT_FLOAT_FREXP(o.fval, &exp);
@@ -260,7 +260,7 @@ pdcrt_entero pdcrt_obtener_entero_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
 pdcrt_float pdcrt_obtener_float_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
 {
     *ok = false;
-    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_ENTERO)
+    if(o.recv == &pdcrt_recv_entero)
     {
         // ReSharper disable once CppDFAUnreachableCode
         if(PDCRT_FLOAT_MANT_DIG >= PDCRT_ENTERO_BITS)
@@ -281,7 +281,7 @@ pdcrt_float pdcrt_obtener_float_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
             }
         }
     }
-    else if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_FLOAT)
+    else if(o.recv == &pdcrt_recv_float)
     {
         *ok = true;
         return o.fval;
@@ -292,7 +292,7 @@ pdcrt_float pdcrt_obtener_float_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
 
 size_t pdcrt_obtener_tam_texto_obj(pdcrt_ctx *ctx, pdcrt_obj o, bool *ok)
 {
-    if(pdcrt_tipo_de_obj(o) == PDCRT_TOBJ_TEXTO)
+    if(o.recv == &pdcrt_recv_texto)
     {
         *ok = true;
         return o.texto->longitud;
@@ -477,7 +477,7 @@ size_t pdcrt_expandir_varargs(pdcrt_ctx *ctx, const int* proto, size_t nproto)
         if(p == 1)
         {
             pdcrt_obj val = ctx->pila[ctx->tam_pila - (nproto - i)];
-            pdcrt_debe_tener_tipo(ctx, val, PDCRT_TOBJ_ARREGLO);
+            pdcrt_debe_tener_tipo_rapido(ctx, val, &pdcrt_recv_arreglo);
             nargs_extra += val.arreglo->longitud;
         }
     }
@@ -764,7 +764,7 @@ pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size
     PDCRT_GUARDAR_RAIZ_CABECERA(0, m);
     pdcrt_obj onombre = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), nombre, tam_nombre));
     PDCRT_CARGAR_RAIZ_CABECERA(0, m);
-    pdcrt_debe_tener_tipo(ctx, ctx->registro_de_espacios_de_nombres, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, ctx->registro_de_espacios_de_nombres, &pdcrt_recv_tabla);
     pdcrt_obj ovalor = pdcrt_objeto_nulo();
     bool contiene = pdcrt_tabla_en(ctx, ctx->registro_de_espacios_de_nombres.tabla, onombre, &ovalor);
     if(contiene)
@@ -773,7 +773,7 @@ pdcrt_tk pdcrt_importar(pdcrt_ctx *ctx, pdcrt_marco *m, const char *nombre, size
     }
     else
     {
-        pdcrt_debe_tener_tipo(ctx, ctx->registro_de_modulos, PDCRT_TOBJ_TABLA);
+        pdcrt_debe_tener_tipo_rapido(ctx, ctx->registro_de_modulos, &pdcrt_recv_tabla);
         contiene = pdcrt_tabla_en(ctx, ctx->registro_de_modulos.tabla, onombre, &ovalor);
         if(!contiene)
         {
@@ -817,7 +817,7 @@ pdcrt_tk pdcrt_extraerv(pdcrt_ctx *ctx,
                         pdcrt_kf kf)
 {
     PDCRT_DEFINE_RAICES(2);
-    pdcrt_debe_tener_tipo(ctx, mod, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, mod, &pdcrt_recv_tabla);
 
     PDCRT_GUARDAR_RAIZ(0, mod);
     PDCRT_GUARDAR_RAIZ_CABECERA(1, m);
@@ -830,7 +830,7 @@ pdcrt_tk pdcrt_extraerv(pdcrt_ctx *ctx,
 
     if(contiene)
     {
-        pdcrt_debe_tener_tipo(ctx, ovalor, PDCRT_TOBJ_ARREGLO);
+        pdcrt_debe_tener_tipo_rapido(ctx, ovalor, &pdcrt_recv_arreglo);
         if(ovalor.arreglo->longitud != 2)
             pdcrt_errortb(ctx, m, u8"Extraerv: el valor de un módulo no es un arreglo de 2 elementos");
         return (*kf)(ctx, m, pdcrt_xmm_desde_obj(ovalor.arreglo->valores[0]));
@@ -851,7 +851,7 @@ pdcrt_tk pdcrt_agregar_nombre(pdcrt_ctx *ctx,
                               bool autoejec,
                               pdcrt_kf kf)
 {
-    pdcrt_debe_tener_tipo(ctx, mod, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, mod, &pdcrt_recv_tabla);
     PDCRT_DEFINE_RAICES(4);
 
     PDCRT_GUARDAR_RAIZ(0, mod);
@@ -882,7 +882,7 @@ pdcrt_tk pdcrt_exportar(pdcrt_ctx *ctx,
 {
     PDCRT_PROBE0(exportar);
     PDCRT_DEFINE_RAICES(2);
-    pdcrt_debe_tener_tipo(ctx, ctx->registro_de_espacios_de_nombres, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, ctx->registro_de_espacios_de_nombres, &pdcrt_recv_tabla);
     PDCRT_GUARDAR_RAIZ_CABECERA(0, m);
     PDCRT_GUARDAR_RAIZ(1, mod);
     pdcrt_obj omodulo = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), modulo, tam_modulo));
@@ -952,7 +952,7 @@ pdcrt_obj pdcrt_mk_closure(pdcrt_ctx *ctx,
 
 void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_obj v)
 {
-    pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+    pdcrt_debe_tener_tipo_rapido(ctx, v, &pdcrt_recv_booleano);
     if(!v.bval)
     {
         pdcrt_error(ctx, "necesitas fallido");

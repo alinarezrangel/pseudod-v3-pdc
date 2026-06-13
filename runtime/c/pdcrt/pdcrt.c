@@ -91,9 +91,17 @@ _Noreturn void pdcrt_errortb(pdcrt_ctx *ctx, pdcrt_marco *m, const char* msj)
     pdcrt_error(ctx, msj);
 }
 
-void pdcrt_debe_tener_tipo(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
+void pdcrt_debe_tener_tipo_lento(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_tipo t)
 {
     if(pdcrt_tipo_de_obj(obj) != t)
+    {
+        pdcrt_error(ctx, "Valor de tipo inesperado");
+    }
+}
+
+void pdcrt_debe_tener_tipo_rapido(pdcrt_ctx *ctx, pdcrt_obj obj, pdcrt_f t)
+{
+    if(obj.recv != t)
     {
         pdcrt_error(ctx, "Valor de tipo inesperado");
     }
@@ -111,68 +119,53 @@ bool pdcrt_es_primitivo(pdcrt_ctx *ctx, pdcrt_obj o)
 {
     (void) ctx;
 
-    switch(pdcrt_tipo_de_obj(o))
-    {
-    case PDCRT_TOBJ_ENTERO:
-    case PDCRT_TOBJ_FLOAT:
-    case PDCRT_TOBJ_TEXTO:
-    case PDCRT_TOBJ_BOOLEANO:
-    case PDCRT_TOBJ_NULO:
-        return true;
-    default:
-        return false;
-    }
+    return o.recv == &pdcrt_recv_entero
+        || o.recv == &pdcrt_recv_float
+        || o.recv == &pdcrt_recv_texto
+        || o.recv == &pdcrt_recv_booleano
+        || o.recv == &pdcrt_recv_nulo;
 }
 
 pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
 {
-    switch(pdcrt_tipo_de_obj(o))
-    {
-        case PDCRT_TOBJ_ENTERO:
-            return pdcrt_hash_entero(o.ival);
-        case PDCRT_TOBJ_FLOAT:
-            return pdcrt_hash_float(o.fval);
-        case PDCRT_TOBJ_TEXTO:
-            return pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud);
-        case PDCRT_TOBJ_BOOLEANO:
-            return o.bval ? 0 : 1;
-        case PDCRT_TOBJ_NULO:
-            return 2;
-        default:
-            pdcrt_error(ctx, "No se puede hashear objeto de ese tipo");
-    }
+    if(o.recv == &pdcrt_recv_entero)
+        return pdcrt_hash_entero(o.ival);
+    else if(o.recv == &pdcrt_recv_float)
+        return pdcrt_hash_float(o.fval);
+    else if(o.recv == pdcrt_recv_texto)
+        return pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud);
+    else if(o.recv == &pdcrt_recv_booleano)
+        return o.bval ? 0 : 1;
+    else if(o.recv == &pdcrt_recv_nulo)
+        return 2;
+    else
+        pdcrt_error(ctx, "No se puede hashear objeto de ese tipo");
 }
 
 bool pdcrt_igualdad(pdcrt_ctx *ctx, pdcrt_obj a, pdcrt_obj b)
 {
     (void) ctx;
 
-    pdcrt_tipo ta = pdcrt_tipo_de_obj(a);
-    pdcrt_tipo tb = pdcrt_tipo_de_obj(b);
-
-    if(ta == tb)
+    if(a.recv == b.recv)
     {
-        switch(ta)
-        {
-        case PDCRT_TOBJ_ENTERO:
+        if(a.recv == &pdcrt_recv_entero)
             return a.ival == b.ival;
-        case PDCRT_TOBJ_FLOAT:
+        else if(a.recv == &pdcrt_recv_float)
             return a.fval == b.fval;
-        case PDCRT_TOBJ_BOOLEANO:
+        else if(a.recv == &pdcrt_recv_booleano)
             return a.bval == b.bval;
-        case PDCRT_TOBJ_NULO:
+        else if(a.recv == &pdcrt_recv_nulo)
             return true;
-        case PDCRT_TOBJ_TEXTO:
+        else if(a.recv == &pdcrt_recv_texto)
             return pdcrt_comparar_textos(a.texto, b.texto);
-        default:
+        else
             return false;
-        }
     }
-    else if(ta == PDCRT_TOBJ_ENTERO && tb == PDCRT_TOBJ_FLOAT)
+    else if(a.recv == &pdcrt_recv_entero && b.recv == &pdcrt_recv_float)
     {
         return pdcrt_comparar_entero_y_float(a.ival, b.fval, PDCRT_IGUAL_A);
     }
-    else if(ta == PDCRT_TOBJ_FLOAT && tb == PDCRT_TOBJ_ENTERO)
+    else if(a.recv == &pdcrt_recv_float && b.recv == &pdcrt_recv_entero)
     {
         return pdcrt_comparar_entero_y_float(b.ival, a.fval, PDCRT_IGUAL_A);
     }
@@ -708,7 +701,7 @@ void pdcrt_fijar_argv(pdcrt_ctx *ctx, int argc, char **argv)
 pdcrt_obj pdcrt_convertir_a_espacio_de_nombres(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj mod)
 {
     (void) m;
-    pdcrt_debe_tener_tipo(ctx, mod, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, mod, &pdcrt_recv_tabla);
     return pdcrt_objeto_espacio_de_nombres(mod.tabla);
 }
 
@@ -761,7 +754,7 @@ bool pdcrt_son_identicos(pdcrt_ctx *ctx, pdcrt_marco *m, pdcrt_obj x, pdcrt_obj 
 {
     (void) ctx;
     (void) m;
-    if(pdcrt_tipo_de_obj(x) != pdcrt_tipo_de_obj(y))
+    if(x.recv != y.recv)
     {
         return false;
     }

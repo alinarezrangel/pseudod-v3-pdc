@@ -13,7 +13,7 @@ pdcrt_tk pdcrt_recv_archivo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_archivo);
 
@@ -122,7 +122,7 @@ pdcrt_tk pdcrt_recv_archivo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Archivo: escribirTexto necesita 1 argumento");
         pdcrt_obj txt = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, txt, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, txt, &pdcrt_recv_texto);
         pdcrt_rsc_archivo *arch = (void *) oyo.valop->datos;
         if(arch->archivo == NULL)
             pdcrt_errortb(ctx, k.marco, u8"El archivo no está abierto");

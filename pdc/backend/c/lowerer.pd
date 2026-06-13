@@ -362,7 +362,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
     si opcode = Opcode#prn
         EmitirLínea: puerto, «do {»
         EmitirLínea: puerto, {pdcrt_obj v = pdcrt_obtener_local(ctx, m, }, (tupla#en: 1), {);}
-        EmitirLínea: puerto, {pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_TEXTO);}
+        EmitirLínea: puerto, {pdcrt_debe_tener_tipo_rapido(ctx, v, &pdcrt_recv_texto);}
         EmitirLínea: puerto, {printf("%.*s", (int) v.texto->longitud, v.texto->contenido);}
         EmitirLínea: puerto, «} while(0);»
     finsi

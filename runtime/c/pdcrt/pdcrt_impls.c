@@ -25,7 +25,7 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
 {
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE1(fallback_a_clase, clase);
 
@@ -55,18 +55,18 @@ static pdcrt_tk pdcrt_recv_fallback_a_clase(pdcrt_ctx *ctx, int args, pdcrt_k k,
         break;
     }
 
-    if(pdcrt_tipo_de_obj(oclase) == PDCRT_TOBJ_NULO)
+    if(oclase.recv == &pdcrt_recv_nulo)
     {
         pdcrt_inspeccionar_texto(omsj.texto);
         pdcrt_errortb(ctx, k.marco, "Método no encontrado");
     }
-    pdcrt_debe_tener_tipo(ctx, oclase, PDCRT_TOBJ_INSTANCIA);
+    pdcrt_debe_tener_tipo_rapido(ctx, oclase, &pdcrt_recv_instancia);
 
     if(oclase.inst->num_atributos != 6)
         pdcrt_errortb(ctx, k.marco, "La clase debe tener 6 atributos");
 
     pdcrt_obj metodos_inst = oclase.inst->atributos[2];
-    pdcrt_debe_tener_tipo(ctx, metodos_inst, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, metodos_inst, &pdcrt_recv_tabla);
 
     pdcrt_obj metodo = pdcrt_objeto_nulo();
     bool contiene = pdcrt_tabla_en(ctx, metodos_inst.tabla, omsj, &metodo);
@@ -96,7 +96,7 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_entero);
 
@@ -120,11 +120,10 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): al sumar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_entero(oyo.ival + otro.ival);
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) + otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (entero): solo se pueden sumar dos números");
@@ -137,11 +136,10 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): al restar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_entero(oyo.ival - otro.ival);
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) - otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (entero): solo se pueden restar dos números");
@@ -154,11 +152,10 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): al multiplicar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_entero(oyo.ival * otro.ival);
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(((pdcrt_float) oyo.ival) * otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (entero): solo se pueden multiplicar dos números");
@@ -171,15 +168,14 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): al dividir se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
         {
             if(otro.ival == 0)
                 pdcrt_errortb(ctx, k.marco, u8"división por 0");
             res = pdcrt_objeto_entero(((pdcrt_float) oyo.ival) / ((pdcrt_float) otro.ival));
         }
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
         {
             if(otro.fval == 0)
                 pdcrt_errortb(ctx, k.marco, u8"división por 0.0");
@@ -199,9 +195,9 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): operador_= / igualA necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
+        if(arg.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_booleano(oyo.ival == arg.ival);
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
+        else if(arg.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, PDCRT_IGUAL_A));
         else
             res = pdcrt_objeto_booleano(false);
@@ -215,9 +211,9 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
+        if(arg.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_booleano(oyo.ival != arg.ival);
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
+        else if(arg.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_booleano(!pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, PDCRT_IGUAL_A));
         else
             res = pdcrt_objeto_booleano(true);
@@ -232,9 +228,9 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): "opms" / "ms" necesitan 1 argumento"); \
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                        \
         pdcrt_obj res = pdcrt_objeto_nulo();                            \
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                 \
+        if(arg.recv == &pdcrt_recv_entero)                 \
             res = pdcrt_objeto_booleano(oyo.ival op arg.ival);          \
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)             \
+        else if(arg.recv == &pdcrt_recv_float)             \
             res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(oyo.ival, arg.fval, cmp)); \
         else                                                            \
             pdcrt_errortb(ctx, k.marco, u8"Numero (entero): "opms" / "ms" solo pueden comparar dos números"); \
@@ -299,9 +295,9 @@ pdcrt_tk pdcrt_recv_entero(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (entero): "nm" acepta solo un argumento");      \
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                                     \
         pdcrt_obj res = pdcrt_objeto_nulo();                                         \
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                              \
+        if(arg.recv == &pdcrt_recv_entero)                              \
             res = pdcrt_objeto_entero(oyo.ival op arg.ival);                         \
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)                          \
+        else if(arg.recv == &pdcrt_recv_float)                          \
             res = pdcrt_objeto_entero(oyo.ival op (pdcrt_entero) arg.fval);          \
         else                                                                         \
             pdcrt_errortb(ctx, k.marco, "Argumento de tipo inesperado");                        \
@@ -324,7 +320,7 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_float);
 
@@ -347,11 +343,10 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (float): al sumar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_float(oyo.fval + ((pdcrt_float) otro.ival));
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(oyo.fval + otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (float): solo se pueden sumar dos números");
@@ -364,11 +359,10 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (float): al restar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_float(oyo.fval - ((pdcrt_float) otro.ival));
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(oyo.fval - otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (float): solo se pueden restar dos números");
@@ -382,11 +376,10 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (float): al multiplicar se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_float(oyo.fval * ((pdcrt_float) otro.ival));
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(oyo.fval * otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (float): solo se pueden multiplicar dos números");
@@ -399,11 +392,10 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Numero (float): al dividir se debe especificar un argumento");
         pdcrt_obj otro = pdcrt_obj_desde_xmm(a1);
-        pdcrt_tipo t_otro = pdcrt_tipo_de_obj(otro);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(t_otro == PDCRT_TOBJ_ENTERO)
+        if(otro.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_float(oyo.fval / ((pdcrt_float) otro.ival));
-        else if(t_otro == PDCRT_TOBJ_FLOAT)
+        else if(otro.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_float(oyo.fval / otro.fval);
         else
             pdcrt_errortb(ctx, k.marco, u8"Numero (float): solo se pueden dividir dos números");
@@ -417,9 +409,9 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (float): operador_= / igualA necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
+        if(arg.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_booleano(oyo.fval == arg.fval);
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
+        else if(arg.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(arg.ival, oyo.fval, PDCRT_IGUAL_A));
         else
             res = pdcrt_objeto_booleano(false);
@@ -433,9 +425,9 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (float): operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)
+        if(arg.recv == &pdcrt_recv_float)
             res = pdcrt_objeto_booleano(oyo.fval != arg.fval);
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)
+        else if(arg.recv == &pdcrt_recv_entero)
             res = pdcrt_objeto_booleano(!pdcrt_comparar_entero_y_float(arg.ival, oyo.fval, PDCRT_IGUAL_A));
         else
             res = pdcrt_objeto_booleano(true);
@@ -450,9 +442,9 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (float): "opms" / "ms" necesitan 1 argumento"); \
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                        \
         pdcrt_obj res = pdcrt_objeto_nulo();                            \
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)                  \
+        if(arg.recv == &pdcrt_recv_float)                  \
             res = pdcrt_objeto_booleano(oyo.fval op arg.fval);          \
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)            \
+        else if(arg.recv == &pdcrt_recv_entero)            \
             res = pdcrt_objeto_booleano(pdcrt_comparar_entero_y_float(arg.ival, oyo.fval, rcmp)); \
         else                                                            \
             pdcrt_errortb(ctx, k.marco, u8"Numero (float): "opms" / "ms" solo pueden comparar dos números"); \
@@ -517,9 +509,9 @@ pdcrt_tk pdcrt_recv_float(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Numero (float): "nm" acepta solo un argumento");       \
         pdcrt_obj res = pdcrt_objeto_nulo();                                         \
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);                                     \
-        if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_ENTERO)                              \
+        if(arg.recv == &pdcrt_recv_entero)                              \
             res = pdcrt_objeto_entero(((pdcrt_entero) oyo.fval) op arg.ival);        \
-        else if(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_FLOAT)                          \
+        else if(arg.recv == &pdcrt_recv_float)                          \
             res = pdcrt_objeto_entero(((pdcrt_entero) oyo.fval) op (pdcrt_entero) arg.fval); \
         else                                                                         \
             pdcrt_errortb(ctx, k.marco, "Argumento de tipo inesperado");                        \
@@ -542,7 +534,7 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_booleano);
 
@@ -565,7 +557,7 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Booleano: operador_= / igualA necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_BOOLEANO)
+        if(arg.recv != &pdcrt_recv_booleano)
             res = pdcrt_objeto_booleano(false);
         else
             res = pdcrt_objeto_booleano(oyo.bval == arg.bval);
@@ -579,7 +571,7 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Booleano: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_BOOLEANO)
+        if(arg.recv != &pdcrt_recv_booleano)
             res = pdcrt_objeto_booleano(true);
         else
             res = pdcrt_objeto_booleano(oyo.bval != arg.bval);
@@ -613,7 +605,7 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Booleano: \"||\" necesita 1 argumento");
         pdcrt_obj v = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+        pdcrt_debe_tener_tipo_rapido(ctx, v, &pdcrt_recv_booleano);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
             pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(oyo.bval || v.bval)));
@@ -624,7 +616,7 @@ pdcrt_tk pdcrt_recv_booleano(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Booleano: \"&&\" necesita 1 argumento");
         pdcrt_obj v = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, v, PDCRT_TOBJ_BOOLEANO);
+        pdcrt_debe_tener_tipo_rapido(ctx, v, &pdcrt_recv_booleano);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
             pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(oyo.bval && v.bval)));
@@ -637,7 +629,7 @@ pdcrt_tk pdcrt_recv_marco(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     // [yo, msj, ...#args]
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
     (void) args;
     (void) k;
     PDCRT_ASSERT(0 && "sin implementar");
@@ -654,7 +646,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_texto);
 
@@ -664,7 +656,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Texto: concatenar necesita 1 argumento");
         PDCRT_DEFINE_RAICES(1);
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, arg, &pdcrt_recv_texto);
         size_t bufflen = oyo.texto->longitud + arg.texto->longitud;
         // TODO Optimiza esto
         char *buff = pdcrt_alojar_ctx(ctx, bufflen);
@@ -686,7 +678,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Texto: operador_= / igualA necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_TEXTO)
+        if(arg.recv != &pdcrt_recv_texto)
             res = pdcrt_objeto_booleano(false);
         else
             res = pdcrt_objeto_booleano(pdcrt_comparar_textos(oyo.texto, arg.texto));
@@ -700,7 +692,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Texto: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         pdcrt_obj res = pdcrt_objeto_nulo();
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_TEXTO)
+        if(arg.recv != &pdcrt_recv_texto)
             res = pdcrt_objeto_booleano(true);
         else
             res = pdcrt_objeto_booleano(!pdcrt_comparar_textos(oyo.texto, arg.texto));
@@ -713,7 +705,7 @@ pdcrt_tk pdcrt_recv_texto(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Texto: menorQue / operador_< necesita 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, arg, &pdcrt_recv_texto);
         size_t menor_long;
         if(oyo.texto->longitud <= arg.texto->longitud)
         {
@@ -1012,7 +1004,7 @@ pdcrt_tk pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     // [yo, msj, ...#args]
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     (void) yo;
     PDCRT_PROBE0(recv_nulo);
@@ -1025,7 +1017,7 @@ pdcrt_tk pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
-            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(pdcrt_tipo_de_obj(arg) == PDCRT_TOBJ_NULO)));
+            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(arg.recv == &pdcrt_recv_nulo)));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.distinto)
         || pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.operador_distinto))
@@ -1035,7 +1027,7 @@ pdcrt_tk pdcrt_recv_nulo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
-            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_NULO)));
+            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(arg.recv != &pdcrt_recv_nulo)));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.como_texto))
     {
@@ -1054,7 +1046,7 @@ pdcrt_tk pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_arreglo);
 
@@ -1123,13 +1115,13 @@ pdcrt_tk pdcrt_recv_arreglo(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Arreglo: unir necesita un argumento");
         PDCRT_DEFINE_RAICES(1);
         pdcrt_obj separador = pdcrt_obj_desde_xmm(a1);
-        if(pdcrt_tipo_de_obj(separador) != PDCRT_TOBJ_TEXTO)
+        if(separador.recv != &pdcrt_recv_texto)
             pdcrt_errortb(ctx, k.marco, "Arreglo: el argumento de unir debe ser un texto");
         size_t tam_final = 0;
         for(size_t i = 0; i < oyo.arreglo->longitud; i++)
         {
             pdcrt_obj el = oyo.arreglo->valores[i];
-            if(pdcrt_tipo_de_obj(el) != PDCRT_TOBJ_TEXTO)
+            if(el.recv != &pdcrt_recv_texto)
                 pdcrt_errortb(ctx, k.marco, "Arreglo: los elementos del arreglo deben ser textos");
             tam_final += el.texto->longitud;
             if(i > 0)
@@ -1206,7 +1198,7 @@ pdcrt_tk pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_closure);
 
@@ -1216,7 +1208,7 @@ pdcrt_tk pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Procedimiento: operador_= / igualA necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CLOSURE)
+        if(arg.recv != &pdcrt_recv_closure)
         {
             PDCRT_SACAR_PRELUDIO();
             return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(false)));
@@ -1234,7 +1226,7 @@ pdcrt_tk pdcrt_recv_closure(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Procedimiento: operador_no= / distintoDe necesitan 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CLOSURE)
+        if(arg.recv != &pdcrt_recv_closure)
         {
             PDCRT_SACAR_PRELUDIO();
             return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(true)));
@@ -1276,7 +1268,7 @@ pdcrt_tk pdcrt_recv_caja(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     // [yo, msj, ...#args]
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
     (void) yo;
     (void) args;
     (void) k;
@@ -1292,7 +1284,7 @@ pdcrt_tk pdcrt_recv_tabla(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_tabla);
 
@@ -1451,7 +1443,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     // [yo, msj, ...#args]
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_runtime);
 
@@ -1576,7 +1568,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Runtime: crearDirectorio necesita 1 argumento");
         pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, nombre, &pdcrt_recv_texto);
 
         pdcrt_directorio *dir = NULL;
         pdcrt_opciones_abrir_directorio opciones = {
@@ -1601,7 +1593,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Runtime: borrarDirectorio necesita 1 argumento");
         pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, nombre, &pdcrt_recv_texto);
 
         pdcrt_vio_cadena cnombre = { .ptr = nombre.texto->contenido, .tam = nombre.texto->longitud + 1 };
         pdcrt_io_error ioerr = (*ctx->vio.vtable->op_borrar_directorio_por_ruta)(ctx->vio.ctx, NULL, cnombre);
@@ -1616,7 +1608,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Runtime: borrarArchivo necesita 1 argumento");
         pdcrt_obj nombre = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, nombre, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, nombre, &pdcrt_recv_texto);
 
         pdcrt_vio_cadena cnombre = { .ptr = nombre.texto->contenido, .tam = nombre.texto->longitud + 1 };
         pdcrt_io_error ioerr = (*ctx->vio.vtable->op_borrar_archivo_por_ruta)(ctx->vio.ctx, NULL, cnombre);
@@ -1639,13 +1631,13 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 3)
             pdcrt_errortb(ctx, k.marco, "Runtime: ejecutar necesita 3 argumento");
         pdcrt_obj ejecutable = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, ejecutable, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, ejecutable, &pdcrt_recv_texto);
         pdcrt_obj argumentos = pdcrt_obj_desde_xmm(a2);
         pdcrt_obj entorno = pdcrt_obj_desde_xmm(a3);
 
         pdcrt_vio_cadena *argv = NULL, cmdline = {0};
         size_t tam_argv = 0;
-        if(pdcrt_tipo_de_obj(argumentos) == PDCRT_TOBJ_ARREGLO)
+        if(argumentos.recv == &pdcrt_recv_arreglo)
         {
             tam_argv = sizeof(pdcrt_vio_cadena) * argumentos.arreglo->longitud;
             argv = pdcrt_alojar_ctx(ctx, tam_argv);
@@ -1653,12 +1645,12 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
                 pdcrt_enomem(ctx);
             for(size_t i = 0; i < argumentos.arreglo->longitud; i++)
             {
-                pdcrt_debe_tener_tipo(ctx, argumentos.arreglo->valores[i], PDCRT_TOBJ_TEXTO);
+                pdcrt_debe_tener_tipo_rapido(ctx, argumentos.arreglo->valores[i], &pdcrt_recv_texto);
                 pdcrt_texto *txt = argumentos.arreglo->valores[i].texto;
                 argv[i] = (pdcrt_vio_cadena) { .ptr = txt->contenido, .tam = txt->longitud + 1 };
             }
         }
-        else if(pdcrt_tipo_de_obj(argumentos) == PDCRT_TOBJ_TEXTO)
+        else if(argumentos.recv == &pdcrt_recv_texto)
         {
             cmdline.ptr = argumentos.texto->contenido;
             cmdline.tam = argumentos.texto->longitud + 1;
@@ -1671,7 +1663,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_variable_de_entorno *envp = NULL;
         size_t tam_envp = 0;
         bool heredar_entorno = false;
-        if(pdcrt_tipo_de_obj(entorno) == PDCRT_TOBJ_ARREGLO && entorno.arreglo->longitud > 0)
+        if(entorno.recv == &pdcrt_recv_arreglo && entorno.arreglo->longitud > 0)
         {
             tam_envp = sizeof(pdcrt_variable_de_entorno) * entorno.arreglo->longitud;
             envp = pdcrt_alojar_ctx(ctx, tam_envp);
@@ -1680,7 +1672,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 
             for(size_t i = 0; i < entorno.arreglo->longitud; i++)
             {
-                pdcrt_debe_tener_tipo(ctx, entorno.arreglo->valores[i], PDCRT_TOBJ_TEXTO);
+                pdcrt_debe_tener_tipo_rapido(ctx, entorno.arreglo->valores[i], &pdcrt_recv_texto);
                 pdcrt_texto *txt = entorno.arreglo->valores[i].texto;
                 size_t eq = SIZE_MAX;
                 for(size_t j = 0; j < txt->longitud; j++)
@@ -1708,7 +1700,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
                 }
             }
         }
-        else if(pdcrt_tipo_de_obj(entorno) == PDCRT_TOBJ_NULO)
+        else if(entorno.recv == &pdcrt_recv_nulo)
         {
             heredar_entorno = true;
         }
@@ -1777,7 +1769,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Runtime: obtenerVariableDeEntorno necesita 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, arg, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, arg, &pdcrt_recv_texto);
         pdcrt_vio_cadena nombre = {
             .ptr = arg.texto->contenido, .tam = arg.texto->longitud + 1,
         };
@@ -1830,7 +1822,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Runtime: atributosDeInstancia necesita 1 argumento");
         pdcrt_obj inst = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, inst, PDCRT_TOBJ_INSTANCIA);
+        pdcrt_debe_tener_tipo_rapido(ctx, inst, &pdcrt_recv_instancia);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
             pdcrt_xmm_desde_obj(pdcrt_objeto_entero((pdcrt_entero) inst.inst->num_atributos)));
@@ -1840,7 +1832,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, u8"Runtime: obtenerMétodos necesita 1 argumento");
         pdcrt_obj inst = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, inst, PDCRT_TOBJ_INSTANCIA);
+        pdcrt_debe_tener_tipo_rapido(ctx, inst, &pdcrt_recv_instancia);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(inst.inst->metodos));
     }
@@ -1849,7 +1841,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 2)
             pdcrt_errortb(ctx, k.marco, "Runtime: obtenerAtributo necesita 2 argumentos");
         pdcrt_obj inst = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, inst, PDCRT_TOBJ_INSTANCIA);
+        pdcrt_debe_tener_tipo_rapido(ctx, inst, &pdcrt_recv_instancia);
         bool ok = false;
         pdcrt_entero atr = pdcrt_obtener_entero_obj(ctx, pdcrt_obj_desde_xmm(a2), &ok);
         if(!ok)
@@ -1864,7 +1856,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 3)
             pdcrt_errortb(ctx, k.marco, "Runtime: fijarAtributo necesita 3 argumentos");
         pdcrt_obj inst = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, inst, PDCRT_TOBJ_INSTANCIA);
+        pdcrt_debe_tener_tipo_rapido(ctx, inst, &pdcrt_recv_instancia);
         bool ok = false;
         pdcrt_entero atr = pdcrt_obtener_entero_obj(ctx, pdcrt_obj_desde_xmm(a2), &ok);
         if(!ok)
@@ -1884,7 +1876,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         pdcrt_obj inst = pdcrt_obj_desde_xmm(a1);
         PDCRT_SACAR_PRELUDIO();
         return pdcrt_continuar(ctx, k,
-            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(pdcrt_tipo_de_obj(inst) == PDCRT_TOBJ_INSTANCIA)));
+            pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(inst.recv == &pdcrt_recv_instancia)));
     }
     else if(pdcrt_comparar_textos(omsj.texto, ctx->textos_globales.enviar_mensaje))
     {
@@ -1906,7 +1898,7 @@ pdcrt_tk pdcrt_recv_runtime(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Runtime: fallarConMensaje necesita 1 argumento");
         // [texto]
         pdcrt_obj texto = pdcrt_obj_desde_xmm(a1);
-        pdcrt_debe_tener_tipo(ctx, texto, PDCRT_TOBJ_TEXTO);
+        pdcrt_debe_tener_tipo_rapido(ctx, texto, &pdcrt_recv_texto);
 
         pdcrt_errortb(ctx, k.marco, texto.texto->contenido);
     }
@@ -2034,7 +2026,7 @@ pdcrt_tk pdcrt_recv_voidptr(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
     (void) argp;
 
     PDCRT_PROBE0(recv_voidptr);
@@ -2066,7 +2058,7 @@ pdcrt_tk pdcrt_recv_valop(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
     (void) argp;
 
     PDCRT_PROBE0(recv_valop);
@@ -2099,7 +2091,7 @@ pdcrt_tk pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCR
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
     (void) argp;
 
     PDCRT_PROBE0(recv_espacio_de_nombres);
@@ -2117,11 +2109,11 @@ pdcrt_tk pdcrt_recv_espacio_de_nombres(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCR
             pdcrt_errortb(ctx, k.marco, "Espacio de nombres no contiene el nombre; error al formatear mensaje de error");
     }
 
-    pdcrt_debe_tener_tipo(ctx, valor, PDCRT_TOBJ_ARREGLO);
+    pdcrt_debe_tener_tipo_rapido(ctx, valor, &pdcrt_recv_arreglo);
     if(valor.arreglo->longitud != 2)
         pdcrt_errortb(ctx, k.marco, u8"Espacio de nombres inválido: no es tupla");
 
-    pdcrt_debe_tener_tipo(ctx, valor.arreglo->valores[1], PDCRT_TOBJ_BOOLEANO);
+    pdcrt_debe_tener_tipo_rapido(ctx, valor.arreglo->valores[1], &pdcrt_recv_booleano);
     if(!/* esAutoejecutable */valor.arreglo->valores[1].bval)
     {
         return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(valor.arreglo->valores[0]));
@@ -2143,7 +2135,7 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_corrutina);
 
@@ -2171,7 +2163,7 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
         if(args != 1)
             pdcrt_errortb(ctx, k.marco, "Corrutina: igualA / operador_= necesita 1 argumento");
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CORRUTINA)
+        if(arg.recv != &pdcrt_recv_corrutina)
         {
             PDCRT_SACAR_PRELUDIO();
             return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(false)));
@@ -2189,7 +2181,7 @@ pdcrt_tk pdcrt_recv_corrutina(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
             pdcrt_errortb(ctx, k.marco, "Corrutina: distintoDe / operador_no= necesita 1 argumento");
 
         pdcrt_obj arg = pdcrt_obj_desde_xmm(a1);
-        if(pdcrt_tipo_de_obj(arg) != PDCRT_TOBJ_CORRUTINA)
+        if(arg.recv != &pdcrt_recv_corrutina)
         {
             PDCRT_SACAR_PRELUDIO();
             return pdcrt_continuar(ctx, k, pdcrt_xmm_desde_obj(pdcrt_objeto_booleano(true)));
@@ -2304,11 +2296,11 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     size_t argp = PDCRT_CALC_ARGS();
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
     pdcrt_obj omsj = pdcrt_obj_desde_xmm(msj);
-    pdcrt_debe_tener_tipo(ctx, omsj, PDCRT_TOBJ_TEXTO);
+    pdcrt_debe_tener_tipo_rapido(ctx, omsj, &pdcrt_recv_texto);
 
     PDCRT_PROBE0(recv_instancia);
 
-    pdcrt_debe_tener_tipo(ctx, oyo.inst->metodos, PDCRT_TOBJ_TABLA);
+    pdcrt_debe_tener_tipo_rapido(ctx, oyo.inst->metodos, &pdcrt_recv_tabla);
     pdcrt_obj metodo_de_instancia = pdcrt_objeto_nulo();
     bool contiene = pdcrt_tabla_en(ctx, oyo.inst->metodos.tabla, omsj, &metodo_de_instancia);
     if(contiene)
@@ -2327,7 +2319,7 @@ pdcrt_tk pdcrt_recv_instancia(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
     else
     {
         pdcrt_obj no_enc = oyo.inst->metodo_no_encontrado;
-        if(pdcrt_tipo_de_obj(no_enc) == PDCRT_TOBJ_BOOLEANO)
+        if(no_enc.recv == &pdcrt_recv_booleano)
         {
             if(no_enc.bval)
             {
