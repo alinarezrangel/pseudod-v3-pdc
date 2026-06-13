@@ -53,7 +53,7 @@ vital más adelante cuando compilemos el programa.
 ## Emisor y lowerer ##
 
 Este pase está dividido en dos archivos:
-[`pdc/backend/c.pd`](../pdc/backend/c.pd) y
+[`pdc/backend/c/revc.pd`](../pdc/backend/c/revc.pd) y
 [`pdc/backend/c/ir.pd`](../pdc/backend/c/ir.pd).
 
 El primero compila el AST al IR, el segundo contiene las estructuras de datos
