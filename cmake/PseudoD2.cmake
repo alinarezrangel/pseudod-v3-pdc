@@ -9,6 +9,11 @@ if(NOT LUA_EXECUTABLE)
     message(FATAL_ERROR "lua interpreter not found in PATH. Please set LUA_EXECUTABLE manually.")
 endif()
 
+find_program(PYTHON_EXECUTABLE NAMES python3 python)
+if(NOT PYTHON_EXECUTABLE)
+    message(FATAL_ERROR "python 3 interpreter not found in PATH. Please set PYTHON_EXECUTABLE manually")
+endif()
+
 set(PSEUDOD_CURRENT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/pd" CACHE PATH
         "Directory where the generated PseudoD files will be placed")
 set(PSEUDOD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH
@@ -23,6 +28,9 @@ set(PSEUDOD_LIBS "" CACHE STRING
 # Path to the deps.lua script
 set(PDC_DEPS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/deps.lua" CACHE FILEPATH
         "Path to deps.lua script")
+
+set(PDC_REPLACE_JSON_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build/replace_json.py" CACHE FILEPATH
+        "Path to the replace_json.py script")
 
 if(NOT DEFINED PSEUDOD_CURRENT_TOOLCHAIN)
     set(PSEUDOD_CURRENT_TOOLCHAIN PSEUDOD_INFER_TOOLCHAIN)
@@ -160,7 +168,7 @@ function(add_pseudod_compile new_target_name)
                     -q "${package}/${module}:${tifile}"
                     ${deps_args}
                     COMMAND ${CMAKE_COMMAND} -E rename "${tcfile}" "${cfile}"
-                    COMMAND ${CMAKE_COMMAND} -E rename "${tifile}" "${ifile}"
+                    COMMAND ${PYTHON_EXECUTABLE} ${PDC_REPLACE_JSON_SCRIPT} "${tifile}" "${ifile}"
                     DEPENDS "${sfile}" ${interface_deps}
                     WORKING_DIRECTORY "${PSEUDOD_CURRENT_BINARY_DIR}"
                     COMMENT "Compiling PseudoD module ${package}/${module} to C"
@@ -221,7 +229,7 @@ function(add_pseudod_executable cc_new_target_name)
 
     add_library("${cc_new_target_name}_int" INTERFACE)
     target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_CFLAGS})
-    target_include_directories("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_INCLUDEDIRS})
+    target_include_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_INCLUDEDIRS})
     target_link_libraries("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LIBS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBNAMES})
     target_link_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBDIRS})
     target_link_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LDFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LDFLAGS})

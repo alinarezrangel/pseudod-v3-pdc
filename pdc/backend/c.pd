@@ -392,7 +392,7 @@ finmetodo
 metodo EstadoDeEmisión#emitirFijarBinding: binding, idcMetadata
     variable regValor
     fijar regValor a yo#cima
-    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+    si no yo#bindingEsCapturado: binding
         yo#emisor#emitir: Opcode#fijarRegistro, (yo#registroDeBinding: binding), regValor, idcMetadata
     sino
         yo#emisor#emitir: Opcode#fijarCaja, (yo#registroDeBinding: binding), regValor, idcMetadata
@@ -400,22 +400,28 @@ metodo EstadoDeEmisión#emitirFijarBinding: binding, idcMetadata
     yo#sacarRegistro: regValor, idcMetadata
 finmetodo
 
-metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
-    variables reg, M
+metodo EstadoDeEmisión#bindingDeIdentificador: nodoIdentificador
+    variable reg
     fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
     si EsNulo: reg
         fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
     finsi
-    fijar M a yo#emisor#agregarMetadata: nodoIdentificador#áreaTextual
-    yo#emitirFijarBinding: reg#binding, M
     devolver reg#binding
+finmetodo
+
+metodo EstadoDeEmisión#emitirFijarIdentificador: nodoIdentificador
+    variables binding, M
+    fijar binding a yo#bindingDeIdentificador: nodoIdentificador
+    fijar M a yo#emisor#agregarMetadata: nodoIdentificador#áreaTextual
+    yo#emitirFijarBinding: binding, M
+    devolver binding
 finmetodo
 
 metodo EstadoDeEmisión#emitirObtenerBinding: binding, idcMetadata
     variable regRes
     fijar regRes a yo#empujar
 
-    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+    si no yo#bindingEsCapturado: binding
         yo#emisor#emitir: Opcode#fijarRegistro, regRes, (yo#registroDeBinding: binding), idcMetadata
     sino
         yo#emisor#emitir: Opcode#valorDeCaja, regRes, (yo#registroDeBinding: binding), idcMetadata
@@ -423,14 +429,11 @@ metodo EstadoDeEmisión#emitirObtenerBinding: binding, idcMetadata
 finmetodo
 
 metodo EstadoDeEmisión#emitirObtenerIdentificador: nodoIdentificador
-    variables reg, M
-    fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
-    si EsNulo: reg
-        fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
-    finsi
+    variables binding, M
+    fijar binding a yo#bindingDeIdentificador: nodoIdentificador
     fijar M a yo#emisor#agregarMetadata: nodoIdentificador#áreaTextual
-    yo#emitirObtenerBinding: reg#binding, M
-    devolver reg#binding
+    yo#emitirObtenerBinding: binding, M
+    devolver binding
 finmetodo
 
 funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst
@@ -458,17 +461,18 @@ funcion ObtenerCapturasYLocales: nodoConCapturas, tablasMcAst
 finfuncion
 
 metodo EstadoDeEmisión#prepararDeclaración: nodoIdentificador
-    variables reg, M
-    fijar reg a yo#tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoIdentificador#id
-    si EsNulo: reg
-        fijar reg a yo#tablasRnAst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoIdentificador#id
-    finsi
+    variables binding, M
+    fijar binding a yo#bindingDeIdentificador: nodoIdentificador
     fijar M a yo#emisor#agregarMetadata: nodoIdentificador#áreaTextual
-    yo#prepararDeclaraciónConBinding: reg#binding, M
+    yo#prepararDeclaraciónConBinding: binding, M
+finmetodo
+
+metodo EstadoDeEmisión#bindingEsCapturado: binding
+    devolver no EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
 finmetodo
 
 metodo EstadoDeEmisión#prepararDeclaraciónConBinding: binding, idcMetadata
-    si EsNulo: (yo#tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding)
+    si no yo#bindingEsCapturado: binding
         yo#emisor#emitir: Opcode#nulo, (yo#registroDeBinding: binding), idcMetadata
     sino
         variable regTemp
@@ -688,12 +692,23 @@ metodo EstadoDeEmisión#emitir: ast
         fijar sub a yo#subestado: emisor, caps#locales, caps#capturas
 
         fijar params a Mapear: ast#parámetros, procedimiento: param
-            devolver Parámetro#crear: param#esVariadic, sub#empujar
+            variables binding, reg
+            fijar binding a yo#bindingDeIdentificador: param#identificador
+            si yo#bindingEsCapturado: binding
+                fijar reg a sub#empujar
+            sino
+                fijar reg a sub#registroDeBinding: binding
+            finsi
+            devolver Parámetro#crear: param#esVariadic, reg
         finprocedimiento
 
         ParaCadaElementoEnReversa: ast#parámetros, procedimiento: param
-            sub#prepararDeclaración: param#identificador
-            sub#emitirFijarIdentificador: param#identificador
+            variable binding
+            fijar binding a yo#bindingDeIdentificador: param#identificador
+            si yo#bindingEsCapturado: binding
+                sub#prepararDeclaración: param#identificador
+                sub#emitirFijarIdentificador: param#identificador
+            finsi
         finprocedimiento
 
         sub#emitir: ast#cuerpo

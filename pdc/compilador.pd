@@ -34,6 +34,7 @@ utilizar pdc/backend/c/lowerer (CompilarPrograma)
 utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 utilizar pdc/backend/c (Emisor, EstadoDeEmisión)
+utilizar pdc/backend/c/revc (Compilar como CompilarAIr)
 utilizar pdc/info como Info
 utilizar pdc/subproceso como Subproceso
 
@@ -219,11 +220,15 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
     MarcarCapturas: ast, tablasRnAst, tablasMcAst, posiblesCapturas, definitivamenteNoCapturas
 
     Escribir: {-- Emitir}
+    [
     variables emisor, estado, programa
     fijar emisor a Emisor#crear
     fijar estado a EstadoDeEmisión#inicial: tablasRnAst, tablasMcAst, emisor, bdMod
     estado#emitir: ast
     fijar programa a estado#emisor#programa
+    ]
+    variable programa
+    fijar programa a CompilarAIr: tablasRnAst, tablasMcAst, bdMod, ast
 
     Escribir: {-- Buscar dependencias}
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo

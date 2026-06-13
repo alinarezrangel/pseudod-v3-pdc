@@ -43,6 +43,7 @@ pseudod_collection(col_pdc
         pdc/abstraer.pd
         pdc/ast.pd
         pdc/backend/c.pd
+        pdc/backend/c/revc.pd
         pdc/backend/c/ir.pd
         pdc/backend/c/lowerer.pd
         pdc/capturas.pd

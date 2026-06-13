@@ -59,3 +59,25 @@ funcion Mínimo: vals
     finprocedimiento
     devolver min
 finfuncion
+
+funcion MáximoCon: m, vals
+    variable max
+    fijar max a m
+    ParaCadaElemento: vals, procedimiento: v
+        si v > max
+            fijar max a v
+        finsi
+    finprocedimiento
+    devolver max
+finfuncion
+
+funcion MínimoCon: m, vals
+    variable min
+    fijar min a m
+    ParaCadaElemento: vals, procedimiento: v
+        si v < min
+            fijar min a v
+        finsi
+    finprocedimiento
+    devolver min
+finfuncion

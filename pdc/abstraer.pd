@@ -378,9 +378,9 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
         finsi
 
         variables binding, reg, id, builtin
-        fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre, VERDADERO, FALSO
         fijar reg a tablasRnCst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodoCst#id
         si no EsNulo: reg
+            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre, VERDADERO, FALSO
             fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding
             registrarParche: procedimiento
@@ -389,6 +389,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
                 finsi
             finprocedimiento
         sino
+            fijar id a AST#NodoIdentificador#crear: nodoCst#áreaTextual, nodoCst#nombre, FALSO, VERDADERO
             fijar reg a tablasRnCst#tablaDefiniciones#buscarÚnico: {idNodo}, nodoCst#id
             fijar builtin a tablasRnCst#tablaBuiltins#intentaBuscarÚnico: {binding}, reg#binding
             fijar binding a tablasRnCst#tablaNombres#buscarÚnico: {binding}, reg#binding

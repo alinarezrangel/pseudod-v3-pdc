@@ -117,6 +117,10 @@ ser de tipo @pd{Etiqueta}.
 @defenum("csaltar"){Salta condicionalmente a una de dos etiquetas. Pide
 el registro determinante y las dos etiquetas.}
 
+@defenum("ncsaltar"){Salta condicionalmente a una de dos etiquetas. Pide
+el registro determinante y las dos etiquetas. Equivalente a @code{negar} +
+@code{csaltar}.}
+
 @defenum("saltar"){Salta incondicionalmente a una etiqueta. Pide un argumento:
 la etiqueta a la que saltar.}
 
@@ -137,13 +141,13 @@ el registro con el objeto que usar, el mensaje a enviar (un entero que es el
 @defenum("fijarRegistro"){Toma dos registros, y le asigna el valor del
 segundo al primero.}
 
-@defenum("caja"){Toma dos argumento: el registro en la que guardar la caja y el
+@defenum("caja"){Toma dos argumento: el registro en el que guardar la caja y el
 registro a envolver en una caja.}
 
 @defenum("fijarCaja"){Toma dos argumentos: el registro con la caja que será cambiada
 y el registro con el nuevo valor.}
 
-@defenum("valorDeCaja"){Toma dos argumentos: el registro en la que se guardará el
+@defenum("valorDeCaja"){Toma dos argumentos: el registro en el que se guardará el
 valor y el registro con la caja a abrir.}
 
 @defenum("prn"){Escribe el valor del registro dado.}
@@ -227,6 +231,7 @@ variable Opcode
 fijar Opcode a EnumConValores: {Opcode},
     [ Nombre del opcode,                       ¿Requiere una continuación?   Núm. raíces ]
     {csaltar},                           (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {ncsaltar},                          (OpcionesDeOpcode#crear: VERDADERO, 0),
     {saltar},                            (OpcionesDeOpcode#crear: VERDADERO, 0),
     {enviarMensaje_s1},                  (OpcionesDeOpcode#crear: VERDADERO, 0),
     {enviarMensaje_s2},                  (OpcionesDeOpcode#crear: FALSO,     0),

@@ -303,8 +303,39 @@ void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, boo
     {
         if(pdcrt_igualdad(ctx, b->llave, llave))
         {
-            b->activo = false;
+            pdcrt_bucket *ultimo_activo = b, *penultimo_activo = NULL;
+            size_t idc_actual = 0;
+            while(ultimo_activo->tiene_colision)
+            {
+                PDCRT_BUG(!ultimo_activo->activo, "ultimo_activo debe estar activo (colisiones invalidas)");
+                penultimo_activo = ultimo_activo;
+                idc_actual = ultimo_activo->idc_colision;
+                ultimo_activo = &tbl->colisiones[ultimo_activo->idc_colision];
+            }
+
+            ultimo_activo->activo = false;
+            b->llave = ultimo_activo->llave;
+            b->valor = ultimo_activo->valor;
             tbl->buckets_ocupados -= 1;
+
+            if(penultimo_activo)
+            {
+                penultimo_activo->tiene_colision = false;
+                for(size_t i = 0; i < tbl->num_colisiones; i++)
+                {
+                    pdcrt_bucket col = tbl->colisiones[i];
+                    if(col.tiene_colision && col.idc_colision > idc_actual)
+                    {
+                        col.idc_colision -= 1;
+                    }
+                    if(i > idc_actual)
+                    {
+                        tbl->colisiones[i - 1] = col;
+                        tbl->colisiones[i].activo = false;
+                    }
+                }
+                tbl->num_colisiones -= 1;
+            }
         }
         else
         {

@@ -164,7 +164,7 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
                      «} };»
         EmitirLínea: puerto, {pdcrt_params(ctx, m, (pdcrt_params_data*) &pdc_params, PDCRT_A_IMM);}
     finsi
-    fijar numRaíces a Iter#Máximo: (Mapear: func#instrucciones, funcion: tupla
+    fijar numRaíces a Iter#MáximoCon: 0, (Mapear: func#instrucciones, funcion: tupla
         devolver (tupla#en: 0)#numRaíces
     finfuncion)
     si numRaíces > 0
@@ -173,6 +173,7 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
     ParaCadaElemento: func#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
+    EmitirLínea: puerto, {abort();}
     EmitirLínea: puerto, «}»
 finprocedimiento
 
@@ -182,7 +183,7 @@ procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k, metadat
     EmitirLínea: puerto, {static pdcrt_tk }, nombre, {(pdcrt_ctx* ctx, pdcrt_marco* m, __m128i res)}
     EmitirLínea: puerto, «{»
     EmitirLínea: puerto, {PDCRT_VERIFICA_PILA(ctx, m, res, }, nombre, {);}
-    fijar numRaíces a Iter#Máximo: (Mapear: k#instrucciones, funcion: tupla
+    fijar numRaíces a Iter#MáximoCon: 0, (Mapear: k#instrucciones, funcion: tupla
         devolver (tupla#en: 0)#numRaíces
     finfuncion)
     si numRaíces > 0
@@ -191,6 +192,7 @@ procedimiento CompilarContinuación: puerto, identificadorDelMódulo, k, metadat
     ParaCadaElemento: k#instrucciones, procedimiento: tupla
         CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlobal
     finprocedimiento
+    EmitirLínea: puerto, {abort();}
     EmitirLínea: puerto, «}»
 finprocedimiento
 
@@ -211,17 +213,26 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
         EmitirLínea: puerto, {pdcrt_obj csaltar_obj = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
         EmitirLínea: puerto, {if(csaltar_obj.recv != &pdcrt_recv_booleano) pdcrt_error(ctx, "Se esperaba un objeto de tipo Boole");}
         EmitirLínea: puerto, {if(csaltar_obj.bval)}
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {, PDCRT_XMM_NULO());}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {(ctx, m, PDCRT_XMM_NULO());}
         EmitirLínea: puerto, {else}
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {, PDCRT_XMM_NULO());}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {(ctx, m, PDCRT_XMM_NULO());}
+    finsi
+
+    si opcode = Opcode#ncsaltar
+        EmitirLínea: puerto, {pdcrt_obj csaltar_obj = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
+        EmitirLínea: puerto, {if(csaltar_obj.recv != &pdcrt_recv_booleano) pdcrt_error(ctx, "Se esperaba un objeto de tipo Boole");}
+        EmitirLínea: puerto, {if(!csaltar_obj.bval)}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {(ctx, m, PDCRT_XMM_NULO());}
+        EmitirLínea: puerto, {else}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 3)), {(ctx, m, PDCRT_XMM_NULO());}
     finsi
 
     si opcode = Opcode#saltar
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {, PDCRT_XMM_NULO());}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)#id), {(ctx, m, PDCRT_XMM_NULO());}
     finsi
 
     si opcode = Opcode#continuar
-        EmitirLínea: puerto, {return pdcrt_saltar(ctx, m, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {, PDCRT_XMM_NULO());}
+        EmitirLínea: puerto, {return }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 1)), {(ctx, m, PDCRT_XMM_NULO());}
     finsi
 
     si (opcode = Opcode#enviarMensaje_s1) || (opcode = Opcode#enviarMensaje_t)
@@ -421,7 +432,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
     si opcode = Opcode#negar
         EmitirLínea: puerto, «do {»
         EmitirLínea: puerto, {pdcrt_obj b = pdcrt_obtener_local(ctx, m, }, (tupla#en: 2), {);}
-        EmitirLínea: puerto, {if(pdcrt_tipo_de_obj(b) != PDCRT_TOBJ_BOOLEANO) pdcrt_error(ctx, "Se esperaba un objeto booleano");}
+        EmitirLínea: puerto, {if(b.recv != &pdcrt_recv_booleano) pdcrt_error(ctx, "Se esperaba un objeto booleano");}
         EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, (tupla#en: 1), {, pdcrt_objeto_booleano(!b.bval));}
         EmitirLínea: puerto, «} while(0);»
     finsi

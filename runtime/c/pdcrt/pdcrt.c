@@ -835,7 +835,7 @@ static pdcrt_tk pdcrt_continuacion_de_ejecutar(pdcrt_ctx *ctx, pdcrt_marco *m, _
 
 static pdcrt_tk pdcrt_inicio_de_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
-    return pdcrt_llamar0(ctx, NULL, &pdcrt_continuacion_de_ejecutar,
+    return pdcrt_llamar0(ctx, k.marco, k.kf,
         a1, pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)));
 }
 

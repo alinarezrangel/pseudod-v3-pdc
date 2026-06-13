@@ -1,0 +1,752 @@
+utilizar bepd/builtins
+utilizar bepd/datos/caja (Caja)
+utilizar bepd/datos/pila (Pila)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+utilizar bepd/x/algebraico (TipoAlgebraico, Alternativa)
+utilizar bepd/x/datos (TipoDeDatos)
+
+utilizar pdc/ast como AST
+utilizar pdc/nombres (TablasDeResoluciónDeNombres)
+utilizar pdc/capturas (TablasDeCapturas)
+utilizar pdc/tabla (EscribirTabla)
+utilizar pdc/backend/c/ir (Opcode, FunciónIR, Parámetro, Argumento, Retorno, Constante, TipoConstante, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
+utilizar pdc/catamorfismos (Buscando)
+utilizar pdc/info (IMPL_COMPILADOR)
+
+
+procedimiento RevertirArreglo: arr
+    ParaCadaNúmero: 0, (arr#longitud / 2)#piso, procedimiento: i
+        variables ri, el
+        fijar ri a arr#longitud - (i + 1)
+        fijar el a arr#en: i
+        arr#fijarEn: i, (arr#en: ri)
+        arr#fijarEn: ri, el
+    finprocedimiento
+finprocedimiento
+
+
+variable Destino
+fijar Destino a TipoAlgebraico: {Destino},
+    (Alternativa: {ninguno}),
+    (Alternativa: {paraRegistro}, {registro})
+
+
+variable RegistrosDisponibles
+fijar RegistrosDisponibles a TipoDeDatos: {RegistrosDisponibles}, {liberados}, {infinitos}
+
+
+variable RegistroPorInicializar
+fijar RegistroPorInicializar a TipoDeDatos: {RegistroPorInicializar}, {registro}, {conCaja}
+
+
+procedimiento ObtenerRegistro: regDisp
+    si regDisp#liberados#longitud > 0
+        variable reg
+        fijar reg a ÚltimoElemento: regDisp#liberados
+        regDisp#liberados#redimensionar: (regDisp#liberados#longitud - 1)
+        devolver reg
+    sino
+        variable reg
+        fijar reg a regDisp#infinitos
+        fijar regDisp#infinitos a regDisp#infinitos + 1
+        devolver reg
+    finsi
+finprocedimiento
+
+procedimiento MatarRegistro: regDisp, reg
+    regDisp#liberados#agregarAlFinal: reg
+finprocedimiento
+
+
+funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
+    variables locales, registrosDisponibles, constantesTextuales, contadorConstantes, bindingsLocales,
+              bindingsCapturados, códigoActual, continuaciones, funciones, metadata, inicializadores
+    fijar locales a Pila#vacía
+    fijar registrosDisponibles a Pila#vacía
+    fijar constantesTextuales a Diccionario#vacío
+    fijar contadorConstantes a 0
+    fijar bindingsLocales a Pila#vacía
+    fijar bindingsCapturados a Pila#vacía
+    fijar códigoActual a Arreglo#vacio
+    fijar continuaciones a Arreglo#vacio
+    fijar funciones a Arreglo#vacio
+    fijar metadata a Arreglo#vacio
+    fijar inicializadores a Pila#vacía
+
+    procedimiento CompilarNodo: nodo, destino
+        variables M, nodoProcesado
+        fijar M a AgregarMetadata: nodo, nodo#áreaTextual
+        fijar nodoProcesado a FALSO
+
+        si EsInstancia: nodo, AST#NodoPrograma
+            fijar nodoProcesado a VERDADERO
+
+            CompilarNodo: nodo#cuerpo, destino
+
+            InicializarÁmbito: M
+
+            variable consts
+            fijar consts a Arreglo#vacio
+            ParaCadaNúmero: 0, constantesTextuales#longitud, procedimiento: i
+                consts#agregarAlFinal: NULO
+            finprocedimiento
+            constantesTextuales#paraCadaPar: procedimiento: texto, idc
+                consts#fijarEn: idc, (Constante#crear: TipoConstante#TEXTO, texto)
+            finprocedimiento
+            Emitir: Opcode#crearConstantes, consts, M
+        finsi
+
+        si EsInstancia: nodo, AST#NodoBloque
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            ParaCadaElementoEnReversa: nodo#cuerpo, procedimiento: subnodo
+                CompilarNodo: subnodo, Destino#ninguno
+            finprocedimiento
+        finsi
+
+        si EsInstancia: nodo, AST#NodoDevolver
+            fijar nodoProcesado a VERDADERO
+
+            si EsInstancia: nodo#expresión, AST#NodoEnviarMensaje
+                variable M'
+                fijar M' a AgregarMetadata: nodo#expresión, nodo#expresión#áreaTextual
+                CompilarEnviarMensaje: nodo#expresión, destino, VERDADERO, M'
+            sino
+                si destino#esParaRegistro
+                    Emitir: Opcode#nulo, destino#registro, M
+                finsi
+                variable regDev
+                fijar regDev a GenerarRegistroPara: nodo#expresión
+                Emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, regDev)), M
+                CompilarNodo: nodo#expresión, (Destino#paraRegistro: regDev)
+                MatarRegistroPara: regDev, nodo#expresión
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoIdentificador
+            fijar nodoProcesado a VERDADERO
+
+            variable binding
+            fijar binding a BindingDeIdentificador: nodo
+
+            si nodo#esDeclaración
+                si destino#esParaRegistro
+                    __FallarConMensaje: ({[~t] / ~t :: Declaración con registro}#formatear: nodo, nodo#áreaTextual)
+                finsi
+
+                [ Este código se llamará para todas las declaraciones excepto los parámetros de las funciones ]
+                variable reg
+                fijar reg a RegistroDeBinding: binding
+
+                inicializadores#últimoValorApilado#agregarAlFinal:
+                        (RegistroPorInicializar#crear: reg, (BindingEsCapturado: binding))
+            sino
+                necesitas nodo#esUso
+                si destino#esParaRegistro
+                    variable reg
+                    fijar reg a RegistroDeBinding: binding
+                    si BindingEsCapturado: binding
+                        si son iguales destino#registro y reg
+                            __FallarConMensaje: ({Nodo ~t es capturado pero se obtiene como registro}#formatear: nodo)
+                        finsi
+
+                        Emitir: Opcode#valorDeCaja, destino#registro, reg, M
+                    sino
+                        si son diferentes destino#registro y reg
+                            Emitir: Opcode#fijarRegistro, destino#registro, reg, M
+                        sino
+                            [ Ya estamos en el registro deseado, no hay que hacer nada... ]
+                        finsi
+                    finsi
+                sino
+                    [ Nuestro valor no es necesario ]
+                finsi
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoFijar
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            variables binding, regObj
+            fijar binding a BindingDeIdentificador: nodo#objetivo
+            fijar regObj a RegistroDeBinding: binding
+            si BindingEsCapturado: binding
+                variable regTmp
+                fijar regTmp a GenerarRegistro
+                Emitir: Opcode#fijarCaja, regObj, regTmp
+                CompilarNodo: nodo#expresión, (Destino#paraRegistro: regTmp)
+                MatarRegistro': regTmp
+            sino
+                CompilarNodo: nodo#expresión, (Destino#paraRegistro: regObj)
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoSonIdénticos
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                variable regLhs, regRhs
+                fijar regRhs a GenerarRegistroPara: nodo#rhs
+                fijar regLhs a GenerarRegistroPara: nodo#lhs
+                Emitir: Opcode#sonIdénticos, destino#registro, regLhs, regRhs, M
+                CompilarNodo: nodo#rhs, (Destino#paraRegistro: regRhs)
+                CompilarNodo: nodo#lhs, (Destino#paraRegistro: regLhs)
+                MatarRegistroPara: regRhs, nodo#rhs
+                MatarRegistroPara: regLhs, nodo#lhs
+            sino
+                CompilarNodo: nodo#rhs, Destino#ninguno
+                CompilarNodo: nodo#lhs, Destino#ninguno
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoLiteralNumérica
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#número, destino#registro, nodo#valor, M
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoLiteralTextual
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                variable const
+                fijar const a RegistrarConstanteTextual: nodo#valor
+                Emitir: Opcode#texto, destino#registro, const, M
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoEnviarMensaje
+            fijar nodoProcesado a VERDADERO
+
+            CompilarEnviarMensaje: nodo, destino, FALSO, M
+        finsi
+
+        si EsInstancia: nodo, AST#NodoVariable
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            CompilarNodo: nodo#nombre, Destino#ninguno
+        finsi
+
+        si EsInstancia: nodo, AST#NodoEscribir
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            variable reg
+            fijar reg a GenerarRegistroPara: nodo#expresión
+            Emitir: Opcode#prn, reg, M
+            CompilarNodo: nodo#expresión, (Destino#paraRegistro: reg)
+            MatarRegistroPara: reg, nodo#expresión
+        finsi
+
+        si EsInstancia: nodo, AST#NodoNl
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            Emitir: Opcode#prnl, M
+        finsi
+
+        si EsInstancia: nodo, AST#NodoNecesitas
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+            variable reg
+            fijar reg a GenerarRegistroPara: nodo#expresión
+            Emitir: Opcode#assert, reg, M
+            CompilarNodo: nodo#expresión, (Destino#paraRegistro: reg)
+            MatarRegistroPara: reg, nodo#expresión
+        finsi
+
+        si EsInstancia: nodo, AST#NodoNo
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                variable reg
+                fijar reg a GenerarRegistroPara: nodo#expresión
+                Emitir: Opcode#negar, destino#registro, reg, M
+                CompilarNodo: nodo#expresión, (Destino#paraRegistro: reg)
+                MatarRegistroPara: reg, nodo#expresión
+            sino
+                CompilarNodo: nodo#expresión, Destino#ninguno
+            finsi
+        finsi
+
+        si EsInstancia: nodo, AST#NodoSi
+            fijar nodoProcesado a VERDADERO
+
+            variables etqSino, etqFinsi, regDet
+            fijar etqSino a Etiqueta#vacía
+            fijar etqFinsi a Etiqueta#vacía
+
+            fijar regDet a GenerarRegistroPara: nodo#condición
+
+            AjustarEtiqueta: etqFinsi, M
+            CompilarNodo: nodo#cuerpoSiFalso, Destino#ninguno
+            AjustarEtiqueta: etqSino, M
+            Emitir: Opcode#saltar, etqFinsi, M
+            CompilarNodo: nodo#cuerpoSiVerdadero, Destino#ninguno
+            Emitir: Opcode#ncsaltar, etqSino, regDet, M
+            CompilarNodo: nodo#condición, (Destino#paraRegistro: regDet)
+
+            MatarRegistroPara: regDet, nodo#condición
+        finsi
+
+        si EsInstancia: nodo, AST#NodoMientras
+            fijar nodoProcesado a VERDADERO
+
+            Buscando: nodo, funcion: nodo
+                devolver EsInstancia: nodo, AST#NodoIdentificador
+            finfuncion, procedimiento: nodoId
+                RegistroDeBinding: (BindingDeIdentificador: nodoId)
+            finprocedimiento
+
+            variables etqInicio, etqFinmientras, regDet
+            fijar etqInicio a Etiqueta#vacía
+            fijar etqFinmientras a Etiqueta#vacía
+
+            fijar regDet a GenerarRegistroPara: nodo#condición
+
+            AjustarEtiqueta: etqFinmientras, M
+            Emitir: Opcode#saltar, etqInicio, M
+
+            inicializadores#apilar: Arreglo#vacio
+            CompilarNodo: nodo#cuerpo, Destino#ninguno
+            InicializarÁmbito: M
+            inicializadores#desapilar
+
+            Emitir: Opcode#ncsaltar, etqFinmientras, regDet, M
+            CompilarNodo: nodo#condición, (Destino#paraRegistro: regDet)
+            AjustarEtiqueta: etqInicio, M
+
+            MatarRegistroPara: regDet, nodo#condición
+        finsi
+
+        si EsInstancia: nodo, AST#NodoUtilizar
+            fijar nodoProcesado a VERDADERO
+
+            variables informaciónDelMódulo, módulo, regMód
+            fijar informaciónDelMódulo a tablasRnAst#tablaInformaciónDeMódulo#buscarÚnico: {idNodo}, nodo#id
+            fijar módulo a bdMod#buscarMódulo: informaciónDelMódulo#paquete, informaciónDelMódulo#módulo
+            fijar regMód a GenerarRegistro [ temporal ]
+
+            si no EsNulo: nodo#espacioDeNombres
+                variables regNs, binding
+                fijar binding a BindingDeIdentificador: nodo#espacioDeNombres
+                fijar regNs a RegistroDeBinding: binding
+                si BindingEsCapturado: binding
+                    variable regOut
+                    fijar regOut a GenerarRegistro
+                    Emitir: Opcode#fijarCaja, regNs, regOut, M
+                    Emitir: Opcode#comoEspacioDeNombres, regOut, regMód, M
+                    MatarRegistro': regOut
+                sino
+                    Emitir: Opcode#comoEspacioDeNombres, regNs, regMód, M
+                finsi
+                CompilarNodo: nodo#espacioDeNombres, Destino#ninguno
+            finsi
+
+            ParaCadaElemento: nodo#nombresEspecíficos, procedimiento: nombreEspecífico
+                variables regValor, binding, M'
+                fijar M' a AgregarMetadata: nombreEspecífico, nombreEspecífico#áreaTextual
+                fijar binding a BindingDeIdentificador: nombreEspecífico#renombre
+                fijar regValor a RegistroDeBinding: binding
+                si BindingEsCapturado: binding
+                    variable regOut
+                    fijar regOut a GenerarRegistro
+                    Emitir: Opcode#fijarCaja, regValor, regOut, M
+                    Emitir: Opcode#extraer_s2, regOut, regMód, nombreEspecífico#nombre#valor, M
+                    Emitir: Opcode#extraer_s1, regOut, regMód, nombreEspecífico#nombre#valor, M
+                    MatarRegistro': regOut
+                sino
+                    Emitir: Opcode#extraer_s2, regValor, regMód, nombreEspecífico#nombre#valor, M
+                    Emitir: Opcode#extraer_s1, regValor, regMód, nombreEspecífico#nombre#valor, M
+                finsi
+                CompilarNodo: nombreEspecífico#renombre, Destino#ninguno
+            finprocedimiento
+
+            Emitir: Opcode#importar_s2, regMód, módulo#prefijoDelMódulo, M
+            Emitir: Opcode#importar_s1, regMód, módulo#prefijoDelMódulo, M
+
+            MatarRegistro': regMód
+        finsi
+
+        si EsInstancia: nodo, AST#NodoFunciónAnónima
+            fijar nodoProcesado a VERDADERO
+
+            variables bndCaps, bndLocales, regCaps, funcIr
+            fijar bndCaps a tablasMcAst#tablaCapturas#buscarÚnico: {idNodo}, nodo#id
+            fijar bndLocales a tablasMcAst#tablaLocales#buscarÚnico: {idNodo}, nodo#id
+
+            fijar funcIr a LlamarConSubfunción: bndLocales#bindingsLocales, bndCaps#bindingsCapturados, M, procedimiento
+                variables params, regRet
+
+                variable agregaDevolverNulo
+                fijar agregaDevolverNulo a FALSO
+                si nodo#cuerpo#cuerpo#longitud > 0
+                    si no EsInstancia: (ÚltimoElemento: nodo#cuerpo#cuerpo), AST#NodoDevolver
+                        fijar agregaDevolverNulo a VERDADERO
+                    finsi
+                sino
+                    fijar agregaDevolverNulo a VERDADERO
+                finsi
+                si agregaDevolverNulo
+                    fijar regRet a GenerarRegistro
+                    Emitir: Opcode#devolverN, (Arreglo#crearCon: (Retorno#crear: FALSO, regRet)), M
+                    Emitir: Opcode#nulo, regRet, M
+                    MatarRegistro': regRet
+                finsi
+
+                CompilarNodo: nodo#cuerpo, Destino#ninguno
+
+                InicializarÁmbito: M
+
+                fijar params a Mapear: nodo#parámetros, funcion: param
+                    variables binding, reg, regV
+                    fijar binding a BindingDeIdentificador: param#identificador
+                    fijar regV a RegistroDeBinding: binding
+                    si BindingEsCapturado: binding
+                        fijar reg a GenerarRegistro
+                        Emitir: Opcode#caja, regV, reg
+                    sino
+                        fijar reg a regV
+                    finsi
+                    devolver Parámetro#crear: param#esVariadic, reg
+                finfuncion
+
+                devolver params
+            finprocedimiento
+
+            fijar regCaps a Mapear: bndCaps#bindingsCapturados, &RegistroDeBinding
+            Emitir: Opcode#mkclz, destino#registro, funcIr#id, regCaps, M
+        finsi
+
+        si EsInstancia: nodo, AST#NodoExportar
+            fijar nodoProcesado a VERDADERO
+
+            si destino#esParaRegistro
+                Emitir: Opcode#nulo, destino#registro, M
+            finsi
+
+            variables regNs
+            fijar regNs a GenerarRegistro [ temporal ]
+
+            Emitir: Opcode#exportar, regNs, M
+
+            ParaCadaElemento: nodo#exportaciones, procedimiento: exp
+                necesitas EsInstancia: exp, AST#NodoExportación
+                variable regExp
+                fijar regExp a GenerarRegistroPara: exp#expresión
+                Emitir: Opcode#agregarNombre, regNs, regExp, exp#nombre#valor, exp#esAutoejecutable, M
+                CompilarNodo: exp#expresión, (Destino#paraRegistro: regExp)
+                MatarRegistroPara: regExp, exp#expresión
+            finprocedimiento
+
+            Emitir: Opcode#espacioDeNombres, regNs, M
+
+            MatarRegistro': regNs
+        finsi
+
+        si EsInstancia: nodo, AST#NodoBuiltin
+            fijar nodoProcesado a VERDADERO
+
+            variable nodoOk
+            fijar nodoOk a FALSO
+            si nodo#nombre = {objeto}
+                fijar nodoOk a VERDADERO
+                si destino#esParaRegistro
+                    Emitir: Opcode#obtenerObjeto, destino#registro, M
+                finsi
+            finsi
+            si nodo#nombre = {obtenerRuntime}
+                fijar nodoOk a VERDADERO
+                si destino#esParaRegistro
+                    Emitir: Opcode#obtenerRuntime, destino#registro, M
+                finsi
+            finsi
+            si nodo#nombre = {__Impl}
+                fijar nodoOk a VERDADERO
+                si destino#esParaRegistro
+                    variable const
+                    fijar const a RegistrarConstanteTextual: IMPL_COMPILADOR
+                    Emitir: Opcode#texto, destino#registro, const, M
+                finsi
+            finsi
+            si (nodo#nombre#subTexto: 0, 3) = {rt:}
+                fijar nodoOk a VERDADERO
+                variables nombre, rets, regObj, const, args, argsYRegs, regDest
+                fijar nombre a nodo#nombre#parteDelTexto: 3, nodo#nombre#longitud
+
+                fijar regObj a GenerarRegistro [ temporal ]
+
+                CompilarEnviarMensajeARegistro: destino,
+                                                regObj,
+                                                nombre,
+                                                nodo#argumentos,
+                                                FALSO,
+                                                M
+
+                Emitir: Opcode#obtenerEspacioDeNombresDelRuntime, regObj, M
+                MatarRegistro': regObj
+            finsi
+
+            si no nodoOk
+                Escribir: {Builtin}, nodo, nodo#áreaTextual
+                NoImplementado
+            finsi
+        finsi
+
+        si no nodoProcesado
+            Escribir: {Nodo sin procesar}, nodo, nodo#áreaTextual
+            NoImplementado
+        finsi
+    finprocedimiento
+
+    procedimiento InicializarÁmbito: M
+        ParaCadaElemento: inicializadores#últimoValorApilado, procedimiento: inic
+            si inic#conCaja
+                variable regTmp
+                fijar regTmp a GenerarRegistro
+                Emitir: Opcode#caja, inic#registro, regTmp, M
+                Emitir: Opcode#nulo, regTmp, M
+                MatarRegistro': regTmp
+            sino
+                Emitir: Opcode#nulo, inic#registro, M
+            finsi
+        finprocedimiento
+    finprocedimiento
+
+    procedimiento LlamarConSubfunción: bndLocales, bndCaps, M, proc
+        variables códigoViejo, params, funcIr, nuevasLocales
+
+        inicializadores#apilar: Arreglo#vacio
+        registrosDisponibles#apilar: (RegistrosDisponibles#crear: Arreglo#vacío, 0)
+        bindingsLocales#apilar: bndLocales
+        bindingsCapturados#apilar: bndCaps
+        fijar nuevasLocales a Diccionario#vacío
+        ParaCadaElemento: bndCaps, procedimiento: binding
+            nuevasLocales#fijarEn: binding, GenerarRegistro
+        finprocedimiento
+        locales#apilar: nuevasLocales
+        fijar códigoViejo a códigoActual
+        fijar códigoActual a Arreglo#vacio
+
+        fijar params a %proc
+
+        RevertirArreglo: códigoActual
+
+        fijar funcIr a FunciónIR#crear: params,
+                                        registrosDisponibles#últimoValorApilado#infinitos,
+                                        bndCaps#longitud,
+                                        códigoActual,
+                                        M
+        fijar funcIr#id a funciones#longitud
+        funciones#agregarAlFinal: funcIr
+
+        fijar códigoActual a códigoViejo
+        locales#desapilar
+        registrosDisponibles#desapilar
+        bindingsLocales#desapilar
+        bindingsCapturados#desapilar
+        inicializadores#desapilar
+
+        devolver funcIr
+    finprocedimiento
+
+    procedimiento CompilarEnviarMensaje: nodoEnviarMensaje, destino, esTailCall, M
+        variable regObj
+        fijar regObj a GenerarRegistroPara: nodoEnviarMensaje#objeto
+        CompilarEnviarMensajeARegistro: destino,
+                                        regObj,
+                                        nodoEnviarMensaje#mensaje,
+                                        nodoEnviarMensaje#argumentos,
+                                        esTailCall,
+                                        M
+        CompilarNodo: nodoEnviarMensaje#objeto, (Destino#paraRegistro: regObj)
+        MatarRegistroPara: regObj, nodoEnviarMensaje#objeto
+    finprocedimiento
+
+    procedimiento CompilarEnviarMensajeARegistro: destino, regObj, mensaje, argumentos, esTailCall, M
+        variables rets, const, args, argsYRegs, regDest
+
+        si destino#esParaRegistro
+            fijar regDest a destino#registro
+        sino
+            fijar regDest a GenerarRegistro [ temporal ]
+        finsi
+        fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regDest)
+
+        fijar const a RegistrarConstanteTextual: mensaje
+
+        fijar argsYRegs a Mapear: argumentos, funcion: arg
+            devolver Arreglo#crearCon: arg, (GenerarRegistroPara: arg#expresión)
+        finfuncion
+
+        fijar args a Mapear: argsYRegs, funcion: tupla
+            devolver Argumento#crear: (tupla#en: 0)#esVariadic, (tupla#en: 1)
+        finfuncion
+
+        si esTailCall
+            Emitir: Opcode#enviarMensaje_t, rets, regObj, const, args, M
+        sino
+            Emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
+            Emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
+        finsi
+
+        si destino#esNinguno
+            MatarRegistro': regDest
+        finsi
+
+        ParaCadaElementoEnReversa: argsYRegs, funcion: tupla
+            CompilarNodo: (tupla#en: 0)#expresión, (Destino#paraRegistro: (tupla#en: 1))
+            MatarRegistroPara: (tupla#en: 1), (tupla#en: 0)#expresión
+        finfuncion
+    finprocedimiento
+
+    procedimiento AgregarMetadata: nodo, áreaTextual
+        si EsNulo: áreaTextual
+            __FallarConMensaje: ({¡Área textual de la metadata es NULO! ~t}#formatear: nodo)
+        finsi
+        metadata#agregarAlFinal: áreaTextual
+        devolver metadata#longitud - 1
+    finprocedimiento
+
+    procedimiento Emitir: opcode, ...args
+        variables cont, M
+        fijar M a ÚltimoElemento: args
+        si opcode#requiereContinuación
+            variable kid
+            fijar kid a continuaciones#longitud
+            RevertirArreglo: códigoActual
+            fijar cont a ContinuaciónIR#crear: códigoActual
+            fijar cont#id a kid
+            continuaciones#agregarAlFinal: cont
+            fijar códigoActual a Arreglo#vacio
+            si opcode = Opcode#etiqueta
+                códigoActual#agregarAlFinal: (Arreglo#crearCon: Opcode#continuar, kid, M)
+            finsi
+            [ (opcode ... M) => (opcode ... K M) ]
+            args#fijarEn: (args#longitud - 1), cont#id
+            args#agregarAlFinal: M
+        finsi
+        si son diferentes opcode y Opcode#etiqueta
+            códigoActual#agregarAlFinal: (Arreglo#crearCon: opcode, ...args)
+        finsi
+        devolver cont
+    finprocedimiento
+
+    procedimiento AjustarEtiqueta: etq, M
+        variable cont
+        fijar cont a Emitir: Opcode#etiqueta, etq, M
+        necesitas no EsNulo: cont
+        fijar etq#id a cont#id
+    finprocedimiento
+
+    procedimiento GenerarRegistro
+        devolver ObtenerRegistro: registrosDisponibles#últimoValorApilado
+    finprocedimiento
+
+    procedimiento MatarRegistro': registro
+        MatarRegistro: registrosDisponibles#últimoValorApilado, registro
+    finprocedimiento
+
+    procedimiento GenerarRegistroPara: nodo
+        si EsInstancia: nodo, AST#NodoIdentificador
+            variable binding
+            fijar binding a BindingDeIdentificador: nodo
+            si BindingEsCapturado: binding
+                devolver GenerarRegistro
+            sino
+                devolver RegistroDeBinding: binding
+            finsi
+        sino
+            devolver GenerarRegistro
+        finsi
+    finprocedimiento
+
+    procedimiento MatarRegistroPara: registro, nodo
+        si no EsInstancia: nodo, AST#NodoIdentificador
+            MatarRegistro': registro
+        sino
+            variable binding
+            fijar binding a BindingDeIdentificador: nodo
+            si BindingEsCapturado: binding
+                MatarRegistro': registro
+            finsi
+        finsi
+    finprocedimiento
+
+    funcion RegistroDeBinding: binding
+        variable locs
+        fijar locs a locales#últimoValorApilado
+        si no locs#contiene: binding
+            locs#fijarEn: binding, GenerarRegistro
+        finsi
+        devolver locs#en: binding
+    finfuncion
+
+    funcion BindingDeIdentificador: nodo
+        variable reg
+        si nodo#esDeclaración
+            fijar reg a tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodo#id
+            si EsNulo: reg
+                Escribir: nodo
+                NoImplementado
+            finsi
+        sino
+            fijar reg a tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodo#id
+            si EsNulo: reg
+                Escribir: nodo
+                NoImplementado
+            finsi
+        finsi
+        devolver reg#binding
+    finfuncion
+
+    funcion BindingEsCapturado: binding
+        variable reg
+        fijar reg a tablasMcAst#tablaEsCapturada#intentaBuscarÚnico: {binding}, binding
+        devolver no EsNulo: reg
+    finfuncion
+
+    procedimiento RegistrarConstanteTextual: texto
+        si constantesTextuales#contiene: texto
+            devolver constantesTextuales#en: texto
+        sino
+            variable k
+            fijar k a contadorConstantes
+            fijar contadorConstantes a contadorConstantes + 1
+            constantesTextuales#fijarEn: texto, k
+            devolver k
+        finsi
+    finprocedimiento
+
+    procedimiento CompilarTodo
+        variables bndCaps, bndLocales, funcIr, M
+        fijar bndCaps a tablasMcAst#tablaCapturas#buscarÚnico: {idNodo}, nodoPrograma#id
+        fijar bndLocales a tablasMcAst#tablaLocales#buscarÚnico: {idNodo}, nodoPrograma#id
+        fijar M a AgregarMetadata: nodoPrograma, nodoPrograma#áreaTextual
+        fijar funcIr a LlamarConSubfunción: bndLocales#bindingsLocales, bndCaps#bindingsCapturados, M, procedimiento
+            CompilarNodo: nodoPrograma, Destino#ninguno
+            devolver Arreglo#vacio
+        finprocedimiento
+        devolver ProgramaIR#crear: funcIr#id, funciones, continuaciones, metadata
+    finprocedimiento
+
+    devolver CompilarTodo
+finfuncion
