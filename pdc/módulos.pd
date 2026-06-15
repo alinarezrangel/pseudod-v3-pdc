@@ -81,6 +81,18 @@ clase BaseDeDatosDeMódulos
     metodo guardarEnArchivo: paquete, módulo, archivo
 
     [DOCUMENTA
+    @brief{Carga la biblioteca PseudoD desde el archivo dado.}
+
+    Todos los módulos son instalados como parte del paquete especificado.
+    DOCUMENTA]
+    metodo cargarBiblioteca: paquete, archivo
+
+    [DOCUMENTA
+    @brief{Guarda todos los módulos de un paquete en un archivo.}
+    DOCUMENTA]
+    metodo guardarBiblioteca: paquete, archivo
+
+    [DOCUMENTA
     @brief{Agrega un nuevo módulo a la base de datos.}
 
     Construye un @pd{Módulo} con los argumentos dados.
@@ -140,25 +152,76 @@ metodo BaseDeDatosDeMódulos#_cargarDesdeArchivoV1: paquete, módulo, json
 finmetodo
 
 metodo BaseDeDatosDeMódulos#guardarEnArchivo: paquete, módulo, archivo
-    variables puerto, modJson, res
+    variables puerto, modJson, res, mod
+    fijar mod a yo#tablaMódulos#buscarMódulo: paquete, módulo
     fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
-    fijar modJson a Diccionario#desdePares: {versión}, 1
-    yo#tablaMódulos#escaneoLineal: procedimiento: mod
-        si (no (mod#paquete = paquete)) || (no (mod#módulo = módulo))
-            devolver NULO
-        finsi
-        modJson#fijarEn: {exportaciones}, (Mapear: mod#exportaciones, funcion: exp
-            devolver Diccionario#desdePares:
-                    {nombre}, exp#nombre,
-                    {esAutoejecutable}, exp#esAutoejecutable
-        finfuncion)
-        modJson#fijarEn: {prefijoDelMódulo}, mod#prefijoDelMódulo
-        modJson#fijarEn: {prefijosDeLosMódulosTransitivos}, mod#prefijosDeLosMódulosTransitivos
-    finprocedimiento
+    fijar modJson a yo#_guardarComoArchivoV1: mod
     fijar res a ComoJSON: puerto, modJson
     si res#esError
         __FallarConMensaje: res#error
     finsi
+finmetodo
+
+metodo BaseDeDatosDeMódulos#_guardarComoArchivoV1: módulo
+    variable modJson
+    fijar modJson a Diccionario#desdePares: {versión}, 1
+    modJson#fijarEn: {exportaciones}, (Mapear: módulo#exportaciones, funcion: exp
+        devolver Diccionario#desdePares:
+                {nombre}, exp#nombre,
+                {esAutoejecutable}, exp#esAutoejecutable
+    finfuncion)
+    modJson#fijarEn: {prefijoDelMódulo}, módulo#prefijoDelMódulo
+    modJson#fijarEn: {prefijosDeLosMódulosTransitivos}, módulo#prefijosDeLosMódulosTransitivos
+    devolver modJson
+finmetodo
+
+metodo BaseDeDatosDeMódulos#cargarBiblioteca: paquete, archivo
+    variables puerto, json, v
+    fijar puerto a PuertoDeArchivoDeLectura#desdeArchivo: archivo
+    fijar json a DesdeJSON: puerto
+    si json#esError
+        __FallarConMensaje: json#error
+    finsi
+    fijar json a json#valor
+    fijar v a json#en: {versión}
+    si v = 1
+        devolver yo#_cargarBibliotecaV1: paquete, json
+    sino
+        __FallarConMensaje: ({No se pudo cargar la base de datos con la versión ~t}#formatear: v)
+    finsi
+finmetodo
+
+metodo BaseDeDatosDeMódulos#_cargarBibliotecaV1: paquete, json
+    variable nombres
+    fijar nombres a Arreglo#vacio
+    ParaCadaElemento: (json#en: {módulos}), procedimiento: ipd
+        yo#_cargarDesdeArchivoV1: paquete, (ipd#en: {módulo}), ipd
+        nombres#agregarAlFinal: (ipd#en: {módulo})
+    finprocedimiento
+    devolver nombres
+finmetodo
+
+metodo BaseDeDatosDeMódulos#guardarBiblioteca: paquete, archivo
+    variables módulos, objJson, puerto, res
+    fijar módulos a yo#tablaMódulos#buscarOrdenado: {paquete}, paquete
+    fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
+    fijar objJson a yo#_guardarBibliotecaV1: módulos
+    fijar res a ComoJSON: puerto, objJson
+    si res#esError
+        __FallarConMensaje: res#error
+    finsi
+finmetodo
+
+metodo BaseDeDatosDeMódulos#_guardarBibliotecaV1: módulos
+    variable ipds
+    fijar ipds a Arreglo#vacio
+    ParaCadaElemento: módulos, procedimiento: mod
+        variable modJson
+        fijar modJson a yo#_guardarComoArchivoV1: mod
+        modJson#fijarEn: {módulo}, mod#módulo
+        ipds#agregarAlFinal: modJson
+    finprocedimiento
+    devolver Diccionario#desdePares: {versión}, 1, {módulos}, ipds
 finmetodo
 
 metodo BaseDeDatosDeMódulos#agregarMódulo: paquete, módulo, exportaciones, prefijoDelMódulo, compilado, prefijosDeLosMódulosTransitivos
