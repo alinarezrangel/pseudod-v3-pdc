@@ -136,6 +136,7 @@ typedef struct pdcrt_gc
 typedef struct pdcrt_texto
 {
     pdcrt_cabecera_gc gc;
+    pdcrt_entero hash;
     size_t longitud;
     char contenido[];
 } pdcrt_texto;
@@ -691,10 +692,16 @@ PDCRT_INLINE bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
 bool pdcrt_comparar_entero_y_float(pdcrt_entero e, pdcrt_float f, enum pdcrt_comparacion op);
 bool pdcrt_comparar_enteros(pdcrt_entero a, pdcrt_entero b, enum pdcrt_comparacion op);
 bool pdcrt_comparar_floats(pdcrt_float a, pdcrt_float b, enum pdcrt_comparacion op);
-bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
+
+PDCRT_INLINE bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b)
+{
+    return a == b;
+}
 
 #define pdcrt_crear_texto_desde_cstr(ctx, m, cstr) \
     pdcrt_crear_texto(ctx, m, cstr, strlen(cstr))
+
+void pdcrt_precalcular_hash(pdcrt_ctx *ctx, pdcrt_obj o);
 
 void pdcrt_traceback(pdcrt_ctx *ctx, pdcrt_marco *m);
 _Noreturn void pdcrt_error(pdcrt_ctx *ctx, const char* msj);

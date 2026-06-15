@@ -409,6 +409,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
             EmitirLínea: puerto,
                          {pdcrt_obj txt = pdcrt_objeto_texto(pdcrt_crear_texto(ctx, PDCRT_GC(), }, (EscaparTexto: const#valor),
                          {, }, const#valor#longitud, {));}
+            EmitirLínea: puerto, {pdcrt_precalcular_hash(ctx, txt);}
             EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(0, m);}
             EmitirLínea: puerto, {PDCRT_CARGAR_RAIZ_CABECERA(1, constantes);}
 

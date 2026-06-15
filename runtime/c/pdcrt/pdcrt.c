@@ -132,8 +132,8 @@ pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
         return pdcrt_hash_entero(o.ival);
     else if(o.recv == &pdcrt_recv_float)
         return pdcrt_hash_float(o.fval);
-    else if(o.recv == pdcrt_recv_texto)
-        return pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud);
+    else if(o.recv == &pdcrt_recv_texto)
+        return o.texto->hash == 0 ? pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud) : o.texto->hash;
     else if(o.recv == &pdcrt_recv_booleano)
         return o.bval ? 0 : 1;
     else if(o.recv == &pdcrt_recv_nulo)
@@ -182,11 +182,21 @@ static pdcrt_texto* pdcrt_crear_nuevo_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, 
     pdcrt_texto *txt = pdcrt_alojar_obj(ctx, m, PDCRT_TGC_TEXTO, sizeof(pdcrt_texto) + len + 1);
     if(!txt)
         pdcrt_enomem(ctx);
+    txt->hash = 0;
     txt->longitud = len;
     if(len > 0)
         memcpy(txt->contenido, str, len);
     txt->contenido[len] = '\0';
     return txt;
+}
+
+void pdcrt_precalcular_hash(pdcrt_ctx *ctx, pdcrt_obj o)
+{
+    (void) ctx;
+    if(o.recv == &pdcrt_recv_texto)
+    {
+        o.texto->hash = pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud);
+    }
 }
 
 static int pdcrt_comparar_str(const char *s1, size_t l1, const char *s2, size_t l2)
@@ -267,10 +277,7 @@ pdcrt_texto* pdcrt_crear_texto(pdcrt_ctx *ctx, pdcrt_gc_raices *m, const char *s
     return txt;
 }
 
-bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b)
-{
-    return a == b;
-}
+extern bool pdcrt_comparar_textos(pdcrt_texto *a, pdcrt_texto *b);
 
 // La mayoría de los tipos son fáciles de comparar (por igualdad). Sin embargo,
 // los números nos presentan un problema: no todos los enteros son floats y no
