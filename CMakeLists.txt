@@ -134,7 +134,6 @@ add_custom_command(
         -fbuiltin-__RT
         "pdc/runtime/c/runtime:${PDCRT_RUNTIME}"
         -o "${PDCRT_RUNTIME_OUT}"
-  JOB_POOL console
   DEPENDS pdc "${PDCRT_RUNTIME}"
   COMMENT "Compiling the PseudoD-side of the runtime"
   VERBATIM

@@ -535,12 +535,12 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
         variables códigoViejo, params, funcIr, nuevasLocales
 
         inicializadores#apilar: Arreglo#vacio
-        registrosDisponibles#apilar: (RegistrosDisponibles#crear: Arreglo#vacío, 0)
+        registrosDisponibles#apilar: (RegistrosDisponibles#crear: Arreglo#vacío, bndCaps#longitud)
         bindingsLocales#apilar: bndLocales
         bindingsCapturados#apilar: bndCaps
         fijar nuevasLocales a Diccionario#vacío
-        ParaCadaElemento: bndCaps, procedimiento: binding
-            nuevasLocales#fijarEn: binding, GenerarRegistro
+        ParaCadaElementoConÍndice: bndCaps, procedimiento: binding, i
+            nuevasLocales#fijarEn: binding, i
         finprocedimiento
         locales#apilar: nuevasLocales
         fijar códigoViejo a códigoActual

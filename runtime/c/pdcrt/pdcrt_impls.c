@@ -1414,24 +1414,6 @@ static pdcrt_tk pdcrt_tabla_para_cada_par_k1(pdcrt_ctx *ctx, pdcrt_marco *m, __m
             return pdcrt_tabla_para_cada_par_k1(ctx, m, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
         }
     }
-    else if(i - pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara) < yo.tabla->num_colisiones)
-    {
-        yo = pdcrt_obtener_local(ctx, m, 0);
-        iterador = pdcrt_obtener_local(ctx, m, 1);
-        oi = pdcrt_obtener_local(ctx, m, 2);
-        i = oi.ival;
-        pdcrt_fijar_local(ctx, m, 2, pdcrt_objeto_entero(i + 1));
-
-        size_t buckets = pdcrt_tabla_num_buckets_hasheables(yo.tabla->mascara);
-
-        PDCRT_ASSERT(i - buckets < yo.tabla->num_colisiones);
-        PDCRT_ASSERT(yo.tabla->colisiones[i - buckets].activo);
-
-        return pdcrt_llamar2(ctx, m, &pdcrt_tabla_para_cada_par_k1,
-            pdcrt_xmm_desde_obj(iterador), pdcrt_xmm_desde_obj(pdcrt_objeto_texto(ctx->textos_globales.llamar)),
-            pdcrt_xmm_desde_obj(yo.tabla->colisiones[i - buckets].llave),
-            pdcrt_xmm_desde_obj(yo.tabla->colisiones[i - buckets].valor));
-    }
     else
     {
         return pdcrt_devolver1(ctx, m, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
@@ -2277,7 +2259,7 @@ static pdcrt_tk pdcrt_corrutina_generar(pdcrt_ctx *ctx, int args, pdcrt_k k, PDC
         pdcrt_errortb(ctx, k.marco, "Corrutina: generador debe llamarse con un argumento");
     pdcrt_obj oyo = pdcrt_obj_desde_xmm(yo);
 #if !NDEBUG
-    pdcrt_debe_tener_tipo(ctx, oyo, PDCRT_TOBJ_CLOSURE);
+    pdcrt_debe_tener_tipo_rapido(ctx, oyo, &pdcrt_recv_closure);
 #endif
     PDCRT_ASSERT(oyo.closure->num_capturas == 1);
     pdcrt_obj obj_coro = oyo.closure->capturas[0];

@@ -7,6 +7,8 @@
 #include "pdcrt_base.h"
 #include "pdcrt_ops.h"
 
+/* Esta implementación de tablas hash está fuertemente inspirada por las tablas hash de Lua 5.4. */
+
 pdcrt_tk pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 {
     if(args != 2)
@@ -37,20 +39,12 @@ pdcrt_tk pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM)
 
 
 #define PDCRT_TABLA_TAM_MINIMO 8 // Debe ser una potencia de 2 mayor a 1
-#define PDCRT_TABLA_OCUPACION_MAXIMA 3 // Máximo 300% de ocupación
-#define PDCRT_TABLA_OCUPACION_MINIMA 4 // Mínimo 1/4 de ocupación
 
 _Static_assert(PDCRT_TABLA_TAM_MINIMO > 1, "PDCRT_TABLA_TAM_MINIMO debe ser mayor a 1");
-_Static_assert(PDCRT_TABLA_OCUPACION_MAXIMA >= 1, "PDCRT_TABLA_OCUPACION_MAXIMA debe ser mayor a 100%");
-_Static_assert(PDCRT_TABLA_OCUPACION_MINIMA > 1, "PDCRT_TABLA_OCUPACION_MINIMA debe ser mayor a 1");
 
 #define PDCRT_TABLA_NUM_MAX_BUCKETS (1LLU << ((sizeof(size_t) * 8LLU) - 1))
 
-size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara)
-{
-    // Aunque parezca un error, la mascara solo tiene 63/31 bits por lo que es seguro.
-    return mascara + 1;
-}
+extern size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara);
 
 void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len)
 {
@@ -58,8 +52,7 @@ void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len)
     {
         arr[i] = (pdcrt_bucket) {
             .activo = false,
-            .idc_colision = 0,
-            .tiene_colision = false,
+            .off_colision = 0,
             .llave = pdcrt_objeto_nulo(),
             .valor = pdcrt_objeto_nulo(),
         };
@@ -73,25 +66,20 @@ void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad)
     tbl->mascara = pdcrt_redondear_a_p2(capacidad) - 1;
     if(tbl->mascara == 0 || capacidad < PDCRT_TABLA_TAM_MINIMO)
         tbl->mascara = PDCRT_TABLA_TAM_MINIMO - 1;
+
     tbl->buckets = pdcrt_alojar_ctx(ctx, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket));
     if(!tbl->buckets)
         pdcrt_enomem(ctx);
     pdcrt_inicializar_buckets(tbl->buckets, pdcrt_tabla_num_buckets_hasheables(tbl->mascara));
 
     tbl->num_colisiones = 0;
-    tbl->cap_colisiones = pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * (PDCRT_TABLA_OCUPACION_MAXIMA - 1) + 1;
-    tbl->colisiones = pdcrt_alojar_ctx(ctx, tbl->cap_colisiones * sizeof(pdcrt_bucket));
-    if(!tbl->colisiones)
-        pdcrt_enomem(ctx);
-
     tbl->buckets_ocupados = 0;
 }
 
 size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl)
 {
-    size_t total = (pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket)) + (tbl->cap_colisiones * sizeof(pdcrt_bucket));
+    size_t total = pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket);
     pdcrt_desalojar_ctx(ctx, tbl->buckets, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * sizeof(pdcrt_bucket));
-    pdcrt_desalojar_ctx(ctx, tbl->colisiones, tbl->cap_colisiones * sizeof(pdcrt_bucket));
     return total;
 }
 
@@ -121,6 +109,7 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
     tbl->buckets = nuevos_buckets;
     tbl->mascara = nueva_cap - 1;
     tbl->buckets_ocupados = 0;
+    tbl->num_colisiones = 0;
 
     for(size_t i = 0; i < hasheables_viejos; i++)
     {
@@ -131,136 +120,103 @@ void pdcrt_tabla_rehashear(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t nueva_cap)
 
     pdcrt_desalojar_ctx(ctx, viejos_buckets, hasheables_viejos * sizeof(pdcrt_bucket));
 
-    tbl->buckets_ocupados = 0;
-    for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
-    {
-        if(tbl->buckets[i].activo)
-        {
-            tbl->buckets_ocupados += 1;
-            tbl->buckets[i].tiene_colision = false;
-        }
-    }
-
-    size_t num_cols = tbl->num_colisiones;
-    tbl->num_colisiones = 0;
-    for(size_t i = 0; i < num_cols; i++)
-    {
-        pdcrt_bucket b = tbl->colisiones[i];
-        if(b.activo)
-            pdcrt_tabla_fijar(ctx, tbl, b.llave, b.valor, false);
-    }
-
-    PDCRT_ASSERT(tbl->num_colisiones <= (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap);
-
-    if(tbl->cap_colisiones > (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1)
-    {
-        pdcrt_bucket *nuevas_cols = pdcrt_realojar_ctx(ctx,
-                                                       tbl->colisiones,
-                                                       tbl->cap_colisiones * sizeof(pdcrt_bucket),
-                                                       (2 * nueva_cap + 1) * sizeof(pdcrt_bucket));
-        if(!nuevas_cols)
-            return;
-        tbl->colisiones = nuevas_cols;
-        tbl->cap_colisiones = (PDCRT_TABLA_OCUPACION_MAXIMA - 1) * nueva_cap + 1;
-    }
-
     PDCRT_PROBE0(tabla_rehashear_exit);
 
     PDCRT_ASSERT(tbl->buckets_ocupados == buckets_ocupados);
 }
 
+static pdcrt_bucket *pdcrt_tabla_reclamar_bucket(pdcrt_tabla *tbl)
+{
+    for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
+    {
+        if(!tbl->buckets[i].activo)
+            return &tbl->buckets[i];
+    }
+    return NULL;
+}
+
 void pdcrt_tabla_fijar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj valor, bool rehashear)
 {
-    if(!pdcrt_es_primitivo(ctx, llave))
-        pdcrt_error(ctx, u8"Se trató de agregar un valor no primitivo a una tabla primitiva");
+    PDCRT_PROBE0(tabla_fijar);
 
-    pdcrt_cabecera_gc *lh = pdcrt_gc_cabecera_de(llave);
-    pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
+    bool rehasheado = false;
+reintentar:;
     pdcrt_entero hash = pdcrt_hash(ctx, llave);
-    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
-    if(b->activo)
+    pdcrt_bucket *b1 = &tbl->buckets[hash & tbl->mascara];
+    if(b1->activo)
     {
-        PDCRT_PROBE0(tabla_fijar_colision);
-        while(true)
+        for(pdcrt_bucket *at = b1;; at += at->off_colision)
         {
-            PDCRT_ASSERT(b->activo);
-
-            if(pdcrt_igualdad(ctx, b->llave, llave))
+            if(pdcrt_igualdad(ctx, llave, at->llave))
             {
+                at->valor = valor;
+                pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(valor);
                 if(vh)
                     pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
-                b->valor = valor;
+                return;
+            }
+
+            if(!at->off_colision)
                 break;
-            }
+        }
 
-            if(!b->tiene_colision)
-            {
-                b->tiene_colision = true;
-                b->idc_colision = tbl->num_colisiones;
+        // Colisión
+        pdcrt_bucket *b2 = &tbl->buckets[pdcrt_hash(ctx, b1->llave) & tbl->mascara];
+        pdcrt_bucket *col = pdcrt_tabla_reclamar_bucket(tbl);
+        if(!col)
+        {
+            PDCRT_ASSERT(!rehasheado);
+            pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) * 2);
+            rehasheado = true;
+            goto reintentar;
+        }
 
-                if(tbl->num_colisiones >= tbl->cap_colisiones)
-                {
-                    size_t nueva_cap = tbl->cap_colisiones * 2;
-                    tbl->colisiones = pdcrt_realojar_ctx(ctx,
-                                                         tbl->colisiones,
-                                                         tbl->cap_colisiones * sizeof(pdcrt_bucket),
-                                                         nueva_cap * sizeof(pdcrt_bucket));
-                    if(!tbl->colisiones)
-                        pdcrt_enomem(ctx);
-                    tbl->cap_colisiones = nueva_cap;
-                    PDCRT_PROBE1(tabla_mas_colisiones, nueva_cap);
-                    PDCRT_ASSERT(tbl->num_colisiones < tbl->cap_colisiones);
-                }
+        tbl->buckets_ocupados += 1;
+        tbl->num_colisiones += 1;
 
-                if(lh)
-                    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), lh);
-                if(vh)
-                    pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
-                tbl->colisiones[tbl->num_colisiones] = (pdcrt_bucket) {
-                    .activo = true,
-                    .idc_colision = 0,
-                    .tiene_colision = false,
-                    .llave = llave,
-                    .valor = valor,
-                };
+        if(b1 == b2)
+        {
+            // Agrega llave/valor como colisión de b1
+            col->activo = true;
+            col->llave = llave;
+            col->valor = valor;
+            col->off_colision = b1->off_colision ? (b1 + b1->off_colision) - col : 0;
+            b1->off_colision = col - b1;
+        }
+        else
+        {
+            // Reubica b1, inserta llave/valor en *b1
+            col->llave = b1->llave;
+            col->valor = b1->valor;
+            col->activo = true;
+            col->off_colision = b1->off_colision ? (b1 + b1->off_colision) - col : 0;
+            pdcrt_bucket *at;
+            for(at = b2;
+                at + at->off_colision != b1;
+                at += at->off_colision)
+            {}
+            at->off_colision = col - at;
 
-                tbl->num_colisiones += 1;
-                tbl->buckets_ocupados += 1;
-                PDCRT_ASSERT(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
-                break;
-            }
-            else
-            {
-                b = &tbl->colisiones[b->idc_colision];
-            }
+            b1->llave = llave;
+            b1->valor = valor;
+            b1->off_colision = 0;
         }
     }
     else
     {
-        if(lh)
-            pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), lh);
-        if(vh)
-            pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
-        *b = (pdcrt_bucket) {
-            .activo = true,
-            .idc_colision = 0,
-            .tiene_colision = false,
-            .llave = llave,
-            .valor = valor,
-        };
-
         tbl->buckets_ocupados += 1;
-        PDCRT_ASSERT(tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) + tbl->num_colisiones);
+        b1->activo = true;
+        b1->llave = llave;
+        b1->valor = valor;
+        b1->off_colision = 0;
     }
 
-    if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
-    {
-        pdcrt_tabla_rehashear(ctx, tbl, tbl->buckets_ocupados);
-    }
-    else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
-    {
-        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
-    }
+    pdcrt_cabecera_gc *vh = pdcrt_gc_cabecera_de(llave);
+    if(vh)
+        pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
+    vh = pdcrt_gc_cabecera_de(valor);
+    if(vh)
+        pdcrt_barrera_de_escritura_cabecera(ctx, PDCRT_CABECERA_GC(tbl), vh);
 }
 
 bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj *valor)
@@ -268,28 +224,34 @@ bool pdcrt_tabla_en(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, pdcrt_obj
     if(!pdcrt_es_primitivo(ctx, llave))
         return false;
 
-    pdcrt_entero hash = pdcrt_hash(ctx, llave);
-    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
-    if(b->activo)
-    {
-        bool iguales = false;
-        while(!((iguales = pdcrt_igualdad(ctx, b->llave, llave))) && b->tiene_colision)
-            b = &tbl->colisiones[b->idc_colision];
+    PDCRT_PROBE0(tabla_en);
 
-        if(iguales)
+    pdcrt_entero hash = pdcrt_hash(ctx, llave);
+    pdcrt_bucket *b1 = &tbl->buckets[hash & tbl->mascara];
+    if(b1->activo)
+    {
+        if(pdcrt_igualdad(ctx, llave, b1->llave))
         {
-            *valor = b->valor;
+            *valor = b1->valor;
             return true;
         }
-        else
+
+        pdcrt_bucket *at = b1;
+        while(true)
         {
-            return false;
+            if(pdcrt_igualdad(ctx, llave, at->llave))
+            {
+                *valor = at->valor;
+                return true;
+            }
+
+            if(!at->off_colision)
+                break;
+
+            at += at->off_colision;
         }
     }
-    else
-    {
-        return false;
-    }
+    return false;
 }
 
 void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, bool rehashear)
@@ -297,109 +259,64 @@ void pdcrt_tabla_eliminar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, pdcrt_obj llave, boo
     if(!pdcrt_es_primitivo(ctx, llave))
         return;
 
+    PDCRT_PROBE0(tabla_eliminar);
+
     pdcrt_entero hash = pdcrt_hash(ctx, llave);
-    pdcrt_bucket *b = &tbl->buckets[hash & tbl->mascara];
-    if(b->activo)
+    pdcrt_bucket *b1 = &tbl->buckets[hash & tbl->mascara];
+    if(b1->activo)
     {
-        if(pdcrt_igualdad(ctx, b->llave, llave))
+        for(pdcrt_bucket *at = b1, *prev = NULL; at != prev; at += at->off_colision, prev = at)
         {
-            pdcrt_bucket *ultimo_activo = b, *penultimo_activo = NULL;
-            size_t idc_actual = 0;
-            while(ultimo_activo->tiene_colision)
+            if(pdcrt_igualdad(ctx, llave, at->llave))
             {
-                PDCRT_BUG(!ultimo_activo->activo, "ultimo_activo debe estar activo (colisiones invalidas)");
-                penultimo_activo = ultimo_activo;
-                idc_actual = ultimo_activo->idc_colision;
-                ultimo_activo = &tbl->colisiones[ultimo_activo->idc_colision];
-            }
+                tbl->buckets_ocupados -= 1;
 
-            ultimo_activo->activo = false;
-            b->llave = ultimo_activo->llave;
-            b->valor = ultimo_activo->valor;
-            tbl->buckets_ocupados -= 1;
-
-            if(penultimo_activo)
-            {
-                penultimo_activo->tiene_colision = false;
-                for(size_t i = 0; i < tbl->num_colisiones; i++)
+                if(!prev)
                 {
-                    pdcrt_bucket col = tbl->colisiones[i];
-                    if(col.tiene_colision && col.idc_colision > idc_actual)
+                    if(!at->off_colision)
                     {
-                        col.idc_colision -= 1;
+                        at->activo = false;
+                        at->off_colision = 0;
                     }
-                    if(i > idc_actual)
+                    else
                     {
-                        tbl->colisiones[i - 1] = col;
-                        tbl->colisiones[i].activo = false;
+                        pdcrt_bucket *ultimo, *penultimo;
+                        for(ultimo = at, penultimo = NULL;
+                            ultimo->off_colision;
+                            penultimo = ultimo, ultimo += ultimo->off_colision)
+                        {}
+                        if(penultimo)
+                            penultimo->off_colision = 0;
+                        ultimo->activo = false;
+                        ultimo->off_colision = 0;
+                        at->llave = ultimo->llave;
+                        at->valor = ultimo->valor;
+
+                        tbl->num_colisiones -= 1;
                     }
                 }
-                tbl->num_colisiones -= 1;
-            }
-        }
-        else
-        {
-            pdcrt_bucket *anterior = NULL, *actual = b;
-            while(actual->tiene_colision)
-            {
-                anterior = actual;
-                actual = &tbl->colisiones[anterior->idc_colision];
-
-                if(pdcrt_igualdad(ctx, actual->llave, llave))
+                else
                 {
-                    size_t idc_actual = anterior->idc_colision;
-
-                    actual->activo = false;
-                    anterior->tiene_colision = actual->tiene_colision;
-                    anterior->idc_colision = actual->idc_colision;
-
-                    for(size_t i = 0; i < tbl->num_colisiones; i++)
-                    {
-                        pdcrt_bucket col = tbl->colisiones[i];
-                        if(col.tiene_colision && col.idc_colision > idc_actual)
-                        {
-                            col.idc_colision -= 1;
-                        }
-                        if(i > idc_actual)
-                        {
-                            tbl->colisiones[i - 1] = col;
-                            tbl->colisiones[i].activo = false;
-                        }
-                    }
-
+                    prev->off_colision = at->off_colision ? prev - (at + at->off_colision) : 0;
+                    at->activo = false;
+                    at->off_colision = 0;
                     tbl->num_colisiones -= 1;
-                    tbl->buckets_ocupados -= 1;
-                    return;
                 }
             }
         }
-    }
-
-    if(rehashear && tbl->buckets_ocupados / pdcrt_tabla_num_buckets_hasheables(tbl->mascara) >= PDCRT_TABLA_OCUPACION_MAXIMA)
-    {
-        pdcrt_tabla_rehashear(ctx, tbl, tbl->buckets_ocupados);
-    }
-    else if(rehashear && tbl->buckets_ocupados <= pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA)
-    {
-        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
     }
 }
 
 void pdcrt_tabla_vaciar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, bool rehashear)
 {
+    (void) rehashear;
+    PDCRT_PROBE0(tabla_vaciar);
+
     for(size_t i = 0; i < pdcrt_tabla_num_buckets_hasheables(tbl->mascara); i++)
     {
         tbl->buckets[i].activo = false;
-    }
-    for(size_t i = 0; i < tbl->num_colisiones; i++)
-    {
-        tbl->colisiones[i].activo = false;
+        tbl->buckets[i].off_colision = 0;
     }
     tbl->num_colisiones = 0;
     tbl->buckets_ocupados = 0;
-
-    if(rehashear)
-    {
-        pdcrt_tabla_rehashear(ctx, tbl, pdcrt_tabla_num_buckets_hasheables(tbl->mascara) / PDCRT_TABLA_OCUPACION_MINIMA);
-    }
 }

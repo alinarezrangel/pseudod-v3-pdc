@@ -541,11 +541,6 @@ class PdcrtLocateCommand(gdb.Command):
             if bucket["activo"]:
                 self.add_child(bucket["llave"], f".buckets[{i}].llave", parent_addr)
                 self.add_child(bucket["valor"], f".buckets[{i}].valor", parent_addr)
-        for i in range(int(tabla["num_colisiones"])):
-            bucket = tabla["colisiones"][i]
-            if bucket["activo"]:
-                self.add_child(bucket["llave"], f".colisiones[{i}].llave", parent_addr)
-                self.add_child(bucket["valor"], f".colisiones[{i}].valor", parent_addr)
 
     def explore_corrutina(self, coro, parent_addr):
         """Explore a corrutina's state"""

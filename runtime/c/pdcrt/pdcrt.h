@@ -233,17 +233,15 @@ struct pdcrt_tabla
 
     bool _bit : 1;
     size_t mascara : sizeof(size_t) * 8 - 1;
-    size_t buckets_ocupados;
-    pdcrt_bucket *buckets, *colisiones;
-    size_t num_colisiones, cap_colisiones;
+    size_t buckets_ocupados, num_colisiones;
+    pdcrt_bucket *buckets;
 };
 
 struct pdcrt_bucket
 {
+    bool activo;
+    ssize_t off_colision;
     pdcrt_obj llave, valor;
-    bool activo : 1;
-    bool tiene_colision : 1;
-    size_t idc_colision : sizeof(void*) * 8 - 2;
 };
 
 typedef void (*pdcrt_valop_liberar)(pdcrt_ctx *ctx, void *datos, size_t ndatos);
@@ -642,7 +640,12 @@ inline void pdcrt_barrera_de_escritura(pdcrt_ctx *ctx, pdcrt_obj contenedor, pdc
     pdcrt_barrera_de_escritura_cabecera(ctx, ch, vh);
 }
 
-size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara);
+PDCRT_INLINE size_t pdcrt_tabla_num_buckets_hasheables(size_t mascara)
+{
+    // Aunque parezca un error, la mascara solo tiene 63/31 bits por lo que es seguro.
+    return mascara + 1;
+}
+
 void pdcrt_inicializar_buckets(pdcrt_bucket *arr, size_t len);
 void pdcrt_tabla_inicializar(pdcrt_ctx *ctx, pdcrt_tabla *tbl, size_t capacidad);
 size_t pdcrt_tabla_desalojar(pdcrt_ctx *ctx, pdcrt_tabla *tbl);

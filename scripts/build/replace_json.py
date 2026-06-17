@@ -13,5 +13,3 @@ except FileNotFoundError:
 
 if in_json != out_json:
     shutil.copyfile(sys.argv[1], sys.argv[2])
-else:
-    print(f"[{sys.argv[2]}] early cut-off", file=sys.stderr)

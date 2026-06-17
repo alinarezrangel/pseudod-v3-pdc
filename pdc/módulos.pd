@@ -153,7 +153,7 @@ finmetodo
 
 metodo BaseDeDatosDeMódulos#guardarEnArchivo: paquete, módulo, archivo
     variables puerto, modJson, res, mod
-    fijar mod a yo#tablaMódulos#buscarMódulo: paquete, módulo
+    fijar mod a yo#buscarMódulo: paquete, módulo
     fijar puerto a PuertoDeArchivoDeEscritura#desdeArchivo: archivo
     fijar modJson a yo#_guardarComoArchivoV1: mod
     fijar res a ComoJSON: puerto, modJson

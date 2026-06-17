@@ -275,14 +275,6 @@ static void pdcrt_gc_visitar_contenido(
                 f_obj(ctx, &b->llave, params);
                 f_obj(ctx, &b->valor, params);
             }
-            for(size_t i = 0; i < tbl->num_colisiones; i++)
-            {
-                pdcrt_bucket *col = &tbl->colisiones[i];
-                if(!col->activo)
-                    continue;
-                f_obj(ctx, &col->llave, params);
-                f_obj(ctx, &col->valor, params);
-            }
             break;
         }
         case PDCRT_TGC_CORO:

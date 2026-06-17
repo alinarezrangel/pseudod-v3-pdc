@@ -133,7 +133,7 @@ pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o)
     else if(o.recv == &pdcrt_recv_float)
         return pdcrt_hash_float(o.fval);
     else if(o.recv == &pdcrt_recv_texto)
-        return o.texto->hash == 0 ? pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud) : o.texto->hash;
+        return o.texto->hash == 0 ? o.texto->hash = pdcrt_hash_bytes(o.texto->contenido, o.texto->longitud) : o.texto->hash;
     else if(o.recv == &pdcrt_recv_booleano)
         return o.bval ? 0 : 1;
     else if(o.recv == &pdcrt_recv_nulo)
