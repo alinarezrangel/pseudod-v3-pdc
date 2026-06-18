@@ -237,48 +237,12 @@ Compila `programa2.pd` y `base.pd`:
 
 Compila `base.pd` y `programa2.pd` por separado:
 
-    pdc -b mi-programa/base:base.pd -o base.opd
-    pdc -b mi-programa/inicio:programa2.pd -k mi-programa/base:./base.opd -o programa2.opd
+    # FIXME: Este ejemplo aún no funciona
+    pdc -b mi-programa/base:base.pd -q mi-programa/base:base.ipd -o base.opd
+    pdc -b mi-programa/inicio:programa2.pd mi-programa/base:base.ipd -o programa2.opd
     pdc ./base.opd ./programa2.opd -o programa2
-
-Compila `base.pd`, `programa3.pd` y `extra.pd` por separado, creando una
-biblioteca para `base` y `extra`:
-
-    mkdir temp
-    pdc -b ./base.pd -o temp/base.opd
-    pdc -b ./extra.pd -k mi-programa/base:./temp/base.opd -o temp/extra.opd
-    pdc -Y mi mi/base:temp/base.opd mi/extra:temp/extra.opd -o mi-programa.bpd
-    # Podrías distribuir mi-programa.bpd como una biblioteca.
-    
-    pdc -b ./programa3.pd -k mi-programa:./mi-programa.bpd -o programa3.opd
-    pdc ./programa3.opd -L. -lmi-programa -o programa3
-
-Compila `base.pd`, `programa3.pd` y `extra.pd` por separado, creando una
-biblioteca para `base` y `extra`. Genera una biblioteca de enlace dinámico:
-
-    mkdir temp
-    pdc -b ./base.pd -o temp/base.opd
-    pdc -b ./extra.pd -k mi-programa/base:./temp/base.opd -o temp/extra.opd
-    pdc -Y mi -shared mi/base:temp/base.opd mi/extra:temp/extra.opd -o mi-programa.bpd -Zco libmi-programa.so
-    # Podrías distribuir mi-programa.bpd y libmi-programa.so como una biblioteca.
-    
-    pdc -b ./programa3.pd -k mi-programa:./mi-programa.bpd -o programa3.opd
-    pdc ./programa3.opd -L. -lmi-programa -o programa3
-
-Compila `base.pd`, `programa3.pd` y `extra.pd` por separado, creando una
-biblioteca para `base` y `extra`. Genera una biblioteca de enlace estático:
-
-    mkdir temp
-    pdc -b ./base.pd -o temp/base.opd
-    pdc -b ./extra.pd -k mi-programa/base:./temp/base.opd -o temp/extra.opd
-    pdc -Y mi -fPIC mi/base:temp/base.opd mi/extra:temp/extra.opd -o mi-programa.bpd -Zco mi-programa.o
-    ar rcs libmi-programa.a mi-programa.o
-    # Podrías distribuir mi-programa.bpd y libmi-programa.a como una biblioteca.
-    
-    pdc -b ./programa3.pd -k mi-programa:./mi-programa.bpd -o programa3.opd
-    pdc ./programa3.opd -L. -lmi-programa -o programa3
 
 ## BUGS ##
 
-Las opciones `-Y`, `-fwhole-program`, `-fsanitize`, `-fno-main`, `-fno-pic`, `-fpie`, `-k` y `-K` no están
+Las opciones `-fwhole-program`, `-fsanitize`, `-fno-main`, `-B` y `-b` no están
 implementadas.

@@ -1217,9 +1217,20 @@ procedimiento EjecutarCompilador: cli
     ParaCadaElemento: opciones#usaBibliotecasPseudoD, procedimiento: uso
         variable archivo
         si uso#enlace#esBiblioteca
-            NoImplementado
-            opciones#rutasDeBibliotecasPseudoD
-            fijar archivo a __AbrirArchivo: uso#enlace#nombre, 10
+            MensajeDepuración: opciones#verboso, {Buscando}, uso#enlace#nombre
+            LlamarConEC: procedimiento: encontrado
+                ParaCadaElemento: opciones#rutasDeBibliotecasPseudoD, procedimiento: rutaBase
+                    variable ruta
+                    fijar ruta a {~t/~t}#formatear: rutaBase, uso#enlace#nombre
+                    MensajeDepuración: opciones#verboso, {En}, ruta
+                    fijar archivo a __AbrirArchivo: ruta, 10
+                    si archivo#estaAbierto
+                        %encontrado: NULO
+                    finsi
+                finprocedimiento
+
+                __FallarConMensaje: ({No se encontró la biblioteca ~t}#formatear: uso#enlace#nombre)
+            finprocedimiento
         sino
             fijar archivo a __AbrirArchivo: uso#enlace#ruta, 10
         finsi
