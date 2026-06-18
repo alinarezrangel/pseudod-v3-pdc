@@ -10,7 +10,7 @@ utilizar pdc/parser (ErrorComoTraceback, CrearCST)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
-utilizar pdc/info (IMPL_COMPILADOR)
+utilizar pdc/info (IMPL_COMPILADOR, CARACTERÍSTICAS)
 
 
 [ Cada identificador del programa que representa una variable se le es asignado
@@ -364,10 +364,26 @@ textual.
 compilada.}
 DOCUMENTA]
 funcion EsCondiciónEstática: condCst, tablas
-    variables lhs, rhs, comp, builtin
-    fijar builtin a tablas#tablaBuiltins#intentaBuscarÚnico: {builtin}, {__Impl}
-    si EsNulo: builtin
-        devolver NULO
+    si EsInstancia: condCst, CST#NodoNo
+        variable res
+        fijar res a EsCondiciónEstática: condCst#expresión, tablas
+        si EsNulo: res
+            devolver NULO
+        sino
+            devolver no res
+        finsi
+    finsi
+
+    variables lhs, rhs, comp, contieneCaracterística, builtinImpl, builtinRt, bindingImpl, bindingRt, puedeRotar
+    fijar builtinImpl a tablas#tablaBuiltins#intentaBuscarÚnico: {builtin}, {__Impl}
+    fijar builtinRt a tablas#tablaBuiltins#intentaBuscarÚnico: {builtin}, {obtenerRuntime}
+    fijar contieneCaracterística a FALSO
+    fijar puedeRotar a VERDADERO
+    si no EsNulo: builtinImpl
+        fijar bindingImpl a builtinImpl#binding
+    finsi
+    si no EsNulo: builtinRt
+        fijar bindingRt a builtinRt#binding
     finsi
 
     si EsInstancia: condCst, CST#NodoSonIguales
@@ -380,6 +396,7 @@ funcion EsCondiciónEstática: condCst, tablas
         && (no condCst#mensaje = {distintoDe})
         && (no condCst#mensaje = {operador_=})
         && (no condCst#mensaje = {operador_no=})
+        && (no condCst#mensaje = {contieneCaracterística})
             devolver NULO
         finsi
         si no condCst#argumentos#longitud = 1
@@ -390,11 +407,17 @@ funcion EsCondiciónEstática: condCst, tablas
         finsi
         fijar lhs a condCst#objeto
         fijar rhs a condCst#argumentos#en: 0
-        si (no condCst#mensaje = {igualA})
-        || (no condCst#mensaje = {operador_=})
+        si (condCst#mensaje = {igualA})
+        || (condCst#mensaje = {operador_=})
             fijar comp a CST#TipoIgualdad#IGUALES
         sino
-            fijar comp a CST#TipoIgualdad#DIFERENTES
+            si condCst#mensaje = {contieneCaracterística}
+                fijar comp a CST#TipoIgualdad#IGUALES
+                fijar contieneCaracterística a VERDADERO
+                fijar puedeRotar a FALSO
+            sino
+                fijar comp a CST#TipoIgualdad#DIFERENTES
+            finsi
         finsi
     finsi
     si EsInstancia: condCst, CST#NodoOperador
@@ -426,17 +449,41 @@ funcion EsCondiciónEstática: condCst, tablas
             fijar id a lhs
             fijar txt a rhs
         sino
+            si no puedeRotar
+                devolver NULO
+            finsi
             fijar id a rhs
             fijar txt a lhs
         finsi
 
-        variable rec
+        variables rec, valor
         fijar rec a tablas#tablaUsos#buscarÚnico: {idNodo}, id#id
-        si no rec#binding = builtin#binding
+
+        si rec#binding = bindingImpl
+            fijar valor a IMPL_COMPILADOR
+            si contieneCaracterística
+                devolver NULO
+            finsi
+        finsi
+        si rec#binding = bindingRt
+            fijar valor a CARACTERÍSTICAS
+            si no contieneCaracterística
+                devolver NULO
+            finsi
+        finsi
+        si EsNulo: valor
             devolver NULO
         finsi
 
-        devolver txt#valor = IMPL_COMPILADOR
+        si contieneCaracterística
+            devolver Contiene: valor, txt#valor
+        finsi
+        si comp = CST#TipoIgualdad#IGUALES
+            devolver txt#valor = valor
+        sino
+            necesitas comp = CST#TipoIgualdad#DIFERENTES
+            devolver no txt#valor = valor
+        finsi
     sino
         devolver NULO
     finsi
