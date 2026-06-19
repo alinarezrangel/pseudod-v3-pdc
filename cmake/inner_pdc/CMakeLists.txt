@@ -20,3 +20,10 @@ add_pseudod_compile(
         ALL
         COLLECTIONS col_bepd col_pdc
 )
+
+add_pseudod_library_bpd(
+        pdc_inner_bpd_bepd
+        ALL
+        MAIN_COLLECTION col_bepd
+        COLLECTIONS col_bepd
+)

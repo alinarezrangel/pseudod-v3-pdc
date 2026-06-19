@@ -119,6 +119,7 @@ function(pseudod_collection pdcoll)
     set("${pdcoll}_SOURCES" "${sources}" PARENT_SCOPE)
     set("${pdcoll}_C_FILES" "${c_files}" PARENT_SCOPE)
     set("${pdcoll}_GEN_FILES" "${intermediate_files}" PARENT_SCOPE)
+    set("${pdcoll}_BPD" "${PSEUDOD_CURRENT_BINARY_DIR}/${arg_PACKAGE}.bpd" PARENT_SCOPE)
 endfunction()
 
 function(add_pseudod_compile new_target_name)
@@ -194,7 +195,7 @@ function(add_pseudod_compile new_target_name)
 endfunction()
 
 function(add_pseudod_executable cc_new_target_name)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "" "ENTRY;DEPENDS" "COLLECTIONS")
+    cmake_parse_arguments(PARSE_ARGV 0 arg "" "ENTRY" "COLLECTIONS;DEPENDS")
 
     if(NOT arg_ENTRY)
         message(FATAL_ERROR "add_pseudod_executable: ENTRY is required")
@@ -213,7 +214,7 @@ function(add_pseudod_executable cc_new_target_name)
                 set(module "${CMAKE_MATCH_2}")
                 set(cfile "${CMAKE_MATCH_3}")
             else()
-                message(FATAL_ERROR "Invalid collection entry: ${package} -> '${source_data}'")
+                message(FATAL_ERROR "Invalid collection entry: ${pdcoll} -> '${source_data}'")
             endif()
 
             if("${package}/${module}" STREQUAL "${arg_ENTRY}")
@@ -242,21 +243,21 @@ function(add_pseudod_executable cc_new_target_name)
     target_link_libraries("${cc_new_target_name}" PUBLIC "${cc_new_target_name}_int")
 
     if(arg_DEPENDS)
-        add_dependencies("${cc_new_target_name}" "${arg_DEPENDS}")
+        add_dependencies("${cc_new_target_name}" ${arg_DEPENDS})
     endif()
 endfunction()
 
-function(add_pseudod_library cc_new_target_name)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "SHARED;STATIC;OBJECT" "MAIN_COLLECTION;DEPENDS" "COLLECTIONS")
+function(add_pseudod_library_bpd cc_new_target_name)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "ALL" "MAIN_COLLECTION" "COLLECTIONS")
 
     if(NOT arg_MAIN_COLLECTION)
         message(FATAL_ERROR "add_pseudod_library: MAIN_COLLECTION is required")
     endif()
 
-    set(cfiles "")
     set(ifiles "")
     set(deps "")
     set(main_pkg "${${arg_MAIN_COLLECTION}_PACKAGE}")
+    set(bfile "${${arg_MAIN_COLLECTION}_BPD}")
 
     foreach(pdcoll IN LISTS arg_COLLECTIONS)
         set(c_files "${${pdcoll}_C_FILES}")
@@ -267,42 +268,15 @@ function(add_pseudod_library cc_new_target_name)
                 set(module "${CMAKE_MATCH_2}")
                 set(cfile "${CMAKE_MATCH_3}")
             else()
-                message(FATAL_ERROR "Invalid collection entry: ${package} -> '${source_data}'")
+                message(FATAL_ERROR "Invalid collection entry: ${pdcoll} -> '${source_data}'")
             endif()
 
             set(ifile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}/${module}.ipd")
 
-            if("${package}" STREQUAL "${main_pkg}")
-                set(bfile "${PSEUDOD_CURRENT_BINARY_DIR}/${package}.bpd")
-            endif()
-
-            list(APPEND cfiles "${cfile}")
             list(APPEND ifiles "${ifile}")
             list(APPEND deps "${package}/${module}:${ifile}")
         endforeach()
     endforeach()
-
-    if(NOT bfile)
-        message(FATAL_ERROR "add_pseudod_library: MAIN_COLLECTION must be set")
-    endif()
-
-    add_library("${cc_new_target_name}_int" INTERFACE)
-    target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_CFLAGS})
-    target_include_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_INCLUDEDIRS})
-    target_link_libraries("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LIBS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBNAMES})
-    target_link_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBDIRS})
-    target_link_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LDFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LDFLAGS})
-
-    if(arg_SHARED)
-        add_library("${cc_new_target_name}_lib" SHARED ${cfiles})
-    elseif(arg_STATIC)
-        add_library("${cc_new_target_name}_lib" STATIC ${cfiles})
-    elseif(arg_OBJECT)
-        add_library("${cc_new_target_name}_lib" OBJECT ${cfiles})
-    else()
-        message(FATAL_ERROR "add_pseudod_library must be STATIC, SHARED or OBJECT")
-    endif()
-    target_link_libraries("${cc_new_target_name}_lib" PUBLIC "${cc_new_target_name}_int")
 
     add_custom_command(
             OUTPUT "${bfile}"
@@ -316,10 +290,68 @@ function(add_pseudod_library cc_new_target_name)
             VERBATIM
             COMMAND_EXPAND_LISTS
     )
-    add_custom_target("${cc_new_target_name}_bpd" DEPENDS "${bfile}")
 
-    add_custom_target("${cc_new_target_name}" DEPENDS "${cc_new_target_name}_bpd" "${cc_new_target_name}_lib")
-    if(arg_DEPENDS)
-        add_dependencies("${cc_new_target_name}" "${arg_DEPENDS}")
+    if(arg_ALL)
+        set(opt_all "ALL")
+    else()
+        set(opt_all "")
+    endif()
+
+    add_custom_target("${cc_new_target_name}" ${opt_all} DEPENDS "${bfile}")
+endfunction()
+
+function(add_pseudod_library cc_new_target_name)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "SHARED;STATIC;OBJECT;EXCLUDE_FROM_ALL" "MAIN_COLLECTION" "COLLECTIONS;DEPENDS")
+
+    if(arg_ADD_BPD)
+        add_pseudod_library_bpd(
+                "${cc_new_target_name}"
+                MAIN_COLLECTION "${arg_MAIN_COLLECTION}"
+                COLLECTIONS ${arg_COLLECTIONS}
+        )
+    endif()
+
+    set(cfiles "")
+
+    foreach(pdcoll IN LISTS arg_COLLECTIONS)
+        set(c_files "${${pdcoll}_C_FILES}")
+
+        foreach(source_data IN LISTS c_files)
+            if(source_data MATCHES "^([^/]+)/([^:]+):(.*)$")
+                set(cfile "${CMAKE_MATCH_3}")
+            else()
+                message(FATAL_ERROR "Invalid collection entry: ${pdcoll} -> '${source_data}'")
+            endif()
+
+            list(APPEND cfiles "${cfile}")
+        endforeach()
+    endforeach()
+
+    add_library("${cc_new_target_name}_int" INTERFACE)
+    target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_CFLAGS})
+    target_include_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_INCLUDEDIRS})
+    target_link_libraries("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LIBS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBNAMES})
+    target_link_directories("${cc_new_target_name}_int" INTERFACE ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LIBDIRS})
+    target_link_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_LDFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_LDFLAGS})
+
+    if(arg_EXCLUDE_FROM_ALL)
+        set(opt_no_all "EXCLUDE_FROM_ALL")
+    else()
+        set(opt_no_all "")
+    endif()
+
+    if(arg_SHARED)
+        add_library("${cc_new_target_name}" SHARED ${cfiles} ${opt_no_all})
+    elseif(arg_STATIC)
+        add_library("${cc_new_target_name}" STATIC ${cfiles} ${opt_no_all})
+    elseif(arg_OBJECT)
+        add_library("${cc_new_target_name}" OBJECT ${cfiles} ${opt_no_all})
+    else()
+        message(FATAL_ERROR "add_pseudod_library must be STATIC, SHARED or OBJECT")
+    endif()
+    target_link_libraries("${cc_new_target_name}" PUBLIC "${cc_new_target_name}_int")
+
+    if(arg_ADD_BPD)
+        add_dependencies("${cc_new_target_name}" "${cc_new_target_name}_bpd" ${arg_DEPENDS})
     endif()
 endfunction()

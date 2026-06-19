@@ -169,8 +169,18 @@ ExternalProject_Add(inner_pdc_cgen
         INSTALL_COMMAND ""
         USES_TERMINAL_BUILD ON
         BUILD_ALWAYS ON
-        BUILD_BYPRODUCTS ${PDC_GEN_FILES}
+        BUILD_BYPRODUCTS ${PDC_GEN_FILES} "${col_bepd_BPD}"
 )
+
+ExternalProject_Add_StepTargets(inner_pdc_cgen configure build)
+
+add_pseudod_library(
+        pd_bepd_static
+        STATIC
+        COLLECTIONS col_bepd
+)
+
+set_target_properties(pd_bepd_static PROPERTIES OUTPUT_NAME "pd-${TOOL_PREFIX}bepd")
 
 add_pseudod_executable(pdc
         COLLECTIONS col_bepd col_pdc
@@ -212,6 +222,16 @@ install(TARGETS pdcrt_lib
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TOOL_PREFIX}pdc
+)
+
+install(TARGETS pd_bepd_static
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(FILES "${col_bepd_BPD}"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/${TOOL_PREFIX}pdc/
 )
 
 install(DIRECTORY runtime/c/pdcrt/
