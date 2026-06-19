@@ -1,6 +1,7 @@
 import json
 import sys
 import shutil
+import os
 
 
 with open(sys.argv[1], "r") as in_handle:
@@ -13,3 +14,5 @@ except FileNotFoundError:
 
 if in_json != out_json:
     shutil.copyfile(sys.argv[1], sys.argv[2])
+
+os.remove(sys.argv[1])

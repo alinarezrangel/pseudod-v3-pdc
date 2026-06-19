@@ -125,6 +125,7 @@ function(add_pseudod_compile new_target_name)
     cmake_parse_arguments(PARSE_ARGV 0 arg "ALL" "" "COLLECTIONS")
 
     set(all_cfiles "")
+    set(all_ifiles "")
 
     foreach(pdcoll IN LISTS arg_COLLECTIONS)
         set(sources_data "${${pdcoll}_SOURCES}")
@@ -177,6 +178,7 @@ function(add_pseudod_compile new_target_name)
             )
 
             list(APPEND all_cfiles "${cfile}")
+            list(APPEND all_ifiles "${ifile}")
         endforeach()
     endforeach()
 
@@ -185,6 +187,8 @@ function(add_pseudod_compile new_target_name)
     else()
         set(opt_all "")
     endif()
+
+    set_source_files_properties(${all_cfiles} ${all_ifiles} PROPERTIES GENERATED TRUE)
 
     add_custom_target("${new_target_name}" ${opt_all} DEPENDS ${all_cfiles})
 endfunction()
@@ -224,8 +228,6 @@ function(add_pseudod_executable cc_new_target_name)
     if(NOT found_entry)
         message(FATAL_ERROR "add_pseudod_executable: entry ${arg_ENTRY} not found in collections")
     endif()
-
-    set_source_files_properties(${other_cfiles} ${entry_cfile} PROPERTIES GENERATED TRUE)
 
     add_library("${cc_new_target_name}_int" INTERFACE)
     target_compile_options("${cc_new_target_name}_int" INTERFACE ${PSEUDOD_CFLAGS} ${${PSEUDOD_CURRENT_TOOLCHAIN}_C_CFLAGS})
