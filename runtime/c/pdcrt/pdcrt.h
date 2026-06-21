@@ -683,7 +683,7 @@ PDCRT_INLINE bool pdcrt_es_mayor_que(enum pdcrt_comparacion op)
 }
 
 #define PDCRT_K(func)                                   \
-    if(pdcrt_stack_lleno(ctx))                          \
+    if(PDCRT_POCO_PROBABLE(pdcrt_stack_lleno(ctx)))     \
     {                                                   \
         PDCRT_DEFINE_RAICES(1);                         \
         PDCRT_GUARDAR_RAIZ_CABECERA(0, m);              \
@@ -747,6 +747,10 @@ pdcrt_entero pdcrt_hash(pdcrt_ctx *ctx, pdcrt_obj o);
 bool pdcrt_igualdad(pdcrt_ctx *ctx, pdcrt_obj a, pdcrt_obj b);
 pdcrt_tk pdcrt_funcion_igualdad(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
 pdcrt_tk pdcrt_funcion_hash(pdcrt_ctx *ctx, int args, pdcrt_k k, PDCRT_F_IMM);
+
+typedef struct pdffi_ctx pdffi_ctx;
+typedef int (*pdffi_f)(pdffi_ctx *ctx, int nargs);
+pdcrt_obj pdffi_invocar_funcion(pdcrt_ctx *ctx, pdcrt_marco **m, pdffi_f f, int args);
 
 void pdcrt_inspeccionar_pila(pdcrt_ctx *ctx);
 void pdcrt_inspeccionar_texto(pdcrt_texto *txt);

@@ -89,11 +89,7 @@ void pdcrt_desalojar_alojador_con_estadisticas(pdcrt_aloj* yo);
 
 PDCRT_INLINE uintptr_t pdcrt_obtener_stack_pointer(void)
 {
-    // TODO: Portar a distíntas arquitecturas
-    uintptr_t sp;
-    asm inline("mov %%rsp, %0\n"
-        : "=r" (sp));
-    return sp;
+    return (uintptr_t) __builtin_frame_address(0);
 }
 
 inline size_t pdcrt_redondear_a_p2(size_t n)

@@ -958,3 +958,11 @@ void pdcrt_assert(pdcrt_ctx *ctx, pdcrt_obj v)
         pdcrt_error(ctx, "necesitas fallido");
     }
 }
+
+pdcrt_tk pdcrt_invocar_ffi(pdcrt_ctx *ctx, pdcrt_marco *m, int args, int rets, pdffi_f simbolo, pdcrt_kf k)
+{
+    PDCRT_ASSERT(rets == 1);
+    pdcrt_obj res = pdffi_invocar_funcion(ctx, &m, simbolo, args);
+    pdcrt_empujar(ctx, res);
+    return k(ctx, m, pdcrt_xmm_desde_obj(pdcrt_objeto_nulo()));
+}

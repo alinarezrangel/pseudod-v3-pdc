@@ -533,4 +533,27 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
                      {pdcrt_fijar_local(ctx, m, }, (tupla#en: 1),
                      {, ctx->espacio_de_nombres_runtime);}
     finsi
+
+    si opcode = Opcode#ffiC_s1
+        EmitirLínea: puerto, {pdcrt_extender_pila(ctx, }, (tupla#en: 3)#longitud, {);}
+        ParaCadaElemento: (tupla#en: 3), procedimiento: arg
+            necesitas no arg#esVariadic
+            EmitirLínea: puerto, {pdcrt_empujar(ctx, pdcrt_obtener_local(ctx, m, }, arg#registro, {));}
+        finprocedimiento
+        EmitirLínea: puerto, {int }, (tupla#en: 2), {(pdffi_ctx *ctx, int nargs);}
+        EmitirLínea: puerto,
+                     {return pdcrt_invocar_ffi(ctx, m, },
+                     (tupla#en: 3)#longitud,
+                     {, }, (tupla#en: 1)#longitud,
+                     {, &}, (tupla#en: 2),
+                     {, }, (NombreDeLaContinuación: identificadorDelMódulo, (tupla#en: 4)),
+                     {);}
+    finsi
+
+    si opcode = Opcode#ffiC_s2
+        ParaCadaElementoEnReversa: (tupla#en: 1), procedimiento: ret
+            necesitas no ret#esVariadic
+            EmitirLínea: puerto, {pdcrt_fijar_local(ctx, m, }, ret#registro, {, pdcrt_sacar(ctx));}
+        finprocedimiento
+    finsi
 finprocedimiento

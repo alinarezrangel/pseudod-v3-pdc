@@ -1,0 +1,8 @@
+[#variables-globales \ProcedimientoExterno\]
+
+funcion Ejemplo
+    devolver ProcedimientoExterno: {ejemplo_externo}
+finfuncion
+
+escribir Ejemplo#comoTexto
+nl

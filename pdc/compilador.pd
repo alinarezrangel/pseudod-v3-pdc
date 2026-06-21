@@ -107,6 +107,7 @@ variable TODOS_LOS_BUILTINS
 fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO),
     (RegistrarBuiltin#crear: {__Impl}, {__Impl}, FALSO),
+    (RegistrarBuiltin#crear: {ProcedimientoExterno}, {ffiC}, VERDADERO),
     (RegistrarBuiltin#crear: {VERDADERO}, {rt:VERDADERO}, FALSO),
     (RegistrarBuiltin#crear: {FALSO}, {rt:FALSO}, FALSO),
     (RegistrarBuiltin#crear: {NULO}, {rt:NULO}, FALSO),

@@ -487,6 +487,31 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
                     Emitir: Opcode#texto, destino#registro, const, M
                 finsi
             finsi
+            si nodo#nombre = {ffiC}
+                fijar nodoOk a VERDADERO
+
+                si nodo#argumentos#longitud = 0
+                    Escribir: {Error en}, nodo#áreaTextual
+                    __FallarConMensaje: {ffiC: el primer argumento debe ser la función a llamar}
+                finsi
+
+                variables ffi, nodoFfi, nodosArgs
+
+                fijar nodoFfi a nodo#argumentos#en: 0
+                fijar nodosArgs a PedazoDeArreglo: nodo#argumentos, 1, -1
+
+                si nodoFfi#esVariadic
+                    Escribir: {Error en}, nodoFfi#áreaTextual
+                    __FallarConMensaje: {ffiC: el primer argumento debe ser la función a llamar}
+                finsi
+                si no EsInstancia: nodoFfi#expresión, AST#NodoLiteralTextual
+                    Escribir: {Error en}, nodoFfi#áreaTextual
+                    __FallarConMensaje: {ffiC: el primer argumento debe ser la función a llamar}
+                finsi
+                fijar ffi a nodoFfi#expresión#valor
+
+                CompilarEnviarMensajeARegistro: destino, NULO, ffi, nodosArgs, FALSO, VERDADERO, M
+            finsi
             si (nodo#nombre#subTexto: 0, 3) = {rt:}
                 fijar nodoOk a VERDADERO
                 variables nombre, rets, regObj, const, args, argsYRegs, regDest
@@ -498,6 +523,7 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
                                                 regObj,
                                                 nombre,
                                                 nodo#argumentos,
+                                                FALSO,
                                                 FALSO,
                                                 M
 
@@ -576,12 +602,13 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
                                         nodoEnviarMensaje#mensaje,
                                         nodoEnviarMensaje#argumentos,
                                         esTailCall,
+                                        FALSO,
                                         M
         CompilarNodo: nodoEnviarMensaje#objeto, (Destino#paraRegistro: regObj)
         MatarRegistroPara: regObj, nodoEnviarMensaje#objeto
     finprocedimiento
 
-    procedimiento CompilarEnviarMensajeARegistro: destino, regObj, mensaje, argumentos, esTailCall, M
+    procedimiento CompilarEnviarMensajeARegistro: destino, regObj, mensaje, argumentos, esTailCall, esFfi, M
         variables rets, const, args, argsYRegs, regDest
 
         si destino#esParaRegistro
@@ -591,8 +618,6 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
         finsi
         fijar rets a Arreglo#crearCon: (Retorno#crear: FALSO, regDest)
 
-        fijar const a RegistrarConstanteTextual: mensaje
-
         fijar argsYRegs a Mapear: argumentos, funcion: arg
             devolver Arreglo#crearCon: arg, (GenerarRegistroPara: arg#expresión)
         finfuncion
@@ -601,11 +626,23 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
             devolver Argumento#crear: (tupla#en: 0)#esVariadic, (tupla#en: 1)
         finfuncion
 
-        si esTailCall
-            Emitir: Opcode#enviarMensaje_t, rets, regObj, const, args, M
+        si esFfi
+            necesitas EsNulo: regObj
+            si esTailCall
+                NoImplementado
+            sino
+                Emitir: Opcode#ffiC_s2, rets, mensaje, args, M
+                Emitir: Opcode#ffiC_s1, rets, mensaje, args, M
+            finsi
         sino
-            Emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
-            Emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
+            fijar const a RegistrarConstanteTextual: mensaje
+
+            si esTailCall
+                Emitir: Opcode#enviarMensaje_t, rets, regObj, const, args, M
+            sino
+                Emitir: Opcode#enviarMensaje_s2, rets, regObj, const, args, M
+                Emitir: Opcode#enviarMensaje_s1, rets, regObj, const, args, M
+            finsi
         finsi
 
         si destino#esNinguno

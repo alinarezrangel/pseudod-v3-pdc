@@ -198,4 +198,6 @@ PDCRT_INLINE pdcrt_obj pdcrt_crear_espacio_de_nombres_cons(pdcrt_ctx *ctx, pdcrt
     return pdcrt_objeto_tabla(pdcrt_crear_tabla(ctx, m, 32));
 }
 
+pdcrt_tk pdcrt_invocar_ffi(pdcrt_ctx *ctx, pdcrt_marco *m, int args, int rets, pdffi_f simbolo, pdcrt_kf k);
+
 #endif //PDCRT_OPS_H

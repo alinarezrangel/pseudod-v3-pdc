@@ -225,6 +225,13 @@ el valor devuelto por el opcode @code{importar}).}
 
 @defenum("crearConstantes"){Acepta un argumento: el arreglo con las
 constantes (véase @pd{Constante}).}
+
+@defenum("ffiC_s1"){Llama a una función definida en C. Toma 3 argumentos:
+un arreglo de @pd{Retorno}s, el @pd{Texto} con el nombre de la función a llamar
+y un arreglo de @pd{Argumento}s. Ninguno de los argumentos o retornos puede ser
+variadic.}
+
+@defenum("ffiC_s2"){La segunda parte de @code{ffiC_s1}.}
 )
 DOCUMENTA]
 variable Opcode
@@ -263,7 +270,9 @@ fijar Opcode a EnumConValores: {Opcode},
     {extraer_s2},                        (OpcionesDeOpcode#crear: FALSO,     0),
     {obtenerEspacioDeNombresDelRuntime}, (OpcionesDeOpcode#crear: FALSO,     0),
     {comoEspacioDeNombres},              (OpcionesDeOpcode#crear: FALSO,     0),
-    {crearConstantes},                   (OpcionesDeOpcode#crear: FALSO,     2)
+    {crearConstantes},                   (OpcionesDeOpcode#crear: FALSO,     2),
+    {ffiC_s1},                           (OpcionesDeOpcode#crear: VERDADERO, 0),
+    {ffiC_s2},                           (OpcionesDeOpcode#crear: FALSO,     0)
 
 [DOCUMENTA
 @brief{Determina si el opcode requiere una continuación.}

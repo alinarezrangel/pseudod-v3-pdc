@@ -654,7 +654,6 @@ pdcrt_ctx *pdcrt_crear_contexto(pdcrt_aloj *aloj, pdcrt_vio vio)
     ctx->tam_textos = ctx->cap_textos = 0;
     ctx->textos = NULL;
 
-    // TODO: Esto debería estár en `pdcrt_ejecutar_opt`.
     ctx->inicio_del_stack = 0;
     ctx->tam_stack = 3 * 1024 * 1024; // 3 MiB
 
@@ -792,6 +791,8 @@ void pdcrt_arreglo_abrir_espacio(pdcrt_ctx *ctx,
     size_t nueva_cap = arr->longitud + espacio;
     if(nueva_cap == 0)
         return;
+    if(nueva_cap < arr->capacidad * 2)
+        nueva_cap = arr->capacidad * 2;
     pdcrt_obj *nuevos_vals = pdcrt_realojar_ctx(ctx, arr->valores,
                                                 sizeof(pdcrt_obj) * arr->capacidad,
                                                 sizeof(pdcrt_obj) * nueva_cap);
@@ -841,9 +842,6 @@ static pdcrt_tk pdcrt_inicio_de_ejecutar(pdcrt_ctx *ctx, int args, pdcrt_k k, PD
 
 static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool protegido)
 {
-    // TODO args > 0 en ejecutar_opt
-    PDCRT_ASSERT(args == 0 && "TODO ejecutar_opt(args > 0)");
-
     PDCRT_PROBE0(ejecutar_entry);
 
     pdcrt_ctx * volatile ctx = ctxp;
@@ -908,8 +906,8 @@ static bool pdcrt_ejecutar_opt(pdcrt_ctx *ctxp, int args, pdcrt_f f, bool proteg
     if(setjmp(ctx->continuar) == 0)
     {
         ctx->hay_un_continuar = true;
-        pdcrt_obj cls = pdcrt_crear_closure_obj_0(ctx, NULL, f);
-        ctx->continuacion_actual = pdcrt_inicio_de_ejecutar(ctx, 0, k,
+        pdcrt_obj cls = pdcrt_crear_closure_obj(ctx, NULL, f, args);
+        ctx->continuacion_actual = pdcrt_inicio_de_ejecutar(ctx, 1, k,
             PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), pdcrt_xmm_desde_obj(cls), PDCRT_XMM_NULO(),
             PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO(), PDCRT_XMM_NULO());
     }
