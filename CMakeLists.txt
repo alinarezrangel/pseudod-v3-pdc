@@ -24,6 +24,8 @@ set(TOOL_PREFIX "" CACHE STRING
 set(PSEUDOD_TOOLCHAIN "" CACHE STRING
         "Determina que toolchain de PseudoD será utilizado. Véase `docs/cmake.md` para más información.")
 
+set(PSEUDOD_TARGET_TOOLCHAIN_PATH "${CMAKE_INSTALL_FULL_DATADIR}/${TOOL_PREFIX}pdc/toolchain.txt")
+
 if(NOT PSEUDOD_TOOLCHAIN STREQUAL "")
     file(READ "${PSEUDOD_TOOLCHAIN}" toolchain)
     pseudod_load_toolchain(CUSTOM_PSEUDOD_TOOLCHAIN "${toolchain}")
@@ -166,6 +168,7 @@ ExternalProject_Add(inner_pdc_cgen
         "-DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}"
         "-DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}"
         "-DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}"
+        "-DPSEUDOD_TARGET_TOOLCHAIN_PATH:STRING=${PSEUDOD_TARGET_TOOLCHAIN_PATH}"
         INSTALL_COMMAND ""
         USES_TERMINAL_BUILD ON
         BUILD_ALWAYS ON

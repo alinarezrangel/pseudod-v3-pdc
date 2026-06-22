@@ -1,0 +1,46 @@
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/texto (Partir)
+utilizar bepd/utilidades/texto/ascii (LF, HT, CR)
+
+
+funcion TextoSinEspacios: txt
+    variables i, inicio, final
+    fijar i a 0
+    fijar final a txt#longitud
+    mientras i < txt#longitud
+        variable c
+        fijar c a txt#en: i
+        si (son diferentes c y LF)
+        && (son diferentes c y HT)
+        && (son diferentes c y CR)
+        && (son diferentes c y { })
+            si EsNulo: inicio
+                fijar inicio a i
+            finsi
+            fijar final a i + 1
+        finsi
+        fijar i a i + 1
+    finmientras
+    si EsNulo: inicio
+        fijar inicio a final
+    finsi
+    devolver txt#parteDelTexto: inicio, final
+finfuncion
+
+
+procedimiento ParsearCabeceras: txt
+    variable líneas
+    fijar líneas a Mapear: (Partir: txt, {~%}#formatear), &TextoSinEspacios
+    fijar líneas a Filtrar: líneas, funcion: línea
+        devolver línea#longitud > 0
+    finfuncion
+    devolver Diccionario#desdeArreglo: (Mapear: líneas, funcion: línea
+        variables c, v, t
+        fijar t a Partir: línea, {:}
+        necesitas t#longitud = 2
+        fijar c a t#en: 0
+        fijar v a t#en: 1
+        devolver Arreglo#crearCon: c, (TextoSinEspacios: v)
+    finfuncion)
+finprocedimiento

@@ -1,3 +1,5 @@
+set_source_files_properties(pdc/compilador.pd PROPERTIES PSEUDOD_COMPILE_OPTIONS "-Dtoolchain=${PSEUDOD_TARGET_TOOLCHAIN_PATH}")
+
 pseudod_collection(col_bepd
         PACKAGE bepd
         SOURCES
@@ -61,6 +63,7 @@ pseudod_collection(col_pdc
         pdc/tokens.pd
         pdc/validación.pd
         pdc/subproceso.pd
+        pdc/cabeceras.pd
 )
 
 set(PDC_GEN_FILES ${col_bepd_GEN_FILES} ${col_pdc_GEN_FILES})

@@ -4,3 +4,4 @@ pdc: @CMAKE_CURRENT_BINARY_DIR@/@TOOL_PREFIX@pdc
 c_includedirs: @CMAKE_CURRENT_BINARY_DIR@/public-includes;@CMAKE_CURRENT_SOURCE_DIR@/runtime/c
 c_libdirs: @CMAKE_CURRENT_BINARY_DIR@
 c_libnames: @TOOL_PREFIX@pdcrt
+bpd_paths: @PSEUDOD_CURRENT_BINARY_DIR@

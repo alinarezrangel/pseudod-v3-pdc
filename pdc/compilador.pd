@@ -1,3 +1,5 @@
+[#variables-globales \__RT\]
+
 utilizar bepd/builtins
 utilizar bepd/datos/caja (Caja)
 utilizar bepd/datos/conjunto (Conjunto)
@@ -8,7 +10,7 @@ utilizar bepd/x/puerto (LeerTodo, EntradaEstándar, SalidaEstándar)
 utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo, CrearDirectorio, BorrarDirectorio, BorrarArchivo, Existe como ArchivoExiste)
 utilizar bepd/utilidades/arreglo (Únicos, Extender)
-utilizar bepd/utilidades/texto (TextoContiene, Partir, EsPrefijo, CortarONulo, CortarOTodo)
+utilizar bepd/utilidades/texto (TextoContiene, Partir, PartirSinVacíos, EsPrefijo, CortarONulo, CortarOTodo)
 utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal, LF, CR, HT)
 utilizar bepd/x/enum (Enum, EnumConValores)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
@@ -36,6 +38,16 @@ utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, Dependenci
 utilizar pdc/backend/c/revc (Compilar como CompilarAIr)
 utilizar pdc/info como Info
 utilizar pdc/subproceso como Subproceso
+utilizar pdc/cabeceras (ParsearCabeceras)
+
+
+variable RutaAlArchivoToolchain
+si __RT#contieneCaracterística: {VariableDeCompilación}
+    fijar RutaAlArchivoToolchain a VariableDeCompilación: {toolchain}
+    si RutaAlArchivoToolchain#longitud = 0
+        fijar RutaAlArchivoToolchain a NULO
+    finsi
+finsi
 
 
 clase BaseDeDatosDeCompilación
@@ -299,7 +311,8 @@ fijar OpcionesDeCompilación a TipoDeDatos: {OpcionesDeCompilación},
     {opcionesAdicionales}, [ OpcionesAdicionales ]
     {optimización}, [ Optimización ]
     {macros}, [ Arreglo de InstrucciónMacro ]
-    {paqueteAGuardarEnLaBibliotecaPseudoD} [ Texto o NULO ]
+    {paqueteAGuardarEnLaBibliotecaPseudoD}, [ Texto o NULO ]
+    {rutaAlToolchain} [ Texto o NULO ]
 
 metodo estatico OpcionesDeCompilación#predeterminado
     devolver yo#crear:
@@ -334,6 +347,7 @@ metodo estatico OpcionesDeCompilación#predeterminado
                                     Arreglo#vacio),
         Optimización#NINGUNA,
         Arreglo#vacio,
+        NULO,
         NULO
 finmetodo
 
@@ -1046,6 +1060,15 @@ funcion ProcesarCli: cli
                     devolver NULO
                 finsi
 
+                si arg = {--toolchain}
+                    fijar opciones#rutaAlToolchain a %avanzar
+                    devolver NULO
+                finsi
+                si ComienzaCon: {--toolchain=}, arg
+                    fijar opciones#rutaAlToolchain a arg#subTexto: {--toolchain=}#longitud, arg#longitud
+                    devolver NULO
+                finsi
+
                 si ComienzaCon: {-}, arg
                     devolver %salir: (ResultadoCli#error: ({Opción inválida: ~t}#formatear: arg))
                 finsi
@@ -1143,6 +1166,21 @@ procedimiento Ejecutar: verbosidad, programa, argumentos, opciones
     devolver Subproceso#Ejecutar: programa, argumentos, opciones
 finprocedimiento
 
+procedimiento LeerToolchain: ruta
+    si EsNulo: ruta
+        devolver Diccionario#vacío
+    sino
+        variable txt
+        [ TODO: TOCTOU ]
+        si ArchivoExiste: ruta
+            fijar txt a LeerArchivo: ruta
+            devolver ParsearCabeceras: txt
+        sino
+            devolver Diccionario#vacío
+        finsi
+    finsi
+finprocedimiento
+
 procedimiento EjecutarCompilador: cli
     variable rOpciones
     fijar rOpciones a ProcesarCli: cli
@@ -1197,13 +1235,21 @@ procedimiento EjecutarCompilador: cli
         NoImplementado
     finsi
 
-    variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo, variablesDeCompilación, usaDirTmp
+    variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo, variablesDeCompilación, usaDirTmp, toolchain
     fijar bdMod a BaseDeDatosDeMódulos#enMemoria
     fijar idcPasoPdPorMódulo a Diccionario#vacío
     fijar entradasCompiladas a Diccionario#vacío
     fijar dirTmp a {.pdc-build-~t}#formatear: Subproceso#ObtenerPid
     fijar limpiar a Arreglo#vacio
     fijar pasos a Arreglo#vacio
+
+    MensajeInformativo: opciones#verboso, {Ruta al toolchain}, RutaAlArchivoToolchain, opciones#rutaAlToolchain
+    si no EsNulo: opciones#rutaAlToolchain
+        fijar toolchain a LeerToolchain: opciones#rutaAlToolchain
+    sino
+        fijar toolchain a LeerToolchain: RutaAlArchivoToolchain
+    finsi
+    MensajeInformativo: opciones#verboso, {Toolchain}, toolchain
 
     fijar variablesDeCompilación a Diccionario#vacío
     ParaCadaElemento: opciones#macros, procedimiento: instr
@@ -1230,6 +1276,11 @@ procedimiento EjecutarCompilador: cli
                 BorrarDirectorio: dirTmp
             finprocedimiento
         finsi
+    finprocedimiento
+
+    ParaCadaElemento: (PartirSinVacíos: (toolchain#intentaEn: {bpd_dirs}, {}), {;}), procedimiento: dir
+        opciones#rutasDeBibliotecasPseudoD#agregarAlFinal: dir
+        MensajeDepuración: opciones#verboso, {-K implícito}, dir
     finprocedimiento
 
     ParaCadaElemento: opciones#usaBibliotecasPseudoD, procedimiento: uso
@@ -1550,6 +1601,24 @@ procedimiento EjecutarCompilador: cli
             opcionesCcAntes#agregarAlFinal: {-include}
             opcionesCcAntes#agregarAlFinal: macroInstr#ruta
         finsi
+    finprocedimiento
+
+    ParaCadaElemento: (PartirSinVacíos: (toolchain#intentaEn: {c_includedirs}, {}), {;}), procedimiento: dir
+        opcionesCcAntes#agregarAlFinal: {-I}
+        opcionesCcAntes#agregarAlFinal: dir
+        MensajeDepuración: opciones#verboso, {includedir}, dir
+    finprocedimiento
+
+    ParaCadaElemento: (PartirSinVacíos: (toolchain#intentaEn: {c_libdirs}, {}), {;}), procedimiento: dir
+        opcionesLdAntes#agregarAlFinal: {-L}
+        opcionesLdAntes#agregarAlFinal: dir
+        MensajeDepuración: opciones#verboso, {libdir}, dir
+    finprocedimiento
+
+    ParaCadaElemento: (PartirSinVacíos: (toolchain#intentaEn: {c_libnames}, {}), {;}), procedimiento: lib
+        opcionesLdDespués#agregarAlFinal: {-l}
+        opcionesLdDespués#agregarAlFinal: lib
+        MensajeDepuración: opciones#verboso, {libname}, lib
     finprocedimiento
 
     Extender: opcionesCcAntes, opciones#opcionesAdicionales#cc

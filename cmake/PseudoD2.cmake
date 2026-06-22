@@ -41,6 +41,9 @@ set(PSEUDOD_INFER_TOOLCHAIN_DESC "Debes configurar PSEUDOD_CURRENT_TOOLCHAIN par
 set(PSEUDOD_INFER_TOOLCHAIN_PDC "${PDC_EXECUTABLE}")
 set(PSEUDOD_INFER_TOOLCHAIN_C_LIBS "-lpdcrt")
 
+define_property(SOURCE PROPERTY PSEUDOD_COMPILE_OPTIONS
+        BRIEF_DOCS "Extra compilation options to use with pdc")
+
 function(pseudod_load_toolchain prefix contents)
     set(rest "${contents}")
     set("${prefix}_NAME" "<nombre desconocido>" PARENT_SCOPE)
@@ -159,6 +162,14 @@ function(add_pseudod_compile new_target_name)
             endforeach()
 
             string(REGEX REPLACE "[^a-zA-Z0-9_]" "_" module_id "${package}/${module}")
+            string(LENGTH "${PSEUDOD_SOURCE_DIR}" srclen)
+            string(REPEAT "." "${srclen}" strip_regex)
+            string(REGEX REPLACE "^${strip_regex}/+" "" rel_sfile "${sfile}")
+
+            get_property(compile_options SOURCE "${rel_sfile}" PROPERTY PSEUDOD_COMPILE_OPTIONS)
+            if("${compile_options}" STREQUAL "NOTFOUND")
+                set(compile_options "")
+            endif()
 
             add_custom_command(
                     OUTPUT "${ifile}" "${cfile}"
@@ -168,6 +179,7 @@ function(add_pseudod_compile new_target_name)
                     "${package}/${module}:${sfile}"
                     -o "${tcfile}"
                     -q "${package}/${module}:${tifile}"
+                    ${compile_options}
                     ${deps_args}
                     COMMAND ${CMAKE_COMMAND} -E rename "${tcfile}" "${cfile}"
                     COMMAND ${PYTHON_EXECUTABLE} ${PDC_REPLACE_JSON_SCRIPT} "${tifile}" "${ifile}"

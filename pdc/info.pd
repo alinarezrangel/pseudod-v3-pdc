@@ -8,4 +8,4 @@ variable IMPL_COMPILADOR
 fijar IMPL_COMPILADOR a {pdc C}
 
 variable CARACTERÍSTICAS
-fijar CARACTERÍSTICAS a Arreglo#crearCon: {pdc C}, {pdc C 3.0.0}
+fijar CARACTERÍSTICAS a Arreglo#crearCon: {pdc C}, {pdc C 3.0.0}, {VariableDeCompilación}, {ProcedimientoExterno}
