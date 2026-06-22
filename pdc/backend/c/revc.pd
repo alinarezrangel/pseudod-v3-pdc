@@ -58,7 +58,7 @@ procedimiento MatarRegistro: regDisp, reg
 finprocedimiento
 
 
-funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
+funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma, variablesDeCompilación
     variables locales, registrosDisponibles, constantesTextuales, contadorConstantes, bindingsLocales,
               bindingsCapturados, códigoActual, continuaciones, funciones, metadata, inicializadores
     fijar locales a Pila#vacía
@@ -511,6 +511,39 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma
                 fijar ffi a nodoFfi#expresión#valor
 
                 CompilarEnviarMensajeARegistro: destino, NULO, ffi, nodosArgs, FALSO, VERDADERO, M
+            finsi
+            si nodo#nombre = {variableDeCompilación}
+                fijar nodoOk a VERDADERO
+
+                si no nodo#argumentos#longitud = 1
+                    Escribir: {Error en}, nodo#áreaTextual
+                    __FallarConMensaje: {variableDeCompilación: el primer argumento debe ser la variable a obtener}
+                finsi
+
+                variables var, val, nodoVar
+
+                fijar nodoVar a nodo#argumentos#en: 0
+
+                si nodoVar#esVariadic
+                    Escribir: {Error en}, nodoVar#áreaTextual
+                    __FallarConMensaje: {variableDeCompilación: el primer argumento debe ser la variable a obtener}
+                finsi
+                si no EsInstancia: nodoVar#expresión, AST#NodoLiteralTextual
+                    Escribir: {Error en}, nodoVar#áreaTextual
+                    __FallarConMensaje: {variableDeCompilación: el primer argumento debe ser la variable a obtener}
+                finsi
+                fijar var a nodoVar#expresión#valor
+                si variablesDeCompilación#contiene: var
+                    fijar val a variablesDeCompilación#en: var
+                sino
+                    fijar val a {}
+                finsi
+
+                si destino#esParaRegistro
+                    variable const
+                    fijar const a RegistrarConstanteTextual: val
+                    Emitir: Opcode#texto, destino#registro, const, M
+                finsi
             finsi
             si (nodo#nombre#subTexto: 0, 3) = {rt:}
                 fijar nodoOk a VERDADERO

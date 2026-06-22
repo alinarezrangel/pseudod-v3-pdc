@@ -108,6 +108,7 @@ fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__RT}, {obtenerRuntime}, FALSO),
     (RegistrarBuiltin#crear: {__Impl}, {__Impl}, FALSO),
     (RegistrarBuiltin#crear: {ProcedimientoExterno}, {ffiC}, VERDADERO),
+    (RegistrarBuiltin#crear: {VariableDeCompilación}, {variableDeCompilación}, VERDADERO),
     (RegistrarBuiltin#crear: {VERDADERO}, {rt:VERDADERO}, FALSO),
     (RegistrarBuiltin#crear: {FALSO}, {rt:FALSO}, FALSO),
     (RegistrarBuiltin#crear: {NULO}, {rt:NULO}, FALSO),
@@ -136,7 +137,7 @@ fijar TODOS_LOS_BUILTINS a Arreglo#crearCon:
     (RegistrarBuiltin#crear: {__LeerCaracter}, {rt:__LeerCaracter}, VERDADERO),
     (RegistrarBuiltin#crear: {__Argv}, {rt:__Argv}, FALSO)
 
-procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, builtins, salidaCompilado, necesitaDependencia, verbosidad
+procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código, archivo, builtins, salidaCompilado, necesitaDependencia, verbosidad, variablesDeCompilación
     variables cst, tablaCst, ast, tablaAst, tablaNombres, parchesNombres,
               tablasRnCst, tablasRnAst, tablaEsCap, tablaCaps, tablaLoc,
               parchesAbstraer, ámbito, exportaciones, dependencias,
@@ -219,7 +220,7 @@ procedimiento Compilar: paquete, nombreDelMódulo, idDelMódulo, bdMod, código,
 
     MensajeDepuración: verbosidad, {-- Emitir}
     variable programa
-    fijar programa a CompilarAIr: tablasRnAst, tablasMcAst, bdMod, ast
+    fijar programa a CompilarAIr: tablasRnAst, tablasMcAst, bdMod, ast, variablesDeCompilación
 
     MensajeDepuración: verbosidad, {-- Buscar dependencias}
     fijar prefijoDelMódulo a PrefijoDelMódulo: idDelMódulo
@@ -1196,7 +1197,7 @@ procedimiento EjecutarCompilador: cli
         NoImplementado
     finsi
 
-    variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo
+    variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo, variablesDeCompilación, usaDirTmp
     fijar bdMod a BaseDeDatosDeMódulos#enMemoria
     fijar idcPasoPdPorMódulo a Diccionario#vacío
     fijar entradasCompiladas a Diccionario#vacío
@@ -1204,15 +1205,31 @@ procedimiento EjecutarCompilador: cli
     fijar limpiar a Arreglo#vacio
     fijar pasos a Arreglo#vacio
 
+    fijar variablesDeCompilación a Diccionario#vacío
+    ParaCadaElemento: opciones#macros, procedimiento: instr
+        si instr#esDefine
+            variablesDeCompilación#fijarEn: instr#nombre, instr#valor
+        finsi
+        si instr#esUndefine
+            variablesDeCompilación#eliminar: instr#nombre
+        finsi
+    finprocedimiento
+
     procedimiento AgregaInstrucciónLimpiar: proc
         limpiar#agregarAlFinal: proc
     finprocedimiento
 
-    MensajeComando: opciones#verboso, {mkdir}, dirTmp
-    CrearDirectorio: dirTmp
-    AgregaInstrucciónLimpiar: procedimiento
-        MensajeComando: opciones#verboso, {rmdir}, dirTmp
-        BorrarDirectorio: dirTmp
+    fijar usaDirTmp a FALSO
+    procedimiento GeneraDirTmp
+        si no usaDirTmp
+            fijar usaDirTmp a VERDADERO
+            MensajeComando: opciones#verboso, {mkdir}, dirTmp
+            CrearDirectorio: dirTmp
+            AgregaInstrucciónLimpiar: procedimiento
+                MensajeComando: opciones#verboso, {rmdir}, dirTmp
+                BorrarDirectorio: dirTmp
+            finprocedimiento
+        finsi
     finprocedimiento
 
     ParaCadaElemento: opciones#usaBibliotecasPseudoD, procedimiento: uso
@@ -1298,6 +1315,9 @@ procedimiento EjecutarCompilador: cli
                 fijar genObj a opciones#salidas#salidaCódigo
                 fijar parar a 2
             finsi
+            si parar > 0
+                GeneraDirTmp
+            finsi
 
             si entrada#esMódulo
                 idcPasoPdPorMódulo#fijarEn: ({~t/~t}#formatear: paquete, módulo), pasos#longitud
@@ -1349,6 +1369,9 @@ procedimiento EjecutarCompilador: cli
                 fijar genObj a opciones#salidas#salidaCódigo
                 fijar parar a 1
             finsi
+            si parar > 0
+                GeneraDirTmp
+            finsi
 
             pasos#agregarAlFinal:
                     (PasoDeCompilación#compilarC: (Caja#crear: FALSO),
@@ -1379,6 +1402,9 @@ procedimiento EjecutarCompilador: cli
             si opciones#emitirFormato = EmitirFormato#OBJETO
                 fijar genObj a opciones#salidas#salidaCódigo
                 fijar parar a 0
+            finsi
+            si parar > 0
+                GeneraDirTmp
             finsi
 
             pasos#agregarAlFinal:
@@ -1603,7 +1629,8 @@ procedimiento EjecutarCompilador: cli
                                   builtins,
                                   salida,
                                   &ProcesarMódulo,
-                                  opciones#verboso
+                                  opciones#verboso,
+                                  variablesDeCompilación
 
             salida#cerrar
 

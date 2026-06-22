@@ -1,0 +1,11 @@
+[#variables-globales \VariableDeCompilación\]
+
+variables FOO, BAR
+fijar FOO a VariableDeCompilación: {FOO}
+fijar BAR a VariableDeCompilación: {BAR}
+escribir {FOO=}
+escribir FOO
+nl
+escribir {BAR=}
+escribir BAR
+nl
