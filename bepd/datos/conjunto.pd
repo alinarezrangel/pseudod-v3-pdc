@@ -4,10 +4,9 @@ utilizar bepd/datos/diccionario (Diccionario)
 [DOCUMENTA
 @brief{Un conjunto de valores únicos.}
 
-Los conjuntos son inmutables, y no importa cuantas veces se les agrege el mismo
+Los conjuntos son inmutables, y no importa cuantas veces se les agregue el mismo
 elemento, siempre poseerán una única referencia a dicho. Usa un
-@pd{Diccionario} internamente, así que puede contener valores tanto hasheables
-(para mayor rendimiento) como simplemente comparables con @pd{\operador_=\}.
+@pd{Diccionario} internamente, así que debe contener valores hasheables.
 
 @ejemplo|{
 variable c
@@ -19,7 +18,7 @@ necesitas c = (Conjunto#conValores: 1, 2, 3, 4)
 Los conjuntos están optimizados para las siguientes operaciones:
 
 @itemlist(
-@item{@code{contiene}: Quizas la operación más importante de los conjuntos. Se
+@item{@code{contiene}: Quizás la operación más importante de los conjuntos. Se
 asume que será una de las más usadas.}
 
 @item{@code{unión}, @code{sin}: Las dos operaciones principales para manipular

@@ -12,20 +12,11 @@ Abre @pd{nombre} como un archivo de lectura binario, leyendo todo su contenido
 como el texto devuelto.
 DOCUMENTA]
 procedimiento LeerArchivo: nombre
-    variables pt, txt, car
+    variables pt, txt
     fijar pt a PDA#PuertoDeArchivoDeLectura#abrir: nombre
-    si __Impl = {Lua Bootstrap}
-        devolver pt#archivo#__leerTodo
-    sino
-        fijar txt a {}
-        fijar car a pt#leerCarácter
-        mientras no (car = Puerto#EOF)
-            fijar txt a txt#concatenar: car
-            fijar car a pt#leerCarácter
-        finmientras
-        pt#cerrar
-        devolver txt
-    finsi
+    fijar txt a pt#archivo#__leerTodo
+    pt#cerrar
+    devolver txt
 finprocedimiento
 
 
@@ -59,38 +50,29 @@ procedimiento EscribirArchivo: nombre, contenido
     pt#cerrar
 finprocedimiento
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{Crea un directorio con el @pd{nombre} dado.}
+
+Si el directorio ya exíste, falla con un error.
+DOCUMENTA]
 procedimiento CrearDirectorio: nombre
-    si __Impl = {Lua Bootstrap}
-        __Lua: «function(name)
-           local stat = require 'posix.sys.stat'
-           local errno = require 'posix.errno'
-           local ok, errmsg, errnum = stat.mkdir(name)
-           assert(ok or errnum == errno.EEXIST, errmsg)
-        end», nombre
-    sino
-        __RT#crearDirectorio: nombre
-    finsi
+    __RT#crearDirectorio: nombre
 finprocedimiento
 
+[DOCUMENTA
+@brief{Borra el archivo con el @pd{nombre} dado.}
+
+Si el archivo no pudo ser borrado, falla con un error.
+DOCUMENTA]
 procedimiento BorrarArchivo: nombre
-    si __Impl = {Lua Bootstrap}
-        __Lua: «function(name)
-           local unistd = require 'posix.unistd'
-           assert(unistd.unlink(name))
-        end», nombre
-    sino
-        __RT#borrarArchivo: nombre
-    finsi
+    __RT#borrarArchivo: nombre
 finprocedimiento
 
+[DOCUMENTA
+@brief{Borra el directorio con el @pd{nombre} dado.}
+
+Si el directorio no pudo ser borrado, falla con un error.
+DOCUMENTA]
 procedimiento BorrarDirectorio: nombre
-    si __Impl = {Lua Bootstrap}
-        __Lua: «function(name)
-           local unistd = require 'posix.unistd'
-           assert(unistd.rmdir(name))
-        end», nombre
-    sino
-        __RT#borrarDirectorio: nombre
-    finsi
+    __RT#borrarDirectorio: nombre
 finprocedimiento

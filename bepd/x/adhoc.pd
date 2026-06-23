@@ -32,10 +32,10 @@ necesitas obj#hola = 3
 necesitas obj#mundo = 2
 }|
 
-No los puedes, sin embargo, comparar por igualdad: los objetos ad-hoc no
-responden a ninguno de los mensajes @code{operador_=} ni @code{igualA}. Sin
-embargo, los objetos ad-hoc si se pueden clonar. También se pueden convertir a
-texto con @code{comoTexto}.
+No los puedes comparar por igualdad: los objetos ad-hoc no responden a ninguno
+de los mensajes @code{operador_=} ni @code{igualA}. Sin embargo, los objetos
+ad-hoc si se pueden clonar. También se pueden convertir a texto con
+@code{comoTexto}.
 
 La sintáxis de esta función es sencilla, similar a la de
 @pd{Diccionario#desdePares}: sus argumentos (@pd{...pares}) deben ser

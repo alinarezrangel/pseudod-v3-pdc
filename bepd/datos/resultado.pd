@@ -6,7 +6,7 @@ utilizar bepd/builtinsImpl
 Cada @pd{Resultado} puede estar en uno de dos valores distíntos: ok o error.
 
 Un resultado "ok" contiene un valor: el resultado de la operación, mientras
-que un resultado "error" contiene el error que sucedio al tratar de realizar
+que un resultado "error" contiene el error que sucedió al tratar de realizar
 la operación.
 DOCUMENTA]
 clase Resultado

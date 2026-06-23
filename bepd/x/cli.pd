@@ -1,38 +1,7 @@
 utilizar bepd/builtins
+utilizar bepd/utilidades/arreglo (ParaCadaElementoSaltando)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/enum (Enum)
-
-[DOCUMENTA
-@brief{Itera sobre un arreglo con intervalos variables.}
-
-Llama @pd{proc} sobre cada elemento del arreglo @pd{arr}. A diferencia de
-@pd{ParaCadaElemento}, @pd{proc} no solo es llamado con cada elemento, sino
-también con dos valores más:
-
-@itemlist(
-@item{Un índice, tal como @pd{ParaCadaElementoConÍndice}.}
-@item{Un procedimiento @pd{saltar}, que te permite ir a un índice dado.}
-)
-
-Es decir, @pd{proc} será llamado con tres valores al final.
-
-El procedimiento @pd{saltar} pide un argumento (un número entero) que será el
-nuevo índice para la iteración. Nota que @pd{saltar} es una @bold{salida no
-local}: luego de llamar a @pd{saltar} la ejecución saldrá de tu procedimiento
-(tal como, por ejemplo, llamar a la continuación de @pd{LlamarConEC}).
-DOCUMENTA]
-procedimiento ParaCadaElementoSaltando: arr, proc
-    variable i
-    fijar i a 0
-    mientras i < arr#longitud
-        variable inc
-        fijar inc a LlamarConEC: procedimiento: saltar
-            %proc: (arr#en: i), i, saltar
-            devolver i + 1
-        finprocedimiento
-        fijar i a inc
-    finmientras
-finprocedimiento
 
 [DOCUMENTA
 @brief{Tipo de opción procesada por el parser del CLI.}

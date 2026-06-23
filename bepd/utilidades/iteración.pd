@@ -1,41 +1,13 @@
 utilizar bepd/builtins
-utilizar bepd/x/adhoc
 
 
-procedimiento __ParaCadaElemento': cuerpo, arreglo, ...otrosArreglos
-    variable longitudMáx
-    fijar longitudMáx a Max: arreglo#longitud, (Mapear: otrosArreglos, (MétodoComoFunción: {longitud}))
-    ParaCadaNúmero: 0, longitudMáx, procedimiento: i
-        variable valor
-        fijar valor a %cuerpo: (arreglo#en: i),
-                               ...(Mapear: otrosArreglos,
-                                           funcion: arr
-                                               devolver arr#en: i
-                                           finfuncion)
-    finprocedimiento
-finprocedimiento
+[DOCUMENTA
+@brief{Calcula el mayor de los números en @pd{vals} (un @pd{Arreglo}).}
 
-funcion Mapear': func, arreglo, ...otrosArreglos
-    variable resultado
-    fijar resultado a Arreglo#vacio
-    __ParaCadaElemento': procedimiento: ...valores
-        resultado#agregarAlFinal: (%func: ...valores)
-    finprocedimiento, arreglo, ...otrosArreglos
-    devolver resultado
-finfuncion
+Similar a @pd{Max}, pero usa un arreglo en vez de sus argumentos.
 
-procedimiento ParaCadaElemento': ...arreglosYCuerpo
-    si arreglosYCuerpo#longitud < 2
-        __FallarConMensaje: ({ParaCadaElemento' requiere al menos 2 argumentos, pero solo especificastes ~t}#formatear: arreglosYCuerpo#longitud)
-    finsi
-    variables arreglos, cuerpo
-    fijar arreglos a PedazoDeArreglo: arreglosYCuerpo, 0, (arreglosYCuerpo#longitud - 2)
-    fijar cuerpo a arreglosYCuerpo#en: (arreglosYCuerpo#longitud - 1)
-    __ParaCadaElemento': procedimiento: ...valores
-        %cuerpo: ...valores
-    finprocedimiento, ...arreglos
-finprocedimiento
-
+@pd{vals} no puede estar vacío.
+DOCUMENTA]
 funcion Máximo: vals
     necesitas vals#longitud > 0
     variable max
@@ -48,6 +20,13 @@ funcion Máximo: vals
     devolver max
 finfuncion
 
+[DOCUMENTA
+@brief{Calcula el menor de los números en @pd{vals} (un @pd{Arreglo}).}
+
+Similar a @pd{Min}, pero usa un arreglo en vez de sus argumentos.
+
+@pd{vals} no puede estar vacío.
+DOCUMENTA]
 funcion Mínimo: vals
     necesitas vals#longitud > 0
     variable min
@@ -60,6 +39,11 @@ funcion Mínimo: vals
     devolver min
 finfuncion
 
+[DOCUMENTA
+@brief{Calcula el mayor de los elementos de @pd{vals}, o @pd{m} si este está vacío.}
+
+Similar a @pd{Máximo}, pero el arreglo puede estar vacío.
+DOCUMENTA]
 funcion MáximoCon: m, vals
     variable max
     fijar max a m
@@ -71,6 +55,11 @@ funcion MáximoCon: m, vals
     devolver max
 finfuncion
 
+[DOCUMENTA
+@brief{Calcula el menor de los elementos de @pd{vals}, o @pd{m} si este está vacío.}
+
+Similar a @pd{Mínimo}, pero el arreglo puede estar vacío.
+DOCUMENTA]
 funcion MínimoCon: m, vals
     variable min
     fijar min a m

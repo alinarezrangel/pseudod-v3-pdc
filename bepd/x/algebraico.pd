@@ -3,7 +3,7 @@ utilizar bepd/datos/diccionario (Diccionario)
 utilizar bepd/utilidades/arreglo (Únicos)
 utilizar bepd/utilidades/texto (Unir)
 utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII_MAYÚSCULAS, ALFABETO_ASCII_MINÚSCULAS)
-utilizar bepd/x/utf8 (ParaCadaCodepoint)
+utilizar bepd/utilidades/texto/utf8 (ParaCadaCodepoint)
 
 utilizar bepd/x/datos (TipoDeDatos)
 
@@ -25,7 +25,7 @@ fijar TABLA_MAYÚSCULAS a ALFABETO_ASCII_MAYÚSCULAS#concatenar: ESPECIALES_MAY�
 
 funcion Mayúscula: c
     [ FIXME: Estoy asumiendo que cada carácter en mayúsculas ocupa la misma
-      cantidad de codeunits que su equivalente en minúsculas ]
+       cantidad de codeunits que su equivalente en minúsculas ]
     variable i
     fijar i a TABLA_MINÚSCULAS#buscar: 0, c
     si EsNulo: i
@@ -69,11 +69,52 @@ finfuncion
 variable AlternativaImpl
 fijar AlternativaImpl a TipoDeDatos: {Alternativa}, {nombre}, {campos}
 
+[DOCUMENTA
+@brief{Declara una alternativa en un tipo algebraico.}
+
+Véase @pd{TipoAlgebraico} para más información.
+DOCUMENTA]
 funcion Alternativa: nombre, ...campos
     necesitas (Únicos: campos)#longitud = campos#longitud
     devolver AlternativaImpl#crear: nombre, campos
 finfuncion
 
+[DOCUMENTA
+@brief{Crea un tipo algebraico.}
+
+@pd{nombre} debe ser el nombre del tipo. Cada alternativa (creada con
+@pd{Alternativa}) será una variante del tipo. El nombre de la
+alternativa crea tanto un constructor como un método que determina
+si la variante es la activa (por ejemplo, una alternativa con nombre
+@pd{{hola}} creará un constructor @code{hola} y un discriminador
+@code{esHola}). Cada campo de la alternativa será un atributo.
+
+Los campos de las alternativas pueden estár repetidos entre
+alternativas distíntas, mas no dentro de la misma alternativa.
+
+Por ejemplo:
+
+@codeblock|{
+variable Componente
+fijar Componente a TipoAlgebraico: {Componente},
+    (Alternativa: {botón}, {texto}),
+    (Alternativa: {etiqueta}, {texto}),
+    (Alternativa: {caja}, {orientación}, {subcomponentes})
+
+variable ventana
+fijar ventana a Componente#caja: {vertical},
+    (Arreglo#crearCon:
+        (Componente#etiqueta: {Hola}),
+        (Componente#botón: {Salir}))
+
+necesitas ventana#esCaja
+necesitas ventana#orientación = {vertical}
+necesitas (ventana#subcomponentes#en: 0)#esEtiqueta
+necesitas (ventana#subcomponentes#en: 0)#texto = {Hola}
+necesitas (ventana#subcomponentes#en: 1)#esBotón
+necesitas (ventana#subcomponentes#en: 1)#texto = {Salir}
+}|
+DOCUMENTA]
 funcion TipoAlgebraico: nombre, ...alternativas
     variables camposPorTipo, atributosReales, númMaxCampos, mapeoDeCampos
     fijar camposPorTipo a Diccionario#vacío

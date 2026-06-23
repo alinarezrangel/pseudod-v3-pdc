@@ -11,7 +11,7 @@ utilizar bepd/x/puerto/deArchivo (PuertoDeArchivoDeEscritura)
 utilizar bepd/x/sistemaDeArchivos/archivo (LeerArchivo, CrearDirectorio, BorrarDirectorio, BorrarArchivo, Existe como ArchivoExiste)
 utilizar bepd/utilidades/arreglo (Únicos, Extender)
 utilizar bepd/utilidades/texto (TextoContiene, Partir, PartirSinVacíos, EsPrefijo, CortarONulo, CortarOTodo)
-utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal, LF, CR, HT)
+utilizar bepd/utilidades/texto/ascii (ALFABETO_ASCII, EsDígitoDecimal, LF, CR, HT, EsEspacio)
 utilizar bepd/x/enum (Enum, EnumConValores)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/puerto (SalidaEstándar)
@@ -20,6 +20,7 @@ utilizar bepd/x/datos2 (Modelo, CrearModelo)
 utilizar bepd/x/algebraico (Alternativa, TipoAlgebraico)
 utilizar bepd/x/cli (Opción, CLI como ProcesarCLI)
 utilizar bepd/x/entorno (ObtenerVariableDeEntorno)
+utilizar bepd/x/subproceso como Subproceso
 
 utilizar pdc/cst como CST
 utilizar pdc/ast como AST
@@ -37,7 +38,6 @@ utilizar pdc/módulos (Exportación, Módulo, BaseDeDatosDeMódulos)
 utilizar pdc/dependencias (ReferenciaAMódulo, InformaciónDeMódulo, DependenciasDelNodo)
 utilizar pdc/backend/c/revc (Compilar como CompilarAIr)
 utilizar pdc/info como Info
-utilizar pdc/subproceso como Subproceso
 utilizar pdc/cabeceras (ParsearCabeceras)
 
 
@@ -529,7 +529,7 @@ funcion PartirOpcionesDeArchivo: txtOpciones
 
         necesitas estado = {palabra}
 
-        si (c = LF) || (c = CR) || (c = HT) || (c = { })
+        si EsEspacio: c
             si buf?
                 cli#agregarAlFinal: buf
             finsi
@@ -1124,7 +1124,7 @@ finprocedimiento
 
 procedimiento InferirIdentificadorDelMódulo: rutaAlArchivo
     Escribir: {Debes especificar el identificador del módulo con -Zid $ID}
-    NoImplementado
+    SinImplementar
 finprocedimiento
 
 variable PasoDeCompilación
@@ -1209,9 +1209,9 @@ procedimiento EjecutarCompilador: cli
 
     si EsNulo: opciones#salidas#salidaCódigo
         si opciones#emitirFormato = EmitirFormato#BIBLIOTECA_PSEUDOD
-            si Algún: (Mapear: opciones#entradas, funcion: entrada
+            si ContienePredicado: opciones#entradas, funcion: entrada
                 devolver son diferentes entrada#lenguaje y Lenguaje#INTERFAZ_PSEUDOD
-            finfuncion)
+            finfuncion
                 __FallarConMensaje: {Cuando se compila código y se emite una biblioteca PseudoD, las salida general (-o) y de código (-Zco) deben ser especificadas por separado}
             finsi
         finsi
@@ -1232,7 +1232,7 @@ procedimiento EjecutarCompilador: cli
     finsi
 
     si opciones#emitirFormato = EmitirFormato#OBJETO_PSEUDOD
-        NoImplementado
+        SinImplementar
     finsi
 
     variables bdMod, entradasCompiladas, dirTmp, limpiar, pasos, idcPasoPdPorMódulo, variablesDeCompilación, usaDirTmp, toolchain
@@ -1316,7 +1316,7 @@ procedimiento EjecutarCompilador: cli
     ParaCadaElementoConÍndice: opciones#entradas, procedimiento: entrada, i
         si (entrada#lenguaje = Lenguaje#OBJETO_PSEUDOD)
         || (entrada#lenguaje = Lenguaje#BIBLIOTECA_PSEUDOD)
-            NoImplementado
+            SinImplementar
         finsi
 
         variable prefijoEntrada
@@ -1404,7 +1404,7 @@ procedimiento EjecutarCompilador: cli
 
         si (entrada#lenguaje = Lenguaje#C) || (entrada#lenguaje = Lenguaje#C_PREPROCESADO)
             si FormatoPrecedeA: opciones#emitirFormato, EmitirFormato#C
-                NoImplementado
+                SinImplementar
             finsi
 
             variables genAsm, genObj, parar
@@ -1443,7 +1443,7 @@ procedimiento EjecutarCompilador: cli
 
         si entrada#lenguaje = Lenguaje#ENSAMBLADOR
             si FormatoPrecedeA: opciones#emitirFormato, EmitirFormato#ENSAMBLADOR
-                NoImplementado
+                SinImplementar
             finsi
 
             variables genObj, parar

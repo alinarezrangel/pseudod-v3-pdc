@@ -57,12 +57,19 @@ finfuncion
 
 Devuelve un arreglo como @pd{arr} pero sin elementos duplicados. Además, el
 órden de los elementos no está especificado.
+
+@bold{Nota}: Los elementos deben ser hasheables.
 DOCUMENTA]
 funcion Únicos: arr
     devolver (Conjunto#desdeArreglo: arr)#comoArreglo
 finfuncion
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{Devuelve otro arreglo con los mismos elementos.}
+
+Crea un segundo arreglo, copia todos los elementos en el mismo órden y devuelve
+esta copia. Los elementos dentro del arreglo @bold{no son copiados}.
+DOCUMENTA]
 funcion ClonarSuperficialmente: arreglo
     variable arr
     fijar arr a Arreglo#vacio
@@ -105,9 +112,59 @@ procedimiento EliminarElemento: arreglo, índice
     arreglo#redimensionar: (arreglo#longitud - 1)
 finprocedimiento
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{Agrega todos los @pd{valores} al final de @pd{arr}.}
+
+Llama @pd{arr#agregarAlFinal} con todos los elementos de @pd{valores}.
+DOCUMENTA]
 procedimiento Extender: arr, valores
     ParaCadaElemento: valores, procedimiento: el
         arr#agregarAlFinal: el
+    finprocedimiento
+finprocedimiento
+
+[DOCUMENTA
+@brief{Itera sobre un arreglo con intervalos variables.}
+
+Llama @pd{proc} sobre cada elemento del arreglo @pd{arr}. A diferencia de
+@pd{ParaCadaElemento}, @pd{proc} no solo es llamado con cada elemento, sino
+también con dos valores más:
+
+@itemlist(
+@item{Un índice, tal como @pd{ParaCadaElementoConÍndice}.}
+@item{Un procedimiento @pd{saltar}, que te permite ir a un índice dado.}
+)
+
+Es decir, @pd{proc} será llamado con tres valores al final.
+
+El procedimiento @pd{saltar} pide un argumento (un número entero) que será el
+nuevo índice para la iteración. Nota que @pd{saltar} es una @bold{salida no
+local}: luego de llamar a @pd{saltar} la ejecución saldrá de tu procedimiento
+(tal como, por ejemplo, llamar a la continuación de @pd{LlamarConEC}).
+DOCUMENTA]
+procedimiento ParaCadaElementoSaltando: arr, proc
+    variable i
+    fijar i a 0
+    mientras i < arr#longitud
+        variable inc
+        fijar inc a LlamarConEC: procedimiento: saltar
+            %proc: (arr#en: i), i, saltar
+            devolver i + 1
+        finprocedimiento
+        fijar i a inc
+    finmientras
+finprocedimiento
+
+[DOCUMENTA
+@brief{Devuelve un arreglo con todos los elementos de @pd{arr} en el órden
+inverso.}
+DOCUMENTA]
+procedimiento RevertirArreglo: arr
+    ParaCadaNúmero: 0, (arr#longitud / 2)#piso, procedimiento: i
+        variables ri, el
+        fijar ri a arr#longitud - (i + 1)
+        fijar el a arr#en: i
+        arr#fijarEn: i, (arr#en: ri)
+        arr#fijarEn: ri, el
     finprocedimiento
 finprocedimiento

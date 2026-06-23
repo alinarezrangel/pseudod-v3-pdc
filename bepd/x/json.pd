@@ -1,11 +1,11 @@
 utilizar bepd/builtins
 utilizar bepd/datos/resultado (Resultado)
-utilizar bepd/datos/diccionario (ParaCadaParConOrden)
 utilizar bepd/utilidades/texto (TextoContiene, AjustarALaIzquierda)
 utilizar bepd/utilidades/texto/ascii (EsDígitoDecimal, LF, CR, HT)
 
 utilizar bepd/x/puerto (TextoComoPuerto, EOF, PuertoDeLectura, PuertoDeEscritura, PuertoParaTexto, TextoDePuertoDeEscritura)
-utilizar bepd/x/utf8 (EsSubrogadoAlto, EsSubrogadoBajo, SubrogadoACodepoint, CodepointACodeunit, REPLACEMENT_CHARACTER, ParaCadaCodepoint, NecesitaParSubrogado, CodepointASubrogado)
+utilizar bepd/utilidades/texto/utf8 (CodepointACodeunit, REPLACEMENT_CHARACTER, ParaCadaCodepoint)
+utilizar bepd/utilidades/texto/utf16 (EsSubrogadoAlto, EsSubrogadoBajo, SubrogadoACodepoint, NecesitaParSubrogado, CodepointASubrogado)
 utilizar bepd/x/control (Bucle)
 
 
@@ -693,7 +693,7 @@ procedimiento EscribirObjeto: salida, valor, error
     salida#escribirTexto: «{»
     variable primero
     fijar primero a VERDADERO
-    ParaCadaParConOrden: valor, procedimiento: llave, valor
+    valor#paraCadaPar: procedimiento: llave, valor
         si no primero
             salida#escribirTexto: {, }
         finsi

@@ -40,7 +40,7 @@ finfuncion
 Codepoint FFFD.
 DOCUMENTA]
 variable REPLACEMENT_CHARACTER_CODEPOINT
-fijar REPLACEMENT_CHARACTER_CODEPOINT a 65533
+fijar REPLACEMENT_CHARACTER_CODEPOINT a 65533 [ TODO Mover a un módulo bepd/utilidades/texto/unicode ]
 
 [DOCUMENTA
 @brief{El carácter de reemplazo, como un @pd{Texto}.}
@@ -61,84 +61,6 @@ funcion CodepointsATexto: ...codepoints
         fijar res a res#concatenar: (CodepointACodeunit: codepoint)
     finprocedimiento
     devolver res
-finfuncion
-
-[DOCUMENTA
-@brief{Convierte una secuencia de bytes a un texto.}
-
-Convierte todos los bytes con @pd{__ByteATexto} y los concatena en un texto que
-es devuelto.
-DOCUMENTA]
-funcion BytesATexto: ...bytes
-    variable res
-    fijar res a {}
-    ParaCadaElemento: bytes, procedimiento: byte
-        fijar res a res#concatenar: (__ByteATexto: byte)
-    finprocedimiento
-    devolver res
-finfuncion
-
-[DOCUMENTA
-@brief{Determina si @pd{codeunit} (un codeunit UTF-16) es la parte alta de un
-par subrogado.}
-DOCUMENTA]
-funcion EsSubrogadoAlto: codeunit
-    devolver (codeunit >= 55296) && (codeunit =< 56319)
-finfuncion
-
-[DOCUMENTA
-@brief{Determina si @pd{codeunit} (un codeunit UTF-16) es la parte baja de un
-par subrogado.}
-DOCUMENTA]
-funcion EsSubrogadoBajo: codeunit
-    devolver (codeunit >= 56320) && (codeunit =< 57343)
-finfuncion
-
-[DOCUMENTA
-@brief{Convierte un par subrogado a su codepoint.}
-
-@pd{alto} y @pd{bajo} son la parte alta y baja del par, respectivamente.
-
-@devuelve{Un @pd{Numero}, el codepoint.}
-DOCUMENTA]
-funcion SubrogadoACodepoint: alto, bajo
-    necesitas EsSubrogadoAlto: alto
-    necesitas EsSubrogadoBajo: bajo
-    devolver 65536 + (((alto <*> 1023) << 10) <+> (bajo <*> 1023))
-finfuncion
-
-[DOCUMENTA
-@brief{Clase que representa un par subrogado.}
-
-Tiene dos atributos, @code{alto} y @code{bajo}, ambos @pd{Numero}s con los
-codeunits (de UTF-16) del par subrogado.
-DOCUMENTA]
-variable ParSubrogado
-fijar ParSubrogado a TipoDeDatos: {ParSubrogado}, {alto}, {bajo}
-
-[DOCUMENTA
-@brief{Determina si el codepoint @pd{codepoint} necesita un par subrogado al
-codificarse en UTF-16.}
-DOCUMENTA]
-funcion NecesitaParSubrogado: codepoint
-    devolver (codepoint >= 65536) && (codepoint =< 1114111)
-finfuncion
-
-[DOCUMENTA
-@brief{Convierte un codepoint a un par subrogado.}
-
-El codepoint debe necesitar un par subrogado (codepoints menores a 65536 no
-serán aceptados).
-
-@devuelve{Un @pd{ParSubrogado}.}
-DOCUMENTA]
-funcion CodepointASubrogado: codepoint
-    necesitas NecesitaParSubrogado: codepoint
-    fijar codepoint a codepoint - 65536
-    variables alto, bajo
-    fijar alto a ((codepoint >> 10) <*> 1023) <+> 55296
-    fijar bajo a (codepoint <*> 1023) <+> 56320
-    devolver ParSubrogado#crear: alto, bajo
 finfuncion
 
 [DOCUMENTA

@@ -4,6 +4,8 @@ utilizar bepd/utilidades/arreglo (Únicos)
 
 utilizar bepd/utilidades/texto (Unir)
 
+[ TODO: Todo este módulo será eliminado cuando termine la gran desorientación-a-objetos. ]
+
 
 funcion CrearEstructura: nombre, ...campos
     clase Tipo

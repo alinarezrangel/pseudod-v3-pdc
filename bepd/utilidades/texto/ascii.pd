@@ -82,3 +82,35 @@ funcion Mayúscula: car
         devolver ALFABETO_ASCII_MAYÚSCULAS#en: i
     finsi
 finfuncion
+
+[DOCUMENTA
+@brief{Determina si @pd{car} (un carácter ASCII) es un espacio en blanco.}
+DOCUMENTA]
+funcion EsEspacio: car
+    devolver (car = { }) || (car = LF) || (car = CR) || (car = HT)
+finfuncion
+
+[DOCUMENTA
+@brief{Devuelve una copia de @pd{txt} sin espacios en blanco al inicio ni al
+final.}
+DOCUMENTA]
+funcion TextoSinEspacios: txt
+    variables i, inicio, final
+    fijar i a 0
+    fijar final a txt#longitud
+    mientras i < txt#longitud
+        variable c
+        fijar c a txt#en: i
+        si no EsEspacio: c
+            si EsNulo: inicio
+                fijar inicio a i
+            finsi
+            fijar final a i + 1
+        finsi
+        fijar i a i + 1
+    finmientras
+    si EsNulo: inicio
+        fijar inicio a final
+    finsi
+    devolver txt#parteDelTexto: inicio, final
+finfuncion

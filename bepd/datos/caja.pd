@@ -2,7 +2,7 @@
 @brief{Te permite mutar una referencia a un valor inmutable.}
 
 Los valores inmutables, como los números, textos o conjuntos, no permiten ser
-mutados. Pero imagina, por ejemplo, que quieres llevar cuenta de un número en
+mutados. Imagina, por ejemplo, que quieres llevar cuenta de un número en
 un cálculo:
 
 @ejemplo|{

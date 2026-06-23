@@ -149,9 +149,9 @@ Los condicionales estáticos son los condicionales de la forma:
 
 @ejemplo|{
 si __Impl = {bootstrap}
-    NoImplementado
+    SinImplementar
 sino
-    NoImplementado
+    SinImplementar
 finsi
 }|
 
@@ -354,10 +354,11 @@ clase TablasDeResoluciónDeNombres
 finclase
 
 [DOCUMENTA
-@brief{Determina si la condicion es estática.}
+@brief{Determina si la condición es estática.}
 
 Una condición estática compara el builtin @code{__Impl} con una literal
-textual.
+textual, o llama a @code{__RT#contieneCaracterística} con un texto, o
+es la negación (@code{no EXPR}) de una de las anteriores.
 
 @devuelve{@pd{NULO} si la condición no es estática. De serlo, devuelve
 @pd{VERDADERO} o @pd{FALSO} dependiendo de que rama del condicional debe ser

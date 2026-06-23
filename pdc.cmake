@@ -9,9 +9,6 @@ pseudod_collection(col_bepd
         bepd/datos/caja.pd
         bepd/datos/conjunto.pd
         bepd/datos/diccionario.pd
-        bepd/datos/diccionario/alist.pd
-        bepd/datos/diccionario/hashmap.pd
-        bepd/datos/diccionario/interfaz.pd
         bepd/datos/pila.pd
         bepd/datos/resultado.pd
         bepd/intrinsics.pd
@@ -19,6 +16,8 @@ pseudod_collection(col_bepd
         bepd/utilidades/iteración.pd
         bepd/utilidades/texto.pd
         bepd/utilidades/texto/ascii.pd
+        bepd/utilidades/texto/utf8.pd
+        bepd/utilidades/texto/utf16.pd
         bepd/x/adhoc.pd
         bepd/x/algebraico.pd
         bepd/x/cli.pd
@@ -36,7 +35,7 @@ pseudod_collection(col_bepd
         bepd/x/sexpr.pd
         bepd/x/sistemaDeArchivos/archivo.pd
         bepd/x/sistemaDeArchivos/rutas.pd
-        bepd/x/utf8.pd
+        bepd/x/subproceso.pd
 )
 
 pseudod_collection(col_pdc
@@ -62,7 +61,6 @@ pseudod_collection(col_pdc
         pdc/tokenizador.pd
         pdc/tokens.pd
         pdc/validación.pd
-        pdc/subproceso.pd
         pdc/cabeceras.pd
 )
 

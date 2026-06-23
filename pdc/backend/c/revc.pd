@@ -1,6 +1,5 @@
 utilizar bepd/builtins
-utilizar bepd/datos/caja (Caja)
-utilizar bepd/datos/pila (Pila)
+utilizar bepd/utilidades/arreglo (RevertirArreglo)
 utilizar bepd/x/adhoc (ObjetoAdHoc)
 utilizar bepd/x/algebraico (TipoAlgebraico, Alternativa)
 utilizar bepd/x/datos (TipoDeDatos)
@@ -12,17 +11,6 @@ utilizar pdc/tabla (EscribirTabla)
 utilizar pdc/backend/c/ir (Opcode, FunciónIR, Parámetro, Argumento, Retorno, Constante, TipoConstante, Etiqueta, ContinuaciónIR, ProgramaIR, EscribirPrograma)
 utilizar pdc/catamorfismos (Buscando)
 utilizar pdc/info (IMPL_COMPILADOR)
-
-
-procedimiento RevertirArreglo: arr
-    ParaCadaNúmero: 0, (arr#longitud / 2)#piso, procedimiento: i
-        variables ri, el
-        fijar ri a arr#longitud - (i + 1)
-        fijar el a arr#en: i
-        arr#fijarEn: i, (arr#en: ri)
-        arr#fijarEn: ri, el
-    finprocedimiento
-finprocedimiento
 
 
 variable Destino
@@ -566,13 +554,13 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma, variablesDeComp
 
             si no nodoOk
                 Escribir: {Builtin}, nodo, nodo#áreaTextual
-                NoImplementado
+                SinImplementar
             finsi
         finsi
 
         si no nodoProcesado
             Escribir: {Nodo sin procesar}, nodo, nodo#áreaTextual
-            NoImplementado
+            SinImplementar
         finsi
     finprocedimiento
 
@@ -662,7 +650,7 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma, variablesDeComp
         si esFfi
             necesitas EsNulo: regObj
             si esTailCall
-                NoImplementado
+                SinImplementar
             sino
                 Emitir: Opcode#ffiC_s2, rets, mensaje, args, M
                 Emitir: Opcode#ffiC_s1, rets, mensaje, args, M
@@ -776,13 +764,13 @@ funcion Compilar: tablasRnAst, tablasMcAst, bdMod, nodoPrograma, variablesDeComp
             fijar reg a tablasRnAst#tablaDefiniciones#intentaBuscarÚnico: {idNodo}, nodo#id
             si EsNulo: reg
                 Escribir: nodo
-                NoImplementado
+                SinImplementar
             finsi
         sino
             fijar reg a tablasRnAst#tablaUsos#intentaBuscarÚnico: {idNodo}, nodo#id
             si EsNulo: reg
                 Escribir: nodo
-                NoImplementado
+                SinImplementar
             finsi
         finsi
         devolver reg#binding

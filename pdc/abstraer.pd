@@ -425,7 +425,7 @@ funcion Abstraer: nodoCst, tablaCst, tablasRnCst, tablasRnAst, parches, ámbitoA
 
         si EsInstancia: proc, AST#NodoBuiltin
             [ FIXME: No debería estar fijando un campo, ya que los nodos
-              deberían ser inmutables. ]
+               deberían ser inmutables. ]
             fijar proc#argumentos a abstraerArgumentos: nodoCst#argumentos
             devolver proc
         sino

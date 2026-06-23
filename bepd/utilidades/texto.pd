@@ -136,36 +136,7 @@ necesitas
 }|
 DOCUMENTA]
 funcion Unir: textos, separador
-    si __Impl = {Lua Bootstrap}
-        devolver __Lua: {function(textos, separador)
-assert(rt.pdtypeof(textos) == "objeto")
-assert(textos.__pd_arreglo)
-local vals, n = textos.attrs[rt.ARREGLO_ATTRS_IDX], textos.attrs[rt.ARREGLO_ATTRS_IDX].n
-return table.concat(vals, separador, 0, n - 1)
-end}, textos, separador
-    sino
-        si __Impl = {pdc C}
-            devolver textos#unir: separador
-        sino
-            variable res
-            fijar res a Reducir: NULO, funcion: acc, el
-                variable sep
-                si acc = NULO
-                    fijar sep a {}
-                    fijar acc a {}
-                sino
-                    fijar sep a separador
-                finsi
-                devolver {~t~t~t}#formatear: acc, sep, el
-            finfuncion, textos
-
-            si EsNulo: res
-                devolver {}
-            sino
-                devolver res
-            finsi
-        finsi
-    finsi
+    devolver textos#unir: separador
 finfuncion
 
 [DOCUMENTA
@@ -203,16 +174,10 @@ finfuncion
 [DOCUMENTA
 @brief{Determina si el @pd{Texto} @pd{A} es menor que @pd{B}.}
 
-TODO: Documenta el órden.
+Utiliza órden lexicográfico.
 DOCUMENTA]
 funcion TextoMenorQue: A, B
-    si __Impl = {Lua Bootstrap}
-        devolver __Lua: {function(a, b)
-           return a < b
-        end}, A, B
-    sino
-        devolver A < B
-    finsi
+    devolver A < B
 finfuncion
 
 [DOCUMENTA
@@ -285,16 +250,36 @@ funcion AjustarALaDerecha: texto, relleno, longitud
     devolver texto
 finfuncion
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{El resultado de cortar un texto.}
+
+Véase @pd{CortarONulo} y @pd{CortarOTodo}.
+DOCUMENTA]
 clase Corte
-    atributos antes, después
+    [DOCUMENTA
+    @brief{El texto antes del corte.}
+    DOCUMENTA]
+    atributo antes
+
+    [DOCUMENTA
+    @brief{El texto después del corte.}
+    DOCUMENTA]
+    atributo después
 finclase
 
 metodo Corte#comoTexto
     devolver {(Corte [~t] | [~t])}#formatear: yo#antes, yo#después
 finmetodo
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{Corta un texto.}
+
+Busca la primera aparición de @pd{parte} dentro del @pd{texto}. Selecciona
+todo el subtexto antes y después de dicha aparición (excluyendo @pd{parte})
+y devuelve un @pd{Corte} con las dos mitades.
+
+Si @pd{parte} no se encuentra en @pd{texto}, devuelve @pd{NULO}.
+DOCUMENTA]
 funcion CortarONulo: texto, parte
     variables p, corte
     fijar p a texto#buscar: 0, parte
@@ -303,12 +288,21 @@ funcion CortarONulo: texto, parte
     sino
         fijar corte a Corte#crear
         fijar corte#antes a texto#subTexto: 0, p
-        fijar corte#después a texto#subTexto: (p + 1), texto#longitud
+        fijar corte#después a texto#subTexto: (p + parte#longitud), texto#longitud
         devolver corte
     finsi
 finfuncion
 
-[ TODO: Documentar ]
+[DOCUMENTA
+@brief{Corta un texto.}
+
+Busca la primera aparición de @pd{parte} dentro del @pd{texto}. Selecciona
+todo el subtexto antes y después de dicha aparición (excluyendo @pd{parte})
+y devuelve un @pd{Corte} con las dos mitades.
+
+Si @pd{parte} no se encuentra en @pd{texto}, devuelve un @pd{Corte} cuyo
+@code{#antes} es todo el @pd{texto} y @code{#después} es un texto vacío.
+DOCUMENTA]
 funcion CortarOTodo: texto, parte
     variables p, corte
     fijar corte a Corte#crear
@@ -318,7 +312,22 @@ funcion CortarOTodo: texto, parte
         fijar corte#después a {}
     sino
         fijar corte#antes a texto#subTexto: 0, p
-        fijar corte#después a texto#subTexto: (p + 1), texto#longitud
+        fijar corte#después a texto#subTexto: (p + parte#longitud), texto#longitud
     finsi
     devolver corte
+finfuncion
+
+[DOCUMENTA
+@brief{Convierte una secuencia de bytes a un texto.}
+
+Convierte todos los bytes con @pd{__ByteATexto} y los concatena en un texto que
+es devuelto.
+DOCUMENTA]
+funcion BytesATexto: ...bytes
+    variable res
+    fijar res a {}
+    ParaCadaElemento: bytes, procedimiento: byte
+        fijar res a res#concatenar: (__ByteATexto: byte)
+    finprocedimiento
+    devolver res
 finfuncion

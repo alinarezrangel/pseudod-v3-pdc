@@ -23,8 +23,6 @@ transitivas) de este módulo.}
 
 @defparam("programa"){El @pd{ProgramaIR} a compilar.}
 )
-
-@devuelve{Nada.}
 DOCUMENTA]
 procedimiento CompilarPrograma: puertoDeEscritura, identificadorDelMódulo, identificadoresDeDependencias, programa
     EmitirLínea: puertoDeEscritura, {#define PDCRT_INTERNO}
@@ -150,8 +148,7 @@ procedimiento CompilarFunción: puerto, identificadorDelMódulo, func, metadataG
     si (func#parámetros#longitud =< 6) && (EsNulo: idcVariadic)
         EmitirLínea: puerto, {if(PDCRT_POCO_PROBABLE(args != }, func#parámetros#longitud, {)) pdcrt_errortb(ctx, m, u8"función llamada de forma inválida");}
         ParaCadaElementoConÍndice: func#parámetros, procedimiento: p, i
-            [ TODO: barrera de escritura ]
-            EmitirLínea: puerto, {m->registros[}, p#registro, {] = pdcrt_obj_desde_xmm(a}, (i + 1), {);}
+            EmitirLínea: puerto, {pdcrt_fijar_local_nb(ctx, m, }, p#registro, {, pdcrt_obj_desde_xmm(a}, (i + 1), {));}
         finprocedimiento
     sino
         EmitirLínea: puerto, «struct », fid, « { const pdcrt_params_base base; const pdcrt_param_data params[», (Max: 1, func#parámetros#longitud), «]; };»
@@ -248,7 +245,7 @@ procedimiento CompilarTupla: puerto, identificadorDelMódulo, tupla, metadataGlo
         necesitas rets#longitud = 1
         necesitas no (rets#en: 0)#esVariadic
 
-        fijar tieneArgsVariadic a Algún: (Mapear: args, (MétodoComoFunción: {esVariadic}))
+        fijar tieneArgsVariadic a ContienePredicado: args, (MétodoComoFunción: {esVariadic})
         si tieneArgsVariadic
             EmitirLínea: puerto, {static const int proto[] =}
             Emitir: puerto, «{ »

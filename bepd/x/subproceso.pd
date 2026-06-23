@@ -1,0 +1,36 @@
+[#variables-globales \__RT\]
+utilizar bepd/builtins
+
+utilizar bepd/utilidades/arreglo (Insertar)
+
+utilizar bepd/x/enum (Enum)
+utilizar bepd/x/adhoc (ObjetoAdHoc)
+utilizar bepd/x/datos (TipoDeDatos)
+utilizar bepd/x/algebraico (Alternativa, TipoAlgebraico)
+utilizar bepd/x/datos2 (CrearModelo, Modelo)
+
+
+
+variable ResultadoEjecutar
+fijar ResultadoEjecutar a CrearModelo: {ResultadoEjecutar}, {CódigoDeEstado}
+
+variable OpcionesEjecutar
+fijar OpcionesEjecutar a CrearModelo: {OpcionesEjecutar}, {NombreDelPrograma}
+
+procedimiento Ejecutar: ejecutable, argumentos, opciones
+    variables argv0, estado
+    fijar argv0 a OpcionesEjecutar#NombreDelPrograma: opciones, ejecutable
+    si EsInstancia: argumentos, Arreglo
+        Insertar: argumentos, 0, argv0
+    finsi
+    fijar estado a __RT#ejecutar: ejecutable, argumentos, NULO
+    si (estado#en: 0) = {ok}
+        devolver Modelo#Crear: ResultadoEjecutar#CódigoDeEstado, (estado#en: 1)
+    sino
+        devolver Modelo#Crear: ResultadoEjecutar#CódigoDeEstado, 125
+    finsi
+finprocedimiento
+
+procedimiento ObtenerPid
+    devolver __RT#obtenerPid
+finprocedimiento

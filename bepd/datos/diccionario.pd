@@ -1,329 +1,278 @@
 [#variables-globales \__RT\]
 
 utilizar bepd/builtinsImpl
-utilizar bepd/datos/diccionario/interfaz (IDiccionario)
-utilizar bepd/datos/diccionario/alist (DiccionarioAlist)
 
 [DOCUMENTA
-@brief{Diccionario eficiente.}
+@brief{Mapea llaves a valores.}
 
-Se recomienda que uses esta clase en vez de usar manualmente las demás
-implementaciones de @pd{IDiccionario}.
+Un diccionario mapea elementos únicos (las llaves) a valores.
 
-Este diccionario utiliza @pd{DiccionarioAList} y @pd{DiccionarioHashMap} del
-módulo @pd{bepd/datos/diccionario/hashmap} (solo disponible en Lua) para
-proveer una implementación de la interfaz de @pd{IDiccionario} que es eficiente
-y portable.
+Este diccionario solo puede tener objetos hasheables como llaves. Los
+objetos hasheables son los enteros, floats, textos, booleanos y
+@pd{NULO}.
 
-Para la documentación de los métodos, véase @pd{IDiccionario}.
+@warn{
+@warntitle{Advertencia de iteración}
 
-Este diccionario puede poseer cualquier objeto comparable con @code{operador_=}
-o @code{igualA} como llave, pero las llaves hasheables son más eficientes.
+Diversos métodos de la interfaz @pd{IDiccionario} iteran sobre una instancia de
+dicho. La iteración sobre un diccionario tiene algunas restricciones que son
+muy importantes a la hora de escribir código correcto:
 
-El orden de iteración de este diccionario @bold{no está determinado}. Es
-posible para el diccionario iterar de forma aleatoria incluso dentro de la
-ejecución de un mismo programa.
-
-Si no se está compilando para Lua, @pd{Diccionario} utilizará automáticamente
-@pd{DiccionarioAList}. Para cualquier futura optimización a los diccionarios,
-@pd{Diccionario} siempre se mantendrá compilable a todas las plataformas
-soportadas al mismo tiempo que implementa dichas optimizaciones.
+@itemlist(
+@item{@bold{El order no está garantizado}. Ni siquiera durante llamadas a
+la misma instancia. Es completamente posible que la primera iteración vea
+primero la llave @pd{1} y luego @pd{2} y que la segunda iteración vea el
+orden contrario.}
+@item{@bold{No se puede modificar el diccionario}. Tratar de modificar el
+diccionario ya sea eliminando, agregando o transformando cualquier llave
+tendrá resultados impredecibles. La única operación destructiva válida es
+@pd{Diccionario#fijarEn} sobre una llave que ya existe.}
+)
+}
 DOCUMENTA]
-clase Diccionario hereda IDiccionario
+clase Diccionario
+    [DOCUMENTA
+    @brief{Determina si @pd{valor} es un diccionario.}
+    DOCUMENTA]
+    metodo estatico esDiccionario: valor
+
+    [DOCUMENTA
+    @brief{Crea y devuelve un diccionario vacío.}
+    DOCUMENTA]
     metodo estatico vacío
+
+    [DOCUMENTA
+    @brief{Crea y devuelve un diccionario desde un arreglo.}
+
+    El arreglo @param{arr} debe contener arreglos de dos elementos, donde el
+    primero de estos será utilizado como la llave y el segundo como el valor.
+
+    Por ejemplo, para crear un diccionario que mapea @pd|{{hola}}| a @pd{12}
+    y @pd{5} a @pd{NULO}:
+
+    @ejemplo|{
+    Diccionario#desdeArreglo:
+        (Arreglo#crearCon:
+            (Arreglo#crearCon: {hola}, 12),
+            (Arreglo#crearCon: 5, NULO))
+    }|
+    DOCUMENTA]
     metodo estatico desdeArreglo: arr
+
+    [DOCUMENTA
+    @brief{Crea un diccionario con los pares especificados.}
+
+    Similar a @pd{Diccionario#desdeArreglo} pero los valores son
+    especificados directamente en la llamada. Por ejemplo, para crear el mismo
+    diccionario del ejemplo anterior:
+
+    @ejemplo|{
+    Diccionario#desdePares:
+        {hola}, 12,
+        5, NULO
+    }|
+
+    Este método es más cómodo para crear diccionarios "a mano".
+
+    @params(
+    @defparam(valores){Debe ser un número par de argumentos. El primero de
+    cada par será una llave y el segundo un valor.}
+    )
+    DOCUMENTA]
     metodo estatico desdePares: ...valores
+
+    [DOCUMENTA
+    @brief{Obtiene el valor de una llave.}
+
+    Si la llave no existe en este diccionario un error es lanzado.
+    DOCUMENTA]
+    metodo en: llave
+
+    [DOCUMENTA
+    @brief{Obtiene el valor de una llave.}
+
+    Si la llave no existe en este diccionario devuelve @pd{predeterminado}.
+    DOCUMENTA]
+    metodo intentaEn: llave, predeterminado
+
+    [DOCUMENTA
+    @brief{Cambia el valor asociado a una llave.}
+
+    El nuevo valor de @param{llave} será @param{valor} y el anterior valor
+    será eliminado del diccionario.
+    DOCUMENTA]
+    metodo fijarEn: llave, valor
+
+    [DOCUMENTA
+    @brief{Transforma el par indicado por @param{llave}.}
+
+    Aplica @param{proc} al valor anteriormente asociado con la llave
+    @param{llave} y el valor devuelto por @param{proc} es asociado como el
+    nuevo valor de la llave.
+
+    Por ejemplo, si @pd{dic} es un diccionario, el siguiente ejemplo le suma
+    1 al valor asociado con la llave @pd|{{nombre}}|:
+
+    @ejemplo|{
+    dic#transformarPar: {nombre}, funcion: valorViejo
+        devolver valorViejo + 1
+    finfuncion
+    }|
+
+    Si la llave no existe en este diccionario un error es lanzado.
+    DOCUMENTA]
+    metodo transformarPar: llave, proc
+
+    [DOCUMENTA
+    @brief{Elimina la llave y su valor de este diccionario.}
+    DOCUMENTA]
+    metodo eliminar: llave
+
+    [DOCUMENTA
+    @brief{Determina si este diccionario contiene una llave.}
+
+    @devuelve{@pd{VERDADERO} si este diccionario contiene @param{llave},
+    @pd{FALSO} de otra forma.}
+    DOCUMENTA]
+    metodo contiene: llave
+
+    [DOCUMENTA
+    @brief{Elimina todas las llaves y valores de este diccionario.}
+    DOCUMENTA]
+    metodo vaciar
+
+    [DOCUMENTA
+    @brief{Devuelve la cantidad de pares de este diccionario.}
+
+    Cada mapeo de una llave a un valor es un "par" o "mapeo". Este método
+    devuelve la cantidad de estos mapeos.
+    DOCUMENTA]
+    metodo longitud
+
+    [DOCUMENTA
+    @brief{Convierte este diccionario a un @pd{Texto}.}
+    DOCUMENTA]
+    metodo comoTexto
+
+    [DOCUMENTA
+    @brief{Convierte este diccionario a un @pd{Arreglo}.}
+
+    El arreglo devuelto está en el mismo formato que el aceptado por
+    @pd{Diccionario#desdeArreglo}.
+    DOCUMENTA]
+    metodo comoArreglo
+
+    [DOCUMENTA
+    @brief{Itera sobre cada par de este diccionario.}
+
+    Llama a @param{proc} con dos argumentos: el primero es la llave de un mapeo
+    y el segundo es el valor de dicho.
+
+    Véase la nota en la documentación de la clase @pd{Diccionario} para una
+    advertencia sobre iterar sobre diccionarios.
+    DOCUMENTA]
+    metodo paraCadaPar: proc
+
+    [DOCUMENTA
+    @brief{Itera sobre cada llave de este diccionario.}
+
+    Llama a @param{proc} por cada par con la llave de dicho par como único
+    argumento.
+
+    Véase la nota en la documentación de la clase @pd{Diccionario} para una
+    advertencia sobre iterar sobre diccionarios.
+    DOCUMENTA]
+    metodo paraCadaLlave: proc
+
+    [DOCUMENTA
+    @brief{Itera sobre cada valor de este diccionario.}
+
+    Llama a @param{proc} por cada par con el valor de dicho par como único
+    argumento.
+
+    Véase la nota en la documentación de la clase @pd{Diccionario} para una
+    advertencia sobre iterar sobre diccionarios.
+    DOCUMENTA]
+    metodo paraCadaValor: proc
+
+    [DOCUMENTA
+    @brief{Reduce este diccionario a un nuevo valor.}
+
+    Para cada par, @param{proc} es llamado con 3 argumentos:
+
+    @itemlist(
+    @item{El @italic{acumulador}. La primera iteración este es @param{ini}.}
+    @item{La llave del par.}
+    @item{El valor del par}
+    )
+
+    El valor devuelto por @param{proc} será utilizado como acumulador para la
+    siguiente iteración.
+
+    @devuelve{@param{ini} si el diccionario está vació, o el acumulador luevo
+    de aplicar el procedimiento anteriormente descrito.}
+    DOCUMENTA]
+    metodo reducir: ini, proc
+
+    [DOCUMENTA
+    @brief{Transforma imperativamente cada par del diccionario.}
+
+    Itera y llama a @param{proc} de la misma manera que
+    @pd{Diccionario#paraCadaPar}, pero el valor devuelto por @param{proc} debe
+    ser un @pd{Arreglo} de dos elementos donde el primero será la nueva llave
+    del par sobre el que se está iterando y el segundo será el nuevo valor
+    de dicho.
+
+    Algunas restricciones sobre @param{proc}:
+
+    @itemlist(
+    @item{@param{proc} no debe duplicar llaves. Durante la llamada a este
+    método @param{proc} nunca debe devolver dos veces la misma llave.}
+    @item{Las llaves devueltas por @param{proc} deben seguir las mismas
+    restricciones que las demás llaves de un diccionario.}
+    )
+    DOCUMENTA]
+    metodo transformar: proc
+
+    [DOCUMENTA
+    @brief{Mapea un diccionario.}
+
+    Similar a @pd{Diccionario#transformar} pero no modifica este diccionario.
+    En cambio, crea una copia, la transforma y luego la devuelve.
+    DOCUMENTA]
+    metodo mapear: proc
 finclase
 
-[ TODO: En el compilador a Lua, los métodos estáticos no son heredados. ]
 metodo estatico Diccionario#esDiccionario: valor
-    devolver IDiccionario#esDiccionario: valor
-finmetodo
-
-[ Sobre la implementación en Lua: Las llaves hasheables se mantienen en `_hash`
-  mientras que todas las demás están en `_alist`. Esto requiere un poco de
-  cuidado en todas las operaciones, pero funciona muy bien.
-
-  El único problema es que los diccionarios hash no están disponibles en el
-  intérprete: en ese caso `_hash` siempre será `NULO`. De nuevo, esto requiere
-  cuidado.
-
-  En pdcrt: los diccionarios solo son tablas hash (`Tabla`). ]
-
-atributos Diccionario#_hash, Diccionario#_alist
-
-metodo estatico Diccionario#_crearDesdeImpls: hash, alist
-    si __Impl = {Lua Bootstrap}
-        necesitas no EsNulo: hash
-    finsi
-    necesitas no EsNulo: alist
-    variable inst
-    fijar inst a yo#crear
-    fijar inst#_hash a hash
-    fijar inst#_alist a alist
-    devolver inst
+    devolver (EsInstancia: valor, Diccionario)
+          || (EsInstancia: valor, __RT#Tabla)
 finmetodo
 
 metodo estatico Diccionario#vacío
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (DiccionarioHashMap, HashMap)
-        devolver yo#_crearDesdeImpls: DiccionarioHashMap#vacío, DiccionarioAlist#vacío
-    sino
-        si __Impl = {pdc C}
-            devolver __RT#crearTabla: 0
-        sino
-            devolver yo#_crearDesdeImpls: NULO, DiccionarioAlist#vacío
-        finsi
-    finsi
+    devolver __RT#crearTabla: 0
 finmetodo
 
 metodo estatico Diccionario#desdeArreglo: arr
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (DiccionarioHashMap, HashMap)
-        variables hasheables, otros
-        fijar hasheables a Arreglo#vacío
-        fijar otros a Arreglo#vacío
-        ParaCadaElemento: arr, procedimiento: el
-            si HashMap#puedeTenerDeLlave: (el#en: 0)
-                hasheables#agregarAlFinal: el
-            sino
-                otros#agregarAlFinal: el
-            finsi
-        finprocedimiento
-        devolver yo#_crearDesdeImpls:
-            (DiccionarioHashMap#desdeArreglo: hasheables),
-            (DiccionarioAlist#desdeArreglo: otros)
-    sino
-        si __Impl = {pdc C}
-            variable tbl
-            fijar tbl a __RT#crearTabla: arr#longitud
-            ParaCadaElemento: arr, procedimiento: par
-                necesitas par#longitud = 2
-                tbl#fijarEn: (par#en: 0), (par#en: 1)
-            finprocedimiento
-            devolver tbl
-        sino
-            devolver yo#_crearDesdeImpls: NULO, (DiccionarioAlist#desdeArreglo: arr)
-        finsi
-    finsi
+    variable tbl
+    fijar tbl a __RT#crearTabla: arr#longitud
+    ParaCadaElemento: arr, procedimiento: par
+        necesitas par#longitud = 2
+        tbl#fijarEn: (par#en: 0), (par#en: 1)
+    finprocedimiento
+    devolver tbl
 finmetodo
 
 metodo estatico Diccionario#desdePares: ...valores
     necesitas EsPar: valores#longitud
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (DiccionarioHashMap, HashMap)
-        variables hasheables, otros, i
-        fijar hasheables a Arreglo#vacío
-        fijar otros a Arreglo#vacío
-        fijar i a 0
-        mientras i < valores#longitud
-            variables ll, v
-            fijar ll a valores#en: i
-            fijar v a valores#en: (i + 1)
-            si HashMap#puedeTenerDeLlave: ll
-                hasheables#agregarAlFinal: (Arreglo#crearCon: ll, v)
-            sino
-                otros#agregarAlFinal: (Arreglo#crearCon: ll, v)
-            finsi
-            fijar i a i + 2
-        finmientras
-        devolver yo#_crearDesdeImpls:
-            (DiccionarioHashMap#desdeArreglo: hasheables),
-            (DiccionarioAlist#desdeArreglo: otros)
-    sino
-        si __Impl = {pdc C}
-            variables i, tbl
-            fijar i a 0
-            fijar tbl a __RT#crearTabla: (valores#longitud / 2)
-            mientras i < valores#longitud
-                variables ll, v
-                fijar ll a valores#en: i
-                fijar v a valores#en: (i + 1)
-                tbl#fijarEn: ll, v
-                fijar i a i + 2
-            finmientras
-            devolver tbl
-        sino
-            devolver yo#_crearDesdeImpls: NULO, (DiccionarioAlist#desdePares: ...valores)
-        finsi
-    finsi
+    variables i, tbl
+    fijar i a 0
+    fijar tbl a __RT#crearTabla: (valores#longitud / 2)
+    mientras i < valores#longitud
+        variables ll, v
+        fijar ll a valores#en: i
+        fijar v a valores#en: (i + 1)
+        tbl#fijarEn: ll, v
+        fijar i a i + 2
+    finmientras
+    devolver tbl
 finmetodo
-
-metodo Diccionario#_estáEnHashMap: llave
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (DiccionarioHashMap, HashMap)
-        si HashMap#puedeTenerDeLlave: llave
-            devolver yo#_hash#contiene: llave
-        sino
-            devolver FALSO
-        finsi
-    sino
-        devolver FALSO
-    finsi
-finmetodo
-
-metodo Diccionario#_dispatch: nombreMétodo, llave, ...argumentos
-    si yo#_estáEnHashMap: llave
-        devolver __EnviarMensaje: yo#_hash, nombreMétodo, (ArregloConFinal: llave, argumentos)
-    sino
-        devolver __EnviarMensaje: yo#_alist, nombreMétodo, (ArregloConFinal: llave, argumentos)
-    finsi
-finmetodo
-
-metodo Diccionario#en: llave
-    devolver yo#_dispatch: {en}, llave
-finmetodo
-
-metodo Diccionario#intentaEn: llave, predeterminado
-    devolver yo#_dispatch: {intentaEn}, llave, predeterminado
-finmetodo
-
-metodo Diccionario#fijarEn: llave, nuevoValor
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (HashMap)
-        si HashMap#puedeTenerDeLlave: llave
-            devolver yo#_hash#fijarEn: llave, nuevoValor
-        sino
-            devolver yo#_alist#fijarEn: llave, nuevoValor
-        finsi
-    sino
-        devolver yo#_dispatch: {fijarEn}, llave, nuevoValor
-    finsi
-finmetodo
-
-metodo Diccionario#transformarPar: llave, proc
-    devolver yo#_dispatch: {transformarPar}, llave, proc
-finmetodo
-
-metodo Diccionario#eliminar: llave
-    devolver yo#_dispatch: {eliminar}, llave
-finmetodo
-
-metodo Diccionario#contiene: llave
-    devolver yo#_dispatch: {contiene}, llave
-finmetodo
-
-metodo Diccionario#vaciar
-    si __Impl = {Lua Bootstrap}
-        yo#_hash#vaciar
-    finsi
-    yo#_alist#vaciar
-finmetodo
-
-metodo Diccionario#longitud
-    si __Impl = {Lua Bootstrap}
-        devolver yo#_hash#longitud + yo#_alist#longitud
-    sino
-        devolver yo#_alist#longitud
-    finsi
-finmetodo
-
-metodo Diccionario#comoTexto
-    variable res
-    fijar res a {(Diccionario#desdePares: }
-    si __Impl = {Lua Bootstrap}
-        yo#_hash#paraCadaPar: procedimiento: ll, v
-            fijar res a res#concatenar: ((ll#comoTexto#concatenar: ({, }#concatenar: v#comoTexto))#concatenar: {, })
-        finprocedimiento
-    finsi
-    yo#_alist#paraCadaPar: procedimiento: ll, v
-        fijar res a res#concatenar: ((ll#comoTexto#concatenar: ({, }#concatenar: v#comoTexto))#concatenar: {, })
-    finprocedimiento
-    devolver res#concatenar: {)}
-finmetodo
-
-metodo Diccionario#comoArreglo
-    si __Impl = {Lua Bootstrap}
-        devolver Concatenar: yo#_hash#comoArreglo, yo#_alist#comoArreglo
-    sino
-        devolver yo#_alist#comoArreglo
-    finsi
-finmetodo
-
-metodo Diccionario#paraCadaPar: proc
-    si __Impl = {Lua Bootstrap}
-        yo#_hash#paraCadaPar: proc
-        yo#_alist#paraCadaPar: proc
-    sino
-        devolver yo#_alist#paraCadaPar: proc
-    finsi
-finmetodo
-
-metodo Diccionario#paraCadaLlave: proc
-    si __Impl = {Lua Bootstrap}
-        yo#_hash#paraCadaLlave: proc
-        yo#_alist#paraCadaLlave: proc
-    sino
-        devolver yo#_alist#paraCadaLlave: proc
-    finsi
-finmetodo
-
-metodo Diccionario#paraCadaValor: proc
-    si __Impl = {Lua Bootstrap}
-        yo#_hash#paraCadaValor: proc
-        yo#_alist#paraCadaValor: proc
-    sino
-        devolver yo#_alist#paraCadaValor: proc
-    finsi
-finmetodo
-
-metodo Diccionario#reducir: ini, proc
-    si __Impl = {Lua Bootstrap}
-        devolver yo#_alist#reducir: (yo#_hash#reducir: ini, proc), proc
-    sino
-        devolver yo#_alist#reducir: ini, proc
-    finsi
-finmetodo
-
-metodo Diccionario#transformar: proc
-    si __Impl = {Lua Bootstrap}
-        utilizar bepd/datos/diccionario/hashmap (DiccionarioHashMap, HashMap)
-        variables hasheables, otros
-        fijar hasheables a Arreglo#vacio
-        fijar otros a Arreglo#vacio
-        yo#_hash#paraCadaPar: procedimiento: ll, v
-            variable res
-            fijar res a %proc: ll, v
-            si HashMap#puedeTenerDeLlave: (res#en: 0)
-                hasheables#agregarAlFinal: res
-            sino
-                otros#agregarAlFinal: res
-            finsi
-        finprocedimiento
-        fijar yo#_hash a DiccionarioHashMap#desdeArreglo: hasheables
-        fijar yo#_alist a DiccionarioAlist#desdeArreglo: otros
-    sino
-        devolver yo#_alist#transformar: proc
-    finsi
-finmetodo
-
-metodo Diccionario#mapear: proc
-    si __Impl = {Lua Bootstrap}
-        variable clon
-        fijar clon a yo#\clonar\
-        clon#transformar: proc
-        devolver clon
-    sino
-        devolver Diccionario#_crearDesdeImpls: NULO, (yo#_alist#mapear: proc)
-    finsi
-finmetodo
-
-
-[DOCUMENTA
-@brief{Itera sobre un @pd{Diccionario} con orden determinista.}
-
-Como indica la documentación de @pd{DiccionarioHashMap}, el orden de iteración
-de @pd{Diccionario} no está determinado. Con esté procedimiento (que emula a
-@code{paraCadaPar}), el orden es de iteración es determinista.
-
-@pd{dic} es el @pd{Diccionario} mientras que @pd{proc} es un procedimiento de
-la misma forma que el esperado por @code{paraCadaPar}.
-DOCUMENTA]
-procedimiento ParaCadaParConOrden: dic, proc
-    si __Impl = {Lua Bootstrap}
-        dic#_hash#_tabla#paraCadaParConOrden: proc
-        dic#_alist#paraCadaPar: proc
-    sino
-        dic#paraCadaPar: proc
-    finsi
-finprocedimiento

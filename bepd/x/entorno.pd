@@ -8,7 +8,7 @@ No todas las implementaciones de PseudoD pueden leer las variables de
 entorno.
 DOCUMENTA]
 funcion SoportaVariablesDeEntorno
-    devolver (__Impl = {Lua Bootstrap}) || (__Impl = {pdc C})
+    devolver VERDADERO
 finfuncion
 
 
@@ -19,9 +19,5 @@ finfuncion
 la variable (siempre es otro texto) o @pd{NULO} si la variable no existe.
 DOCUMENTA]
 procedimiento ObtenerVariableDeEntorno: nombre
-    si __Impl = {Lua Bootstrap}
-        devolver __Lua: {os.getenv}, nombre
-    sino
-        devolver __RT#obtenerVariableDeEntorno: nombre
-    finsi
+    devolver __RT#obtenerVariableDeEntorno: nombre
 finprocedimiento
